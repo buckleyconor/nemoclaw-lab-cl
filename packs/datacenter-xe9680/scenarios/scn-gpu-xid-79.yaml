@@ -1,0 +1,33 @@
+# Scenario: GPU Xid 79 — GPU has fallen off the bus
+# PLACEHOLDER — SME to verify signatures and replace KB article with real Dell content.
+id: scn-gpu-xid-79
+pack_id: datacenter-xe9680
+target_asset: gpu-server-02
+fault_type: gpu_xid
+
+emit:
+  event:
+    severity: Critical
+    message_id: "OEM.1.0.GPUFault"
+  log_entries:
+    - severity: Critical
+      message: "GPU0: Xid 79: GPU has fallen off the bus"
+    - severity: Critical
+      message: "NVRM: Xid (PCI:0000:3b:00): 79, pid='<unknown>', name=<unknown>"
+
+log_bundle_ref: bundles/scn-gpu-xid-79.log
+
+# SME-provided canonical signatures used for deterministic KB fallback.
+error_signatures:
+  - "Xid 79"
+  - "GPU has fallen off the bus"
+
+kb_article_ref: kb/KB000123.md
+
+remediation_steps:
+  - id: drain_node
+    label: "Cordon and drain affected node"
+  - id: gpu_reset
+    label: "Issue GPU reset via iDRAC"
+  - id: verify_health
+    label: "Re-run DCGM health check"

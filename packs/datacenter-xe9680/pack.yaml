@@ -1,0 +1,11 @@
+id: datacenter-xe9680
+name: "Dell XE9680 GPU Cluster"
+asset_noun:
+  singular: server
+  plural: servers
+fleet_label: "Cluster Health"
+monitoring_adapter: redfish
+theme: dell-nvidia
+assets:
+  - id: gpu-server-01
+  - id: gpu-server-02

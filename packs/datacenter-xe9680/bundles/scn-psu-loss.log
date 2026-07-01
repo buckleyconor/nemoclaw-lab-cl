@@ -1,0 +1,17 @@
+# PLACEHOLDER LOG BUNDLE — scn-psu-loss
+# SME: replace with real iDRAC Lifecycle Log from an XE9680 exhibiting PSU redundancy loss.
+# Required signatures present: "PSU 2 input lost", "power supply failure"
+
+2024-01-17T03:10:00Z INFO  iDRAC[LifecycleLog]: System power healthy. PSU 1: 1100W, PSU 2: 1100W, PSU 3: 1100W, PSU 4: 1100W
+2024-01-17T03:10:00Z INFO  iDRAC[LifecycleLog]: PDU A and PDU B feeds nominal. Redundancy: 2+2
+2024-01-17T03:10:30Z INFO  iDRAC[LifecycleLog]: GPU workload steady. Total system draw: 3840W of 4400W available
+2024-01-17T03:11:00Z INFO  iDRAC[LifecycleLog]: Thermal: all inlet temps 22°C, all fans at 45%
+2024-01-17T03:11:45Z WARN  iDRAC[LifecycleLog]: PSU.1.0.InputVoltageWarning — PSU 2: input voltage fluctuation detected (199V, threshold 200V)
+2024-01-17T03:11:47Z CRIT  iDRAC[LifecycleLog]: PSU 2 input power lost — redundancy degraded
+2024-01-17T03:11:47Z CRIT  iDRAC[LifecycleLog]: OEM.1.0.PSULost — Power supply failure on PSU 2. System now operating on 3 of 4 PSUs.
+2024-01-17T03:11:47Z WARN  iDRAC[LifecycleLog]: System operating on single PSU; workload at risk
+2024-01-17T03:11:48Z WARN  iDRAC[LifecycleLog]: power supply failure — PSU 2 removed from active pool
+2024-01-17T03:11:48Z INFO  iDRAC[LifecycleLog]: Remaining capacity: PSU 1 (1100W), PSU 3 (1100W), PSU 4 (1100W) = 3300W. Current draw 3840W — OVER CAPACITY
+2024-01-17T03:11:49Z CRIT  iDRAC[LifecycleLog]: Power budget exceeded. Initiating GPU power capping.
+2024-01-17T03:11:49Z WARN  dcgm[1234]: GPU power limits reduced: all GPUs capped at 300W (was 400W)
+2024-01-17T03:11:50Z INFO  iDRAC[LifecycleLog]: Alert: Critical PSU event on gpu-server-01. Immediate attention required.

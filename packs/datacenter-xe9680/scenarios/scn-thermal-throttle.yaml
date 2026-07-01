@@ -1,0 +1,32 @@
+# Scenario: GPU thermal throttle — GPU temperature threshold exceeded
+# PLACEHOLDER — SME to verify signatures and replace KB article with real Dell content.
+id: scn-thermal-throttle
+pack_id: datacenter-xe9680
+target_asset: gpu-server-01
+fault_type: thermal_throttle
+
+emit:
+  event:
+    severity: Warning
+    message_id: "OEM.1.0.ThermalThrottle"
+  log_entries:
+    - severity: Warning
+      message: "GPU3: thermal throttle active — temperature 89°C exceeds 85°C threshold"
+    - severity: Warning
+      message: "GPU temperature threshold exceeded: performance throttled to prevent damage"
+
+log_bundle_ref: bundles/scn-thermal-throttle.log
+
+error_signatures:
+  - "thermal throttle"
+  - "GPU temperature threshold exceeded"
+
+kb_article_ref: kb/KB001213.md
+
+remediation_steps:
+  - id: reduce_workload
+    label: "Reduce GPU workload to lower temperature"
+  - id: check_cooling
+    label: "Verify fan speeds and inlet temperature via iDRAC"
+  - id: verify_temps
+    label: "Confirm GPU temperature below threshold after cooling"

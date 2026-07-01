@@ -1,0 +1,32 @@
+# Scenario: Uncorrectable ECC memory error (double-bit error on GPU HBM)
+# PLACEHOLDER — SME to verify signatures and replace KB article with real Dell content.
+id: scn-ecc-uncorrectable
+pack_id: datacenter-xe9680
+target_asset: gpu-server-01
+fault_type: gpu_ecc
+
+emit:
+  event:
+    severity: Critical
+    message_id: "OEM.1.0.MemUCE"
+  log_entries:
+    - severity: Critical
+      message: "GPU1: Uncorrectable ECC error detected on HBM bank 3"
+    - severity: Warning
+      message: "DCGM_FI_DEV_ECC_DBE_VOL_TOTAL exceeded threshold on GPU 1"
+
+log_bundle_ref: bundles/scn-ecc-uncorrectable.log
+
+error_signatures:
+  - "ECC uncorrectable error"
+  - "DCGM_FI_DEV_ECC_DBE_VOL_TOTAL"
+
+kb_article_ref: kb/KB000456.md
+
+remediation_steps:
+  - id: drain_node
+    label: "Cordon and drain affected node"
+  - id: ecc_reset
+    label: "Reset GPU ECC counters and clear fault"
+  - id: verify_health
+    label: "Re-run DCGM ECC diagnostic"

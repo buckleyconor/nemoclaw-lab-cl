@@ -1,0 +1,18 @@
+# PLACEHOLDER LOG BUNDLE — scn-nvlink-down
+# SME: replace with real iDRAC Lifecycle Log + DCGM log from an XE9680 with NVLink failure.
+# Required signatures present: "NVLink fabric failure", "nvlink_recovery_error"
+
+2024-01-18T11:00:00Z INFO  dcgm[1234]: NVLink fabric healthy. 16 links active on gpu-server-02.
+2024-01-18T11:00:00Z INFO  nvidia-smi[1235]: NVSwitch 0: all 64 ports UP, BW 900 GB/s/link
+2024-01-18T11:01:00Z INFO  dcgm[1234]: GPU 0<->GPU 1 NVLink bandwidth: 895 GB/s (healthy)
+2024-01-18T11:02:30Z INFO  dcgm[1234]: GPU collective comm (NCCL) healthy. AllReduce latency 2.1ms
+2024-01-18T11:03:00Z INFO  nvidia-smi[1235]: NVSwitch 0: fabric throughput 6.8 TB/s
+2024-01-18T11:04:15Z WARN  nvidia-smi[1235]: NVSwitch 0: Port 4 (GPU0): CRC error rate elevated — 1.2e-6 (threshold 1e-6)
+2024-01-18T11:04:20Z WARN  nvidia-smi[1235]: NVSwitch 0: Port 4 entering recovery mode
+2024-01-18T11:04:22Z CRIT  dcgm[1234]: NVLink fabric failure: link GPU0<->GPU1 is down (nvlink_recovery_error)
+2024-01-18T11:04:22Z CRIT  kernel[  743.009812]: NVRM: nvlink_recovery_error on NVSwitch port 4 (GPU 0, link 0)
+2024-01-18T11:04:22Z CRIT  dcgm[1234]: DCGM: NVLink error count exceeded threshold on GPU pair (0,1)
+2024-01-18T11:04:23Z ERROR iDRAC[LifecycleLog]: OEM.1.0.NVLinkDown — NVLink fabric failure detected. GPU 0 link 0 down. Severity: Critical.
+2024-01-18T11:04:23Z WARN  scheduler[5678]: Distributed workload on gpu-server-02 suspended — NVLink fabric degraded
+2024-01-18T11:04:24Z WARN  dcgm[1234]: NCCL AllReduce timeout — NVLink unavailable for GPU 0,1
+2024-01-18T11:04:24Z INFO  kubelet[9012]: gpu-server-02: NVLink fault reported — flagging for inspection

@@ -1,0 +1,27 @@
+# PLACEHOLDER LOG BUNDLE — scn-gpu-xid-79
+# SME: replace with real iDRAC Lifecycle Log + DCGM log excerpt from an XE9680 exhibiting Xid 79.
+# Required signatures present: "Xid 79", "GPU has fallen off the bus"
+
+2024-01-15T09:20:00Z INFO  dcgm[1234]: Health monitoring started. Watching 8 GPUs on gpu-server-02.
+2024-01-15T09:20:01Z INFO  dcgm[1234]: Driver version 535.129.03, CUDA 12.3
+2024-01-15T09:20:05Z INFO  dcgm[1234]: GPU 0 (H100 SXM5 80GB): healthy. Temp 58°C, Power 240W
+2024-01-15T09:20:05Z INFO  dcgm[1234]: GPU 1 (H100 SXM5 80GB): healthy. Temp 61°C, Power 255W
+2024-01-15T09:20:05Z INFO  dcgm[1234]: GPU 2 (H100 SXM5 80GB): healthy. Temp 57°C, Power 248W
+2024-01-15T09:20:05Z INFO  dcgm[1234]: GPU 3 (H100 SXM5 80GB): healthy. Temp 60°C, Power 251W
+2024-01-15T09:20:05Z INFO  dcgm[1234]: NVLink fabric: all links healthy (16 links checked)
+2024-01-15T09:21:00Z INFO  dcgm[1234]: GPU 0: mem bandwidth 72 GB/s, compute 88%
+2024-01-15T09:21:00Z INFO  dcgm[1234]: GPU 1: mem bandwidth 69 GB/s, compute 91%
+2024-01-15T09:22:15Z INFO  nvidia-smi[1235]: All 8 GPUs reporting healthy state
+2024-01-15T09:22:30Z INFO  dcgm[1234]: ECC error counts stable. DBE vol: 0 on all GPUs.
+2024-01-15T09:23:38Z WARN  kernel[  583.447211]: pciehp 0000:00:1c.7:pcie204: Slot(204): Attention button pressed
+2024-01-15T09:23:39Z WARN  kernel[  584.101834]: pciehp 0000:00:1c.7:pcie204: Slot(204): Card not present
+2024-01-15T09:23:40Z CRIT  kernel[  584.882043]: NVRM: Xid (PCI:0000:3b:00): 79, pid='<unknown>', name=<unknown>, GPU-60ded90b-1a2b-3c4d-5e6f-7a8b9c0d1e2f
+2024-01-15T09:23:40Z CRIT  dcgm[1234]: GPU 0 (bus 0x3b): GPU has fallen off the bus — Xid error 79
+2024-01-15T09:23:40Z CRIT  dcgm[1234]: GPU 0 health FAILED: GPU_XIDDB_79
+2024-01-15T09:23:41Z ERROR iDRAC[LifecycleLog]: GPU.1.0.GpuXidError — GPU 0 critical Xid 79 fault detected (PCI 0000:3b:00)
+2024-01-15T09:23:41Z CRIT  nvidia-smi[1235]: GPU-60ded90b-1a2b-3c4d-5e6f-7a8b9c0d1e2f: Not Found (Xid 79)
+2024-01-15T09:23:41Z ERROR iDRAC[LifecycleLog]: OEM.1.0.GPUFault — Critical hardware fault on GPU 0, severity: Critical
+2024-01-15T09:23:42Z WARN  scheduler[5678]: Workload on gpu-server-02 GPU 0 suspended — device unavailable
+2024-01-15T09:23:42Z INFO  kubelet[9012]: Node gpu-server-02: GPU 0 removed from allocatable resources
+2024-01-15T09:23:43Z ERROR dcgm[1234]: Removing GPU 0 from health watch — device lost
+2024-01-15T09:23:43Z INFO  iDRAC[LifecycleLog]: Alert raised: Critical hardware event on gpu-server-02 GPU 0

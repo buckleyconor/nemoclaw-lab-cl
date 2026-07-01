@@ -1,0 +1,14 @@
+pack_id: datacenter-xe9680
+assets:
+  - id: gpu-server-01
+    type: server
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 8
+  - id: gpu-server-02
+    type: server
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 8

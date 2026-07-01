@@ -1,0 +1,32 @@
+# Scenario: NVLink fabric link failure between GPUs
+# PLACEHOLDER — SME to verify signatures and replace KB article with real Dell content.
+id: scn-nvlink-down
+pack_id: datacenter-xe9680
+target_asset: gpu-server-02
+fault_type: nvlink_failure
+
+emit:
+  event:
+    severity: Critical
+    message_id: "OEM.1.0.NVLinkDown"
+  log_entries:
+    - severity: Critical
+      message: "NVLink fabric failure: link GPU0<->GPU1 is down (nvlink_recovery_error)"
+    - severity: Error
+      message: "DCGM: NVLink error count exceeded threshold on GPU pair (0,1)"
+
+log_bundle_ref: bundles/scn-nvlink-down.log
+
+error_signatures:
+  - "NVLink fabric failure"
+  - "nvlink_recovery_error"
+
+kb_article_ref: kb/KB001011.md
+
+remediation_steps:
+  - id: drain_node
+    label: "Cordon and drain affected node"
+  - id: nvlink_reset
+    label: "Reset NVLink fabric via iDRAC"
+  - id: verify_fabric
+    label: "Run nvidia-smi nvlink --status to confirm recovery"

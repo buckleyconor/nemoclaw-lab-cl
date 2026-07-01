@@ -1,0 +1,32 @@
+# Scenario: PSU redundancy loss — power supply 2 input failure
+# PLACEHOLDER — SME to verify signatures and replace KB article with real Dell content.
+id: scn-psu-loss
+pack_id: datacenter-xe9680
+target_asset: gpu-server-01
+fault_type: psu_failure
+
+emit:
+  event:
+    severity: Critical
+    message_id: "OEM.1.0.PSULost"
+  log_entries:
+    - severity: Critical
+      message: "PSU 2 input power lost — redundancy degraded"
+    - severity: Warning
+      message: "System operating on single PSU; workload at risk"
+
+log_bundle_ref: bundles/scn-psu-loss.log
+
+error_signatures:
+  - "PSU 2 input lost"
+  - "power supply failure"
+
+kb_article_ref: kb/KB000789.md
+
+remediation_steps:
+  - id: acknowledge_alert
+    label: "Acknowledge PSU fault in iDRAC"
+  - id: schedule_maintenance
+    label: "Schedule PSU replacement with facilities"
+  - id: verify_redundancy
+    label: "Confirm remaining PSU load within limits"
