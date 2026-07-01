@@ -1,21 +1,37 @@
-"""MonitoringAdapter protocol — the interface all adapters must satisfy."""
+"""MonitoringAdapter protocol — the interface all adapters must satisfy.
+
+The agent calls ``monitor.list_events()`` and is identical across all
+packs. Adapters translate between pack-specific surfaces (Redfish for
+datacenter, generic REST for laptops/rigs) and this common shape.
+"""
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Protocol
 
-from libs.common.models import _Placeholder as Asset  # replaced in M1
+
+@dataclass
+class MonitorAsset:
+    id: str
+    type: str
+    state: str  # "healthy" | "faulted"
 
 
-class Event(_Placeholder):  # noqa: F821 — replaced in M1
-    pass
+@dataclass
+class MonitorEvent:
+    asset_id: str
+    severity: str
+    message: str
+    message_id: str
+    ts: str
 
 
 class MonitoringAdapter(Protocol):
     """Vertical-blind monitoring interface. Implemented by redfish.py and generic.py."""
 
-    async def list_assets(self) -> list[Asset]: ...
+    async def list_assets(self) -> list[MonitorAsset]: ...
 
-    async def list_events(self, asset_id: str | None = None) -> list[Event]: ...
+    async def list_events(self, asset_id: str | None = None) -> list[MonitorEvent]: ...
 
-    async def get_asset(self, asset_id: str) -> Asset: ...
+    async def get_asset(self, asset_id: str) -> MonitorAsset: ...
