@@ -1,0 +1,27 @@
+id: scn-fabric-link-down
+pack_id: network-fabric
+target_asset: leaf-01
+fault_type: link_down
+status: scaffold
+
+emit:
+  event:
+    severity: Critical
+    message_id: "NET.1.0.LinkDown"
+  log_entries:
+    - severity: Critical
+      message: "Link down detected on Ethernet1/1 — scaffold placeholder"
+
+log_bundle_ref: bundles/scn-fabric-link-down.log
+
+error_signatures:
+  - "link down"
+  - "LinkDown"
+
+kb_article_ref: kb/KB200001.md
+
+remediation_steps:
+  - id: check_cable
+    label: "Inspect physical cable on Ethernet1/1"
+  - id: bounce_interface
+    label: "Bounce the interface to re-negotiate link"

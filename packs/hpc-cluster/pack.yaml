@@ -1,0 +1,11 @@
+id: hpc-cluster
+name: "HPC Cluster Nodes"
+asset_noun:
+  singular: node
+  plural: nodes
+fleet_label: "Cluster Health"
+monitoring_adapter: generic
+theme: default
+assets:
+  - id: hpc-node-01
+  - id: hpc-node-02

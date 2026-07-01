@@ -1,0 +1,35 @@
+# Scenario: GPU ECC memory error on mobile discrete GPU
+# PLACEHOLDER — SME: verify with DCGM / nvidia-smi output from Precision 7780 under compute load.
+id: scn-nvgpu-ecc-error
+pack_id: laptop-fleet
+target_asset: laptop-03
+fault_type: gpu_ecc_mobile
+
+emit:
+  event:
+    severity: Warning
+    message_id: "GPU.1.0.ECC"
+  log_entries:
+    - severity: Warning
+      message: "ECC error detected: double bit error on GPU 0 frame buffer"
+    - severity: Warning
+      message: "nvidia-smi: ECC DBE volatile count=1 on GPU 00000000:01:00.0"
+
+log_bundle_ref: bundles/scn-nvgpu-ecc-error.log
+
+error_signatures:
+  - "ECC error"
+  - "double bit error"
+  - "ECC DBE"
+
+kb_article_ref: kb/KB100003.md
+
+remediation_steps:
+  - id: drain_gpu_workloads
+    label: "Terminate active GPU compute workloads"
+  - id: run_ecc_diagnostic
+    label: "Run nvidia-smi --query-gpu=ecc.errors.corrected.volatile.total --format=csv"
+  - id: reset_ecc_counters
+    label: "Reset ECC error counters: nvidia-smi --ecc-config=1 then reboot"
+  - id: escalate_if_persistent
+    label: "If DBE persists after reboot, raise hardware repair ticket"

@@ -1,0 +1,3 @@
+# SCAFFOLD LOG BUNDLE — scn-mpi-process-crash
+# SME: replace with real Slurm + OpenMPI log from an HPC node exhibiting an MPI rank failure.
+2024-01-01T00:00:00Z WARN  slurm[3001]: MPI process rank 0 terminated abnormally — scaffold placeholder

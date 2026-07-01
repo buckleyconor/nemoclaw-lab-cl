@@ -1,0 +1,27 @@
+id: scn-nvme-media-error
+pack_id: storage-nvme
+target_asset: nvme-tray-01
+fault_type: media_error
+status: scaffold
+
+emit:
+  event:
+    severity: Critical
+    message_id: "STO.1.0.MediaError"
+  log_entries:
+    - severity: Critical
+      message: "NVMe critical warning: media and data integrity error — scaffold placeholder"
+
+log_bundle_ref: bundles/scn-nvme-media-error.log
+
+error_signatures:
+  - "media error"
+  - "NVMe critical warning"
+
+kb_article_ref: kb/KB400001.md
+
+remediation_steps:
+  - id: identify_failed_drive
+    label: "Identify failed NVMe drive by serial number"
+  - id: hot_swap_drive
+    label: "Hot-swap replacement NVMe drive"

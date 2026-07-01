@@ -1,0 +1,19 @@
+# PLACEHOLDER LOG BUNDLE — scn-nvgpu-ecc-error
+# SME: replace with real nvidia-smi / DCGM output from a Precision 7780 under FP16 workload
+# that has triggered a double-bit ECC error.
+# Required signatures present: "ECC error", "double bit error", "ECC DBE"
+
+2024-05-20T16:30:00Z INFO  dcgm[2200]: DCGM 3.3.0 started — monitoring 1 GPU on laptop-03
+2024-05-20T16:30:01Z INFO  dcgm[2200]: GPU 0: NVIDIA RTX 5000 Ada Generation, 16384 MB VRAM, ECC enabled
+2024-05-20T16:30:02Z INFO  dcgm[2200]: ECC baseline: SBE vol=0, DBE vol=0, SBE agg=0, DBE agg=0
+2024-05-20T16:30:05Z INFO  pytorch[3310]: SDXL fine-tune: FP16 AMP enabled, batch_size=8
+2024-05-20T16:31:10Z INFO  pytorch[3310]: Epoch 1 step 100/200 — loss=0.82
+2024-05-20T16:32:18Z INFO  pytorch[3310]: Epoch 1 step 200/200 — loss=0.74
+2024-05-20T16:33:00Z INFO  pytorch[3310]: Epoch 2 step 100/200 — loss=0.71
+2024-05-20T16:34:05Z WARN  dcgm[2200]: ECC SBE volatile count increased to 3 on GPU 0 — within threshold
+2024-05-20T16:35:22Z CRIT  dcgm[2200]: ECC error detected: double bit error on GPU 0 frame buffer
+2024-05-20T16:35:22Z CRIT  dcgm[2200]: nvidia-smi: ECC DBE volatile count=1 on GPU 00000000:01:00.0
+2024-05-20T16:35:22Z CRIT  dcgm[2200]: Health check FAILED: GPU 0 — memory error (DBE)
+2024-05-20T16:35:23Z WARN  pytorch[3310]: CUDA error: uncorrectable ECC error encountered
+2024-05-20T16:35:23Z WARN  pytorch[3310]: Training suspended — GPU memory integrity compromised
+2024-05-20T16:35:24Z INFO  dcgm[2200]: Recommended action: drain workloads, reset ECC counters, reboot

@@ -1,0 +1,20 @@
+# PLACEHOLDER LOG BUNDLE — scn-gpu-oom
+# SME: replace with real application log + nvidia-smi output from a Precision laptop
+# running a large-batch PyTorch training job.
+# Required signatures present: "CUDA out of memory", "GPU OOM", "device-side assert"
+
+2024-04-08T09:00:00Z INFO  pytorch[12441]: PyTorch 2.2.1+cu121, using device cuda:0 (RTX 5000 Ada)
+2024-04-08T09:00:01Z INFO  pytorch[12441]: Model: LLaMA-3-8B, parameter count: 8.03B
+2024-04-08T09:00:02Z INFO  pytorch[12441]: Loading model weights to GPU ... 14.9 GB allocated
+2024-04-08T09:00:05Z INFO  pytorch[12441]: Optimizer: AdamW, batch_size=32, seq_len=4096
+2024-04-08T09:00:10Z INFO  pytorch[12441]: Step 1/500 — loss=2.31, GPU mem 14.9/16.0 GB
+2024-04-08T09:00:25Z INFO  pytorch[12441]: Step 2/500 — loss=2.27, GPU mem 15.2/16.0 GB
+2024-04-08T09:00:41Z INFO  pytorch[12441]: Step 3/500 — loss=2.19, GPU mem 15.7/16.0 GB
+2024-04-08T09:00:57Z WARN  pytorch[12441]: GPU mem approaching limit: 15.9/16.0 GB used
+2024-04-08T09:01:12Z CRIT  pytorch[12441]: CUDA out of memory: tried to allocate 4.00 GiB on device 0
+2024-04-08T09:01:12Z CRIT  pytorch[12441]: Total GPU memory: 16.00 GiB; already allocated: 15.90 GiB
+2024-04-08T09:01:12Z CRIT  pytorch[12441]: GPU OOM — training run terminated
+2024-04-08T09:01:13Z CRIT  pytorch[12441]: RuntimeError: CUDA error: device-side assert triggered
+2024-04-08T09:01:13Z INFO  nvidia-smi[12442]: GPU 0: RTX 5000 Ada — 15943 MiB / 16384 MiB used
+2024-04-08T09:01:13Z INFO  nvidia-smi[12442]: Processes: pytorch[12441] 15943 MiB
+2024-04-08T09:01:15Z INFO  pytorch[12441]: Traceback: torch.cuda.OutOfMemoryError

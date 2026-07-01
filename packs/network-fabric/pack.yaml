@@ -1,0 +1,11 @@
+id: network-fabric
+name: "Data Center Network Fabric"
+asset_noun:
+  singular: switch
+  plural: switches
+fleet_label: "Fabric Health"
+monitoring_adapter: generic
+theme: default
+assets:
+  - id: spine-01
+  - id: leaf-01

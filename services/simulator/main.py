@@ -16,6 +16,7 @@ from fastapi import FastAPI
 from libs.common.pack_loader import LoadedPack, PackLoadError, load_pack
 from services.simulator.control import router as control_router
 from services.simulator.engine import SimulatorEngine
+from services.simulator.surfaces.generic import router as generic_router
 from services.simulator.surfaces.redfish import router as redfish_router
 
 
@@ -50,6 +51,7 @@ def create_app(pack_dir: Path | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.include_router(redfish_router)
+    app.include_router(generic_router)
     app.include_router(control_router)
 
     @app.get("/healthz", tags=["health"])

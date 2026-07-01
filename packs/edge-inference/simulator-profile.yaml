@@ -1,0 +1,14 @@
+pack_id: edge-inference
+assets:
+  - id: jetson-01
+    type: node
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 1
+  - id: jetson-02
+    type: node
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 1

@@ -1,0 +1,14 @@
+pack_id: storage-nvme
+assets:
+  - id: nvme-tray-01
+    type: drive
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 0
+  - id: nvme-tray-02
+    type: drive
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 0

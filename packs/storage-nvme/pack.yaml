@@ -1,0 +1,11 @@
+id: storage-nvme
+name: "NVMe Storage Array Fleet"
+asset_noun:
+  singular: drive
+  plural: drives
+fleet_label: "Storage Health"
+monitoring_adapter: generic
+theme: default
+assets:
+  - id: nvme-tray-01
+  - id: nvme-tray-02

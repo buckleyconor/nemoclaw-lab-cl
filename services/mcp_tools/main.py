@@ -24,6 +24,8 @@ from pydantic import BaseModel
 
 from libs.common.models import ApprovalDecision
 from libs.common.pack_loader import load_pack
+from libs.common.models import MonitoringAdapterType
+from services.mcp_tools.adapters.generic import GenericAdapter
 from services.mcp_tools.adapters.redfish import RedfishAdapter
 from services.mcp_tools.fault_registry import FaultEventRegistry
 from services.mcp_tools.kb_index import KBIndex
@@ -88,9 +90,16 @@ def create_app(
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         loaded = load_pack(resolved_dir)
 
+        # Select the monitoring adapter based on the pack's declared adapter type.
+        adapter_type = loaded.pack.monitoring_adapter
+        if adapter_type == MonitoringAdapterType.generic:
+            adapter = GenericAdapter(sim_url)
+        else:
+            adapter = RedfishAdapter(sim_url)
+
         # Populate the module-level state dict used by the MCP tool handlers.
         _state.update(
-            adapter=RedfishAdapter(sim_url),
+            adapter=adapter,
             orchestrator_url=orch_url,
             simulator_url=sim_url,
             kb_index=KBIndex(loaded),

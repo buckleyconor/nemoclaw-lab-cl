@@ -1,0 +1,22 @@
+# PLACEHOLDER LOG BUNDLE — scn-driver-tdr
+# SME: replace with real Windows Event Log export + NVIDIA bug report from a Precision 7780
+# exhibiting TDR under CUDA or DX12 workload.
+# Required signatures present: "TDR", "Display driver stopped responding", "nvlddmkm"
+
+2024-03-12T14:05:00Z INFO  NVDisplay[1024]: NVIDIA driver 546.33 initialised on \\Device\\Video0 (RTX 5000 Ada, 16384 MB VRAM)
+2024-03-12T14:05:01Z INFO  NVDisplay[1024]: Display mode: 2560x1600@165Hz (HDR enabled)
+2024-03-12T14:05:02Z INFO  NVDisplay[1024]: Power management mode: Adaptive (on AC power)
+2024-03-12T14:10:15Z INFO  cuda[8821]: cuInit() OK, device 0: NVIDIA RTX 5000 Ada, compute 8.9
+2024-03-12T14:10:16Z INFO  cuda[8821]: Allocated 8192 MB VRAM for model weights
+2024-03-12T14:10:45Z INFO  cuda[8821]: Training epoch 1/50 — batch 0/1024
+2024-03-12T14:11:30Z INFO  cuda[8821]: Training epoch 1/50 — batch 512/1024
+2024-03-12T14:12:03Z WARN  kernel[EventLog]: GPU scheduler detected hang on \\Device\\Video0
+2024-03-12T14:12:03Z WARN  kernel[EventLog]: TDR detected: initiating recovery sequence
+2024-03-12T14:12:04Z CRIT  EventLog[System]: Display driver nvlddmkm stopped responding and has successfully recovered
+2024-03-12T14:12:04Z CRIT  EventLog[System]: Event ID 4101 — Source: nvlddmkm, Level: Error
+2024-03-12T14:12:04Z WARN  kernel[EventLog]: TDR detected: GPU reset triggered on \\Device\\Video0
+2024-03-12T14:12:04Z WARN  NVDisplay[1024]: LiveKernelEvent 141 logged to C:\Windows\LiveKernelReports
+2024-03-12T14:12:05Z INFO  NVDisplay[1024]: GPU reset complete — driver recovered
+2024-03-12T14:12:05Z WARN  cuda[8821]: CUDA context lost due to TDR — application must reinitialise
+2024-03-12T14:12:06Z CRIT  cuda[8821]: RuntimeError: CUDA error: an illegal memory access was encountered
+2024-03-12T14:12:06Z INFO  NVDisplay[1024]: TDR recovery complete. Monitoring for recurrence.

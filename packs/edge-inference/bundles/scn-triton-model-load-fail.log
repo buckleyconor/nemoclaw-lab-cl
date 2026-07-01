@@ -1,0 +1,4 @@
+# SCAFFOLD LOG BUNDLE — scn-triton-model-load-fail
+# SME: replace with real Triton Inference Server log from a Jetson AGX Orin
+# exhibiting a model-load failure on startup.
+2024-01-01T00:00:00Z WARN  triton[1001]: Triton model repository: failed to load model 'resnet50' — scaffold placeholder

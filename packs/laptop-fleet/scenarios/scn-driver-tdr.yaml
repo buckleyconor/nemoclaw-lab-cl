@@ -1,0 +1,35 @@
+# Scenario: Display Driver TDR — NVIDIA driver timeout on Dell Precision laptop
+# PLACEHOLDER — SME: verify with real Windows Event Log entries from Precision 7780.
+id: scn-driver-tdr
+pack_id: laptop-fleet
+target_asset: laptop-02
+fault_type: driver_tdr
+
+emit:
+  event:
+    severity: Critical
+    message_id: "DRV.1.0.TDR"
+  log_entries:
+    - severity: Critical
+      message: "Display driver nvlddmkm stopped responding and has successfully recovered"
+    - severity: Warning
+      message: "TDR detected: GPU reset triggered on \\Device\\Video0"
+
+log_bundle_ref: bundles/scn-driver-tdr.log
+
+error_signatures:
+  - "TDR"
+  - "Display driver stopped responding"
+  - "nvlddmkm"
+
+kb_article_ref: kb/KB100001.md
+
+remediation_steps:
+  - id: collect_tdr_dump
+    label: "Collect TDR minidump from C:\\Windows\\Minidump"
+  - id: update_gpu_driver
+    label: "Update NVIDIA GPU driver to latest Game Ready or Studio release"
+  - id: disable_tdr_registry
+    label: "Increase TdrDelay registry value (HKLM\\System\\CurrentControlSet\\Control\\GraphicsDrivers)"
+  - id: verify_stability
+    label: "Run NVIDIA FrameView stress test to confirm stability"

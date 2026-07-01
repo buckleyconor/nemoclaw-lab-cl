@@ -1,0 +1,12 @@
+id: laptop-fleet
+name: "Dell Precision Mobile Workstation Fleet"
+asset_noun:
+  singular: laptop
+  plural: laptops
+fleet_label: "Fleet Health"
+monitoring_adapter: generic
+theme: dell-precision
+assets:
+  - id: laptop-01
+  - id: laptop-02
+  - id: laptop-03

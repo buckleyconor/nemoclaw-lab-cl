@@ -1,0 +1,35 @@
+# Scenario: GPU Out of Memory — CUDA/VRAM exhaustion during AI workload
+# PLACEHOLDER — SME: verify signatures from CUDA toolkit and NVIDIA System Management Interface.
+id: scn-gpu-oom
+pack_id: laptop-fleet
+target_asset: laptop-01
+fault_type: gpu_oom
+
+emit:
+  event:
+    severity: Warning
+    message_id: "GPU.1.0.OOM"
+  log_entries:
+    - severity: Warning
+      message: "CUDA out of memory: tried to allocate 4.00 GiB on device 0"
+    - severity: Warning
+      message: "RuntimeError: CUDA error: device-side assert triggered"
+
+log_bundle_ref: bundles/scn-gpu-oom.log
+
+error_signatures:
+  - "CUDA out of memory"
+  - "GPU OOM"
+  - "device-side assert"
+
+kb_article_ref: kb/KB100002.md
+
+remediation_steps:
+  - id: identify_gpu_processes
+    label: "List GPU processes consuming VRAM via nvidia-smi"
+  - id: terminate_gpu_process
+    label: "Terminate the highest VRAM consumer"
+  - id: clear_gpu_memory
+    label: "Verify VRAM freed: nvidia-smi --query-gpu=memory.used --format=csv"
+  - id: advise_batch_resize
+    label: "Advise user to reduce batch size or enable gradient checkpointing"

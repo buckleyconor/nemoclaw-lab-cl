@@ -1,0 +1,14 @@
+pack_id: network-fabric
+assets:
+  - id: spine-01
+    type: switch
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 0
+  - id: leaf-01
+    type: switch
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 0

@@ -1,0 +1,20 @@
+pack_id: laptop-fleet
+assets:
+  - id: laptop-01
+    type: laptop
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 1
+  - id: laptop-02
+    type: laptop
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 1
+  - id: laptop-03
+    type: laptop
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 1

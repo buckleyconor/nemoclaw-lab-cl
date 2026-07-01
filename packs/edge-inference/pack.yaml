@@ -1,0 +1,11 @@
+id: edge-inference
+name: "NVIDIA Jetson Edge Inference Nodes"
+asset_noun:
+  singular: node
+  plural: nodes
+fleet_label: "Inference Fleet Health"
+monitoring_adapter: generic
+theme: default
+assets:
+  - id: jetson-01
+  - id: jetson-02

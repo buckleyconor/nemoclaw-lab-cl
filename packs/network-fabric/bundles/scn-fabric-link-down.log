@@ -1,0 +1,4 @@
+# SCAFFOLD LOG BUNDLE — scn-fabric-link-down
+# SME: replace with real switch syslog from a Dell PowerSwitch S5248F-ON or Z9332F-ON
+# exhibiting an Ethernet link-down event on a spine-leaf uplink.
+2024-01-01T00:00:00Z CRIT  switch[syslog]: Link down detected on Ethernet1/1 — scaffold placeholder

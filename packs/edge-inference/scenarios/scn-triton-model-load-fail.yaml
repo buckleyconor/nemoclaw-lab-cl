@@ -1,0 +1,27 @@
+id: scn-triton-model-load-fail
+pack_id: edge-inference
+target_asset: jetson-01
+fault_type: model_load_failure
+status: scaffold
+
+emit:
+  event:
+    severity: Warning
+    message_id: "INF.1.0.ModelLoadFail"
+  log_entries:
+    - severity: Warning
+      message: "Triton model repository: failed to load model 'resnet50' — scaffold placeholder"
+
+log_bundle_ref: bundles/scn-triton-model-load-fail.log
+
+error_signatures:
+  - "model load failure"
+  - "Triton failed to load"
+
+kb_article_ref: kb/KB300001.md
+
+remediation_steps:
+  - id: check_model_repo
+    label: "Verify model repository path and file integrity"
+  - id: restart_triton
+    label: "Restart Triton Inference Server service"

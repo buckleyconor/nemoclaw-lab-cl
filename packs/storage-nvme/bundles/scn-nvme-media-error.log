@@ -1,0 +1,4 @@
+# SCAFFOLD LOG BUNDLE — scn-nvme-media-error
+# SME: replace with real nvme-cli SMART log from a Dell PowerEdge NVMe tray
+# exhibiting a media integrity error.
+2024-01-01T00:00:00Z CRIT  storage[2001]: NVMe critical warning: media and data integrity error — scaffold placeholder
