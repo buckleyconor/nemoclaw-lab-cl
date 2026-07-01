@@ -10,19 +10,13 @@ __pycache__
 *.egg-info
 dist/
 
-# Tests / docs (not needed in images)
+# Tests (not needed in images)
 tests/
-docs/
 
-# UI source (gateway image uses Node build stage; other images don't need it)
+# UI — exclude build artifacts and dependencies; source is needed by gateway Node build stage
 ui/node_modules/
-ui/src/
-ui/public/
-ui/tsconfig*.json
-ui/vite.config.ts
-ui/package*.json
+ui/dist/
 ui/README.md
-ui/.oxlintrc.json
 
 # Git / IDE
 .git/

@@ -14,7 +14,7 @@ from typing import Protocol
 class LLMClient(Protocol):
     """Minimal interface the agent loop needs from the LLM client."""
 
-    async def complete(self, system: str, user: str) -> str:
+    async def complete(self, system: str, user: str, *, thinking: bool = True) -> str:
         """Return the assistant's response string."""
         ...
 
@@ -30,7 +30,7 @@ class OpenAILLMClient:
         api_key: str,
         model: str,
         temperature: float = 0.0,
-        max_tokens: int = 256,
+        max_tokens: int = 2048,
     ) -> None:
         try:
             import openai
@@ -42,8 +42,8 @@ class OpenAILLMClient:
         self._temperature = temperature
         self._max_tokens = max_tokens
 
-    async def complete(self, system: str, user: str) -> str:
-        resp = await self._client.chat.completions.create(
+    async def complete(self, system: str, user: str, *, thinking: bool = True) -> str:
+        kwargs: dict = dict(
             model=self._model,
             messages=[
                 {"role": "system", "content": system},
@@ -52,7 +52,14 @@ class OpenAILLMClient:
             temperature=self._temperature,
             max_tokens=self._max_tokens,
         )
-        return resp.choices[0].message.content or ""
+        if not thinking:
+            kwargs["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
+        resp = await self._client.chat.completions.create(**kwargs)
+        msg = resp.choices[0].message
+        # Qwen 3.6 35B A3B surfaces chain-of-thought in .reasoning_content;
+        # prefer the final answer in .content, fall through to reasoning fields
+        # only when thinking is enabled and content is empty.
+        return msg.content or getattr(msg, "reasoning_content", None) or getattr(msg, "reasoning", None) or ""
 
 
 # ── Stub client (tests) ───────────────────────────────────────────────────────
@@ -73,7 +80,7 @@ class StubLLMClient:
         self._default = default_response
         self.calls: list[tuple[str, str]] = []  # (system, user) for assertions
 
-    async def complete(self, system: str, user: str) -> str:
+    async def complete(self, system: str, user: str, *, thinking: bool = True) -> str:
         self.calls.append((system, user))
         for pattern, reply in self._responses.items():
             if pattern.lower() in user.lower() or pattern.lower() in system.lower():
@@ -94,4 +101,16 @@ SIGNATURE_EXTRACTION_SYSTEM = (
 
 SIGNATURE_EXTRACTION_USER_TMPL = (
     "Extract the error signature from these logs:\n\n{log_text}"
+)
+
+FAULT_ANALYSIS_SYSTEM = (
+    "You are an AI infrastructure monitoring agent analysing a hardware fault on a GPU cluster node. "
+    "Based on the error signature and log excerpt, write 2-3 sentences in first person: "
+    "what the fault indicates, what most likely caused it, and the immediate operational risk. "
+    "Be specific and technical. Do not repeat the signature verbatim in the opening. "
+    "Do not use bullet points or headings — flowing prose only."
+)
+
+FAULT_ANALYSIS_USER_TMPL = (
+    "Error signature: {signature}\n\nLog excerpt:\n{log_text}"
 )

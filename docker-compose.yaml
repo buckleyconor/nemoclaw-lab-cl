@@ -15,7 +15,7 @@ x-env-common: &env-common
   PACK_ID: ${PACK_ID:-datacenter-xe9680}
 
 x-env-llm: &env-llm
-  LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:8000/v1}
+  LLM_BASE_URL: ${LLM_BASE_URL:-http://192.168.68.131:8000/v1}
   LLM_API_KEY: ${LLM_API_KEY:-vllm}
   LLM_MODEL: ${LLM_MODEL:-qwen3.6-35b-a3b-dflash}
 

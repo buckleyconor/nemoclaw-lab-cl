@@ -6,10 +6,11 @@ Exposes four MCP tools over Streamable HTTP:
   kb.search
   remediation.execute (token-gated, HITL)
 
-Also exposes two FastAPI endpoints:
+Also exposes three FastAPI endpoints:
   GET  /healthz                           — liveness probe
   POST /internal/fault-events             — register a fault event (called by Gateway)
   POST /internal/tokens                   — mint an approval token (called by Gateway)
+  POST /internal/reset                    — clear all token/registry state (called by Gateway reset)
 """
 
 from __future__ import annotations
@@ -86,6 +87,10 @@ def create_app(
     ts: ApprovalTokenStore = token_store if token_store is not None else ApprovalTokenStore()
     fr: FaultEventRegistry = fault_registry if fault_registry is not None else FaultEventRegistry()
 
+    # Build the MCP ASGI app now so the session_manager is created and available
+    # for the lifespan to start. Must happen before create_app returns.
+    _mcp_asgi = mcp.streamable_http_app()
+
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         loaded = load_pack(resolved_dir)
@@ -110,7 +115,11 @@ def create_app(
 
         app.state.loaded_pack = loaded
 
-        yield
+        # Run the MCP session manager lifecycle. streamable_http_app() above
+        # created the session_manager; we must enter its run() context here
+        # because FastAPI does not run mounted sub-app lifespans automatically.
+        async with mcp.session_manager.run():
+            yield
 
         # Clean up module-level state when app shuts down (important for tests
         # that create multiple app instances in the same process).
@@ -121,9 +130,6 @@ def create_app(
         version="0.1.0",
         lifespan=lifespan,
     )
-
-    # Mount MCP Streamable HTTP transport at /mcp
-    app.mount("/mcp", mcp.streamable_http_app())
 
     @app.get("/healthz", tags=["health"])
     async def healthz() -> dict[str, str]:
@@ -154,6 +160,18 @@ def create_app(
             "decision": token.decision,
             "consumed": token.consumed,
         }
+
+    @app.post("/internal/reset", tags=["internal"])
+    async def reset_state() -> dict:
+        """Clear all token and fault-registry state. Called by Gateway on presenter reset."""
+        ts.clear()
+        fr.clear()
+        return {"status": "cleared"}
+
+    # Mount MCP Streamable HTTP transport last. The sub-app exposes its route at
+    # /mcp internally; mounting at "/" means the agent's {url}/mcp call lands
+    # correctly. Explicit routes above take priority over this catch-all mount.
+    app.mount("/", _mcp_asgi)
 
     return app
 

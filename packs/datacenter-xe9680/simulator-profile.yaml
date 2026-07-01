@@ -12,3 +12,15 @@ assets:
       system_status: "OK"
       power_status: "OK"
       gpu_count: 8
+  - id: gpu-server-03
+    type: server
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 8
+  - id: gpu-server-04
+    type: server
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 8

@@ -25,7 +25,7 @@ from typing import AsyncGenerator
 import httpx
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from libs.common.models import ApprovalDecision, AssetState, FaultEventStatus
 from services.gateway.store import AssetRecord
@@ -112,6 +112,7 @@ class CreateFaultRequest(BaseModel):
     asset_id: str
     kb_article_id: str | None = None
     log_extract: str | None = None
+    remediation_step_labels: list[str] = Field(default_factory=list)
 
 
 class UpdateStatusRequest(BaseModel):
@@ -147,6 +148,7 @@ async def create_fault(body: CreateFaultRequest, request: Request) -> dict:
         asset_id=body.asset_id,
         kb_article_id=body.kb_article_id,
         log_extract=body.log_extract,
+        remediation_step_labels=body.remediation_step_labels,
     )
 
     # Update asset state to faulted
@@ -185,6 +187,23 @@ async def update_fault_status(fault_id: str, body: UpdateStatusRequest, request:
     updated = await store.update_fault_status(fault_id, body.status)
     if updated is None:
         raise HTTPException(status_code=404, detail="fault_not_found")
+
+    # When a fault resolves, return the asset to healthy and clear its fault link.
+    if body.status == FaultEventStatus.resolved and updated.asset_id:
+        if await store.has_asset(updated.asset_id):
+            asset = await store.get_asset(updated.asset_id)
+            await store.set_asset(AssetRecord(
+                id=asset.id,
+                type=asset.type,
+                state=AssetState.healthy,
+                active_fault_event_id=None,
+            ))
+            await store.sse.publish("asset", {
+                "id": updated.asset_id,
+                "state": "healthy",
+                "active_fault_event_id": None,
+            })
+
     await store.sse.publish("fault", updated.model_dump(mode="json"))
     return updated.model_dump(mode="json")
 
@@ -352,3 +371,51 @@ async def events_stream(request: Request) -> StreamingResponse:
             "X-Accel-Buffering": "no",
         },
     )
+
+
+# ── Presenter controls (proxy to orchestrator) ────────────────────────────────
+
+@router.post("/api/presenter/inject")
+async def presenter_inject(request: Request, scenario: str | None = None):
+    """Inject a fault scenario. Proxies to the orchestrator /api/run endpoint.
+
+    Optional ``?scenario=<id>`` selects a specific scenario; omit to rotate.
+    """
+    orch = _orchestrator_client(request)
+    if scenario:
+        resp = await orch.post(f"/api/run/{scenario}")
+    else:
+        resp = await orch.post("/api/run")
+    resp.raise_for_status()
+    return resp.json()
+
+
+@router.post("/api/presenter/reset")
+async def presenter_reset(request: Request):
+    """Reset all state: orchestrator rotation, gateway store, mcp-tools token/registry."""
+    store = _store(request)
+    orch = _orchestrator_client(request)
+    mcp = _mcp_tools_client(request)
+
+    # Clear orchestrator rotation
+    orch_resp = await orch.post("/api/reset")
+    orch_resp.raise_for_status()
+
+    # Clear mcp-tools tokens + fault registry
+    try:
+        await mcp.post("/internal/reset")
+    except httpx.HTTPError:
+        pass
+
+    # Clear gateway in-memory state + broadcast reset SSE
+    await store.reset()
+
+    # SSE: push fresh healthy asset state for all assets
+    for asset in await store.list_assets():
+        await store.sse.publish("asset", {
+            "id": asset.id,
+            "state": asset.state.value,
+            "active_fault_event_id": None,
+        })
+
+    return {"status": "idle"}

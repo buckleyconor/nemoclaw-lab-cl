@@ -21,5 +21,10 @@ export const gateway = {
       method: "POST",
       body: JSON.stringify({ decision }),
     }),
+  updateFaultStatus: (faultId: string, status: string) =>
+    json(`/api/faults/${faultId}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
   getActivity: () => json("/api/activity"),
 };

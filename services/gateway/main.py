@@ -16,6 +16,7 @@ from typing import AsyncGenerator
 
 import httpx
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from libs.common.models import AssetState
@@ -91,11 +92,23 @@ def create_app(
         lifespan=lifespan,
     )
 
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
     app.include_router(router)
 
     @app.get("/healthz", tags=["health"])
     async def healthz() -> dict[str, str]:
         return {"status": "ok"}
+
+    # Serve lab guide docs at /lab/ (must be mounted before the SPA catch-all).
+    docs_dir = Path(__file__).parent.parent.parent / "docs"
+    if docs_dir.is_dir():
+        app.mount("/lab", StaticFiles(directory=str(docs_dir), html=True), name="lab")
 
     # Serve the React SPA from the built ui/dist directory in prod.
     # During dev the Vite dev server handles this; the path won't exist yet.

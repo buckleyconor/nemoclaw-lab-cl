@@ -11,6 +11,9 @@ GET  /api/assets/{id}/scenario Full scenario data for the active scenario on thi
 
 from __future__ import annotations
 
+import re
+from datetime import date, datetime, timezone
+
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
@@ -84,6 +87,14 @@ def _active(request: Request) -> dict[str, str | None]:
 # ─────────────────────────────────────────────────────────────────────────────
 # Internal helpers
 # ─────────────────────────────────────────────────────────────────────────────
+
+_DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}(?=T)")
+
+def _stamp_today(log_text: str) -> str:
+    """Replace every ISO-8601 date in log_text with today's UTC date."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return _DATE_RE.sub(today, log_text)
+
 
 def _run_response(scenario_id: str, pack: LoadedPack) -> RunResponse:
     scenario = pack.scenarios_by_id[scenario_id]
@@ -217,6 +228,7 @@ async def get_logs(asset_id: str, request: Request) -> LogsResponse:
 
     scenario = pack.scenarios_by_id[scenario_id]
     log_text = pack.log_bundles.get(scenario.log_bundle_ref, "")
+    log_text = _stamp_today(log_text)
     return LogsResponse(asset_id=asset_id, scenario_id=scenario_id, log_text=log_text)
 
 

@@ -7,6 +7,9 @@ ARG NODE_VERSION=22
 ARG PYTHON_VERSION=3.11
 ARG UV_VERSION=0.5.11
 
+# Named stage so ARG expansion works in --from (BuildKit limitation)
+FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv
+
 # ── Stage 1: build React SPA ──────────────────────────────────────────────────
 FROM node:${NODE_VERSION}-alpine AS ui-builder
 
@@ -20,14 +23,13 @@ COPY ui/ ./
 RUN npm run build
 
 
-# ── Stage 2: install Python deps ──────────────────────────────────────────────
+# ── Stage 2: install Python deps into a virtualenv ────────────────────────────
 FROM python:${PYTHON_VERSION}-slim AS py-deps
 
-COPY --from=ghcr.io/astral-sh/uv:${UV_VERSION} /uv /usr/local/bin/uv
+COPY --from=uv /uv /usr/local/bin/uv
 
 WORKDIR /app
-ENV UV_SYSTEM_PYTHON=1 \
-    UV_CACHE_DIR=/tmp/uv-cache
+ENV UV_CACHE_DIR=/tmp/uv-cache
 
 COPY pyproject.toml uv.lock ./
 # Gateway does not need the [ml] group (KB search runs in mcp-tools).
@@ -37,12 +39,10 @@ RUN uv sync --no-dev --frozen --no-install-project
 # ── Stage 3: runtime ──────────────────────────────────────────────────────────
 FROM python:${PYTHON_VERSION}-slim
 
-COPY --from=ghcr.io/astral-sh/uv:${UV_VERSION} /uv /usr/local/bin/uv
-
 WORKDIR /app
 
-COPY --from=py-deps /usr/local/lib /usr/local/lib
-COPY --from=py-deps /usr/local/bin /usr/local/bin
+# Copy the virtualenv from py-deps stage
+COPY --from=py-deps /app/.venv /app/.venv
 
 # Application source
 COPY libs/ libs/
@@ -52,7 +52,13 @@ COPY packs/ packs/
 # Embed the built SPA so FastAPI's StaticFiles mount serves it at "/"
 COPY --from=ui-builder /ui/dist ui/dist/
 
-ENV PYTHONPATH=/app \
+# Embed lab guide docs so FastAPI's StaticFiles mount serves them at "/lab/"
+COPY docs/ docs/
+
+# Activate the virtualenv for all subsequent commands
+ENV VIRTUAL_ENV=/app/.venv \
+    PATH=/app/.venv/bin:$PATH \
+    PYTHONPATH=/app \
     PYTHONUNBUFFERED=1
 
 EXPOSE 8001

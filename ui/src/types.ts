@@ -36,6 +36,7 @@ export interface FaultEvent {
     | "denied";
   kb_article_id: string | null;
   log_extract: string | null;
+  remediation_step_labels: string[];
 }
 
 export interface ActivityEvent {
@@ -51,4 +52,5 @@ export type SSEEvent =
   | { type: "fault"; data: FaultEvent }
   | { type: "notification"; data: Notification }
   | { type: "activity"; data: ActivityEvent }
-  | { type: "decision"; data: { fault_event_id: string; decision: string } };
+  | { type: "decision"; data: { fault_event_id: string; decision: string } }
+  | { type: "reset"; data: Record<string, never> };

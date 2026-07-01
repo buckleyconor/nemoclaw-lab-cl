@@ -152,6 +152,7 @@ class FaultEvent(BaseModel):
     status: FaultEventStatus = FaultEventStatus.detected
     kb_article_id: str | None = None
     log_extract: str | None = None
+    remediation_step_labels: list[str] = Field(default_factory=list)
 
 
 class Notification(BaseModel):

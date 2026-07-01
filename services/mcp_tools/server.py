@@ -19,6 +19,7 @@ import os
 
 import httpx
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 from services.mcp_tools.adapters.redfish import RedfishAdapter
 from services.mcp_tools.tools.kb import kb_search
@@ -35,7 +36,12 @@ from services.mcp_tools.tools.remediation import RemediationError, remediation_e
 _state: dict = {}
 
 
-mcp = FastMCP("NemoClaw MCP Tools")
+mcp = FastMCP(
+    "NemoClaw MCP Tools",
+    # Disable DNS rebinding protection — the server runs inside Docker where
+    # the agent connects via the service hostname (mcp-tools:8004), not localhost.
+    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+)
 
 
 # ──────────────────────────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 id: datacenter-xe9680
-name: "Dell XE9680 GPU Cluster"
+name: "Dell XE9780L GPU Cluster"
 asset_noun:
   singular: server
   plural: servers
@@ -9,3 +9,5 @@ theme: dell-nvidia
 assets:
   - id: gpu-server-01
   - id: gpu-server-02
+  - id: gpu-server-03
+  - id: gpu-server-04

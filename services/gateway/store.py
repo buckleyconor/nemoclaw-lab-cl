@@ -152,3 +152,20 @@ class GatewayStore:
 
     async def get_pending_token(self, fault_id: str) -> str | None:
         return self._pending_tokens.get(fault_id)
+
+    # ── Reset ─────────────────────────────────────────────────────────────────
+
+    async def reset(self) -> None:
+        """Clear all transient state and return assets to healthy."""
+        self._fault_events.clear()
+        self._notifications.clear()
+        self._activity_events.clear()
+        self._pending_tokens.clear()
+        for asset_id, rec in list(self._assets.items()):
+            self._assets[asset_id] = AssetRecord(
+                id=rec.id,
+                type=rec.type,
+                state=AssetState.healthy,
+                active_fault_event_id=None,
+            )
+        await self.sse.publish("reset", {})
