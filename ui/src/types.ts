@@ -1,0 +1,54 @@
+export interface PackInfo {
+  id: string;
+  name: string;
+  asset_noun: { singular: string; plural: string };
+  fleet_label: string;
+  theme: string;
+}
+
+export interface AssetRecord {
+  id: string;
+  type: string;
+  state: "healthy" | "faulted";
+  active_fault_event_id: string | null;
+}
+
+export interface Notification {
+  id: string;
+  fault_event_id: string;
+  title: string;
+  body: string;
+  read: boolean;
+  ts: string;
+}
+
+export interface FaultEvent {
+  id: string;
+  scenario_id: string;
+  asset_id: string;
+  detected_at: string;
+  status:
+    | "detected"
+    | "diagnosing"
+    | "awaiting_approval"
+    | "remediating"
+    | "resolved"
+    | "denied";
+  kb_article_id: string | null;
+  log_extract: string | null;
+}
+
+export interface ActivityEvent {
+  id: string;
+  fault_event_id: string;
+  step: string;
+  message: string;
+  ts: string;
+}
+
+export type SSEEvent =
+  | { type: "asset"; data: AssetRecord }
+  | { type: "fault"; data: FaultEvent }
+  | { type: "notification"; data: Notification }
+  | { type: "activity"; data: ActivityEvent }
+  | { type: "decision"; data: { fault_event_id: string; decision: string } };

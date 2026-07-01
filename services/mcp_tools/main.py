@@ -78,12 +78,15 @@ def create_app(
     sim_url = simulator_url or os.environ.get("SIMULATOR_URL", "http://localhost:8003")
     orch_url = orchestrator_url or os.environ.get("ORCHESTRATOR_URL", "http://localhost:8002")
 
+    # Create token_store and fault_registry at factory time so internal endpoints
+    # can capture them in closures — this avoids depending on app.state which
+    # is only populated after the lifespan starts (not when using ASGITransport).
+    ts: ApprovalTokenStore = token_store if token_store is not None else ApprovalTokenStore()
+    fr: FaultEventRegistry = fault_registry if fault_registry is not None else FaultEventRegistry()
+
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         loaded = load_pack(resolved_dir)
-
-        ts = token_store if token_store is not None else ApprovalTokenStore()
-        fr = fault_registry if fault_registry is not None else FaultEventRegistry()
 
         # Populate the module-level state dict used by the MCP tool handlers.
         _state.update(
@@ -96,8 +99,6 @@ def create_app(
             loaded_pack=loaded,
         )
 
-        app.state.token_store = ts
-        app.state.fault_registry = fr
         app.state.loaded_pack = loaded
 
         yield
@@ -122,7 +123,7 @@ def create_app(
     @app.post("/internal/fault-events", tags=["internal"])
     async def register_fault_event(req: RegisterFaultEventRequest) -> dict:
         """Register a fault event so remediation.execute can validate step ids."""
-        app.state.fault_registry.register(
+        fr.register(
             fault_event_id=req.fault_event_id,
             asset_id=req.asset_id,
             scenario_id=req.scenario_id,
@@ -133,7 +134,7 @@ def create_app(
     @app.post("/internal/tokens", tags=["internal"])
     async def mint_token(req: MintTokenRequest) -> dict:
         """Mint a single-use approval token (called by Gateway in M5)."""
-        token = app.state.token_store.mint(
+        token = ts.mint(
             fault_event_id=req.fault_event_id,
             decision=req.decision,
             decided_by=req.decided_by,
