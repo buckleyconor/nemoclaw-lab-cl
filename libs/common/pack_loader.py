@@ -23,12 +23,14 @@ class PackLoadError(Exception):
 class LoadedPack:
     pack: Pack
     scenarios: list[Scenario]
-    kb_articles: dict[str, KBArticle]   # article_id → article
-    log_bundles: dict[str, str]          # bundle_ref (pack-relative) → text
+    kb_articles: dict[str, KBArticle]       # article_id → article
+    log_bundles: dict[str, str]             # bundle_ref (pack-relative) → text
     simulator_profile: SimulatorProfile
     # signature → kb_article_id — the deterministic fallback index used by kb.search
     # when the semantic similarity score is below the confidence threshold.
     signature_index: dict[str, str] = field(default_factory=dict)
+    # Convenience index built from scenarios list; avoids O(n) lookups in hot paths.
+    scenarios_by_id: dict[str, Scenario] = field(default_factory=dict)
 
 
 def load_pack(pack_dir: Path) -> LoadedPack:
@@ -61,6 +63,7 @@ def load_pack(pack_dir: Path) -> LoadedPack:
         log_bundles=log_bundles,
         simulator_profile=sim_profile,
         signature_index=signature_index,
+        scenarios_by_id={s.id: s for s in scenarios},
     )
 
 
