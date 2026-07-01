@@ -52,7 +52,7 @@ agent:
   pollIntervalSeconds: "10"
   approvalTimeoutSeconds: "600"
   llm:
-    baseUrl: "http://192.168.68.131:8000/v1"
+    baseUrl: "http://YOUR_VLLM_HOST:8000/v1"
     apiKey: "vllm"
     model: "qwen3.6-35b-a3b-dflash"
   resources:

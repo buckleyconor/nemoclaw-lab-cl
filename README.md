@@ -123,7 +123,7 @@ uv run pytest tests/e2e/      # end-to-end (requires running stack)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `VLLM_BASE_URL` | `http://192.168.68.131:8000/v1` | LLM inference endpoint (OpenAI-compatible) |
+| `VLLM_BASE_URL` | `http://YOUR_VLLM_HOST:8000/v1` | LLM inference endpoint (OpenAI-compatible) |
 | `VLLM_API_KEY` | `token-abc123` | API key for vLLM endpoint |
 | `PACK_ID` | `datacenter-xe9680` | Active domain pack |
 | `POLL_INTERVAL` | `5.0` | Agent poll interval in seconds |
