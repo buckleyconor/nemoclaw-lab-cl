@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NemoClaw Sentinel — Welcome</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --bg:          #0a0e1a;
+  --bg-card:     #131b2c;
+  --bg-panel:    #0f1624;
+  --border:      #1f2937;
+  --border-s:    #374151;
+  --text:        #e5e7eb;
+  --text-m:      #9ca3af;
+  --text-d:      #6b7280;
+  --healthy:     #10b981;
+  --accent:      #3b82f6;
+  --dell:        #0076ce;
+  --nv:          #76b900;
+  --sans: "Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  --mono: "JetBrains Mono","SF Mono","Menlo",ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-font-smoothing:antialiased;}
+
+/* ── PAGE ─────────────────────────────────────────────────────── */
+.page{display:flex;flex-direction:column;min-height:100vh;}
+
+/* ── HERO ─────────────────────────────────────────────────────── */
+.hero{
+  position:relative;padding:64px 32px 56px;text-align:center;
+  background:radial-gradient(ellipse at top,#1a2440 0%,var(--bg) 65%);
+  border-bottom:1px solid var(--border);overflow:hidden;
+}
+.hero-orb{position:absolute;border-radius:50%;filter:blur(55px);pointer-events:none;}
+.o1{width:320px;height:320px;background:radial-gradient(circle,rgba(0,118,206,.75)0%,transparent 70%);left:-3%;top:-10%;animation:orb-a 18s ease-in-out infinite;opacity:.55;}
+.o2{width:260px;height:260px;background:radial-gradient(circle,rgba(118,185,0,.65)0%,transparent 70%);right:-2%;top:15%;animation:orb-b 22s ease-in-out infinite;opacity:.45;}
+.o3{width:220px;height:220px;background:radial-gradient(circle,rgba(147,197,253,.7)0%,transparent 70%);left:44%;bottom:-15%;animation:orb-c 15s ease-in-out infinite;opacity:.4;}
+@keyframes orb-a{0%,100%{transform:translate(0,0);}50%{transform:translate(40px,25px);}}
+@keyframes orb-b{0%,100%{transform:translate(0,0);}50%{transform:translate(-30px,40px);}}
+@keyframes orb-c{0%,100%{transform:translate(0,0);}50%{transform:translate(25px,-30px);}}
+
+.hero-grid{position:absolute;inset:0;opacity:.45;mask-image:radial-gradient(ellipse at center,black 30%,transparent 72%);-webkit-mask-image:radial-gradient(ellipse at center,black 30%,transparent 72%);}
+
+.hero-inner{position:relative;z-index:1;}
+.eyebrow{
+  font-size:.7rem;font-weight:700;letter-spacing:.22em;text-transform:uppercase;margin-bottom:14px;
+  background:linear-gradient(90deg,var(--dell),var(--nv) 40%,#ef4444 70%,var(--dell));
+  background-size:300% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  animation:rainbow 6s linear infinite;
+}
+@keyframes rainbow{0%{background-position:0%}100%{background-position:300%}}
+.brand{
+  font-size:1rem;font-weight:800;letter-spacing:.06em;
+  background:linear-gradient(90deg,var(--dell),#93c5fd 50%,var(--nv));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  margin-bottom:12px;display:block;
+}
+.hero h1{
+  font-size:clamp(2rem,4.5vw,3.2rem);font-weight:800;letter-spacing:-.03em;margin-bottom:12px;
+  background:linear-gradient(135deg,#fff 0%,#93c5fd 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  line-height:1.1;
+}
+.hero-sub{color:var(--text-m);font-size:1rem;max-width:560px;margin:0 auto 10px;line-height:1.6;}
+.hero-choose{
+  display:inline-block;margin-top:8px;padding:7px 18px;border-radius:999px;
+  font-size:.78rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+  color:#fff;border:1px solid rgba(255,255,255,.14);
+  background:linear-gradient(90deg,rgba(0,118,206,.2),rgba(118,185,0,.18));
+}
+
+/* ── GRID ─────────────────────────────────────────────────────── */
+.grid-section{flex:1;padding:48px 32px 64px;max-width:1100px;margin:0 auto;width:100%;}
+.grid-label{
+  font-family:var(--mono);font-size:11px;color:var(--text-d);letter-spacing:.16em;text-transform:uppercase;
+  margin-bottom:24px;display:flex;align-items:center;gap:10px;
+}
+.grid-label::after{content:"";flex:1;height:1px;background:var(--border);}
+
+.cards{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+  gap:18px;
+}
+
+/* ── CARD ─────────────────────────────────────────────────────── */
+.card{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:14px;
+  padding:24px;cursor:pointer;position:relative;overflow:hidden;
+  transition:border-color .2s,transform .18s,box-shadow .2s;
+  text-align:left;display:flex;flex-direction:column;gap:14px;
+}
+.card:hover:not(.soon){
+  border-color:var(--card-accent,var(--accent));
+  transform:translateY(-3px);
+  box-shadow:0 8px 28px rgba(0,0,0,.35);
+}
+.card.soon{cursor:default;opacity:.6;}
+.card::before{
+  content:"";position:absolute;top:0;left:0;right:0;height:2px;
+  background:var(--card-accent,var(--border));
+  transition:opacity .2s;opacity:.5;
+}
+.card:hover:not(.soon)::before{opacity:1;}
+
+.card-icon{
+  width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;
+  font-size:26px;background:rgba(255,255,255,.04);border:1px solid var(--border-s);flex-shrink:0;
+}
+
+.card-body{flex:1;}
+.card-title{font-size:1rem;font-weight:700;color:#fff;margin-bottom:5px;line-height:1.3;}
+.card-desc{font-size:.82rem;color:var(--text-m);line-height:1.55;}
+
+.badge{
+  display:inline-block;padding:3px 9px;border-radius:4px;font-family:var(--mono);
+  font-size:.65rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  border:1px solid;align-self:flex-start;
+}
+.badge.active{background:rgba(16,185,129,.12);color:var(--healthy);border-color:rgba(16,185,129,.3);}
+.badge.soon-badge{background:rgba(107,114,128,.1);color:var(--text-d);border-color:var(--border-s);}
+
+.card-arrow{
+  position:absolute;bottom:18px;right:18px;width:28px;height:28px;border-radius:50%;
+  background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25);
+  display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--accent);
+  transition:background .15s,transform .15s;
+}
+.card:hover:not(.soon) .card-arrow{background:var(--accent);color:#fff;transform:translateX(3px);}
+
+/* ── FOOTER ───────────────────────────────────────────────────── */
+footer{padding:24px;text-align:center;border-top:1px solid var(--border);color:var(--text-d);font-size:.72rem;font-family:var(--mono);}
+
+/* ── TOAST ────────────────────────────────────────────────────── */
+.toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+  background:var(--bg-card);border:1px solid var(--border-s);
+  border-radius:8px;padding:10px 20px;font-size:13px;color:var(--text);
+  box-shadow:0 8px 28px rgba(0,0,0,.5);z-index:999;opacity:0;
+  transition:opacity .2s;pointer-events:none;white-space:nowrap;
+}
+.toast.show{opacity:1;}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="hero-orb o1"></div>
+    <div class="hero-orb o2"></div>
+    <div class="hero-orb o3"></div>
+    <svg class="hero-grid" viewBox="0 0 1200 400" preserveAspectRatio="none">
+      <defs><pattern id="dots" x="0" y="0" width="34" height="34" patternUnits="userSpaceOnUse">
+        <circle cx="2" cy="2" r="1" fill="rgba(147,197,253,0.18)"/></pattern></defs>
+      <rect width="100%" height="100%" fill="url(#dots)"/>
+    </svg>
+    <div class="hero-inner">
+      <div class="eyebrow">NemoClaw AI Infrastructure Sentinel</div>
+      <span class="brand">DELL × NVIDIA</span>
+      <h1>Welcome to the<br>NemoClaw Sentinel Lab</h1>
+      <p class="hero-sub">Autonomous AI-driven infrastructure monitoring across every industry vertical. Watch the agent detect, diagnose, and resolve hardware faults — with you in control of the final decision.</p>
+      <span class="hero-choose">Choose your industry vertical to begin ↓</span>
+    </div>
+  </header>
+
+  <!-- VERTICAL GRID -->
+  <section class="grid-section">
+    <div class="grid-label">Industry Verticals</div>
+    <div class="cards" id="cards">
+
+      <!-- AI Infrastructure -->
+      <div class="card" style="--card-accent:#0076ce" data-href="./lab-guide.html?vertical=ai-infrastructure">
+        <div class="card-icon">🖥️</div>
+        <div class="card-body">
+          <div class="card-title">AI Infrastructure</div>
+          <div class="card-desc">Monitor a Dell XE9780L GPU cluster running NVIDIA B300s. The agent detects hardware faults — Xid errors, ECC failures, NVLink drops — and waits for your approval to remediate.</div>
+        </div>
+        <span class="badge active">Active</span>
+        <span class="card-arrow">→</span>
+      </div>
+
+      <!-- Laptop Fleet -->
+      <div class="card" style="--card-accent:#76b900" data-href="./lab-guide.html?vertical=laptop-fleet">
+        <div class="card-icon">💻</div>
+        <div class="card-body">
+          <div class="card-title">Laptop Fleet Management</div>
+          <div class="card-desc">Manage a fleet of enterprise laptops across a distributed workforce. Agent detects driver failures, battery anomalies, and hardware degradation at scale.</div>
+        </div>
+        <span class="badge active">Active</span>
+        <span class="card-arrow">→</span>
+      </div>
+
+      <!-- Oil & Gas -->
+      <div class="card soon" style="--card-accent:#f59e0b" data-coming="true">
+        <div class="card-icon">⛽</div>
+        <div class="card-body">
+          <div class="card-title">Oil &amp; Gas</div>
+          <div class="card-desc">SCADA system monitoring for upstream and midstream operations. Predictive fault detection across pumps, compressors, and pipeline sensors.</div>
+        </div>
+        <span class="badge soon-badge">Coming Soon</span>
+      </div>
+
+      <!-- Healthcare -->
+      <div class="card soon" style="--card-accent:#ec4899" data-coming="true">
+        <div class="card-icon">🏥</div>
+        <div class="card-body">
+          <div class="card-title">Healthcare</div>
+          <div class="card-desc">Medical imaging workstation monitoring and clinical device fleet management. Ensures uptime for diagnostic and patient care systems.</div>
+        </div>
+        <span class="badge soon-badge">Coming Soon</span>
+      </div>
+
+      <!-- Financial Services -->
+      <div class="card soon" style="--card-accent:#8b5cf6" data-coming="true">
+        <div class="card-icon">🏦</div>
+        <div class="card-body">
+          <div class="card-title">Financial Services</div>
+          <div class="card-desc">Low-latency trading infrastructure and risk compute cluster monitoring. Sub-millisecond fault detection with compliance-aware remediation approval.</div>
+        </div>
+        <span class="badge soon-badge">Coming Soon</span>
+      </div>
+
+      <!-- Edge Computing -->
+      <div class="card soon" style="--card-accent:#06b6d4" data-coming="true">
+        <div class="card-icon">🌐</div>
+        <div class="card-body">
+          <div class="card-title">Edge &amp; IoT</div>
+          <div class="card-desc">Distributed edge node and IoT gateway fleet management. Autonomous fault recovery across thousands of remote, unattended devices.</div>
+        </div>
+        <span class="badge soon-badge">Coming Soon</span>
+      </div>
+
+    </div>
+  </section>
+
+  <footer>NemoClaw AI Infrastructure Sentinel · Demo Environment · NemoClaw v0.0.70 · v0.1.0</footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+document.getElementById("cards").addEventListener("click", function(e) {
+  const card = e.target.closest(".card");
+  if (!card) return;
+  if (card.dataset.coming) {
+    showToast("This vertical is coming soon — choose AI Infrastructure or Laptop Fleet to begin.");
+    return;
+  }
+  const href = card.dataset.href;
+  if (href) window.location.href = href;
+});
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 3200);
+}
+</script>
+</body>
+</html>

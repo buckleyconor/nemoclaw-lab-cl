@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NemoClaw Sentinel — Lab Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --split: 42%;
+  --bg:           #0a0e1a;
+  --bg-elevated:  #111827;
+  --bg-panel:     #0f1624;
+  --bg-card:      #131b2c;
+  --border:       #1f2937;
+  --border-strong:#374151;
+  --text:         #e5e7eb;
+  --text-muted:   #9ca3af;
+  --text-dim:     #6b7280;
+  --healthy:      #10b981;
+  --warning:      #f59e0b;
+  --critical:     #ef4444;
+  --accent:       #3b82f6;
+  --dell-blue:    #0076ce;
+  --nv-green:     #76b900;
+  --mono: "JetBrains Mono","SF Mono","Menlo",ui-monospace,monospace;
+  --sans: "Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; background: var(--bg); font-family: var(--sans); -webkit-font-smoothing: antialiased; color: var(--text); }
+
+/* ── SPLIT ROOT ─────────────────────────────────────────────────── */
+.split-root {
+  display: grid;
+  grid-template-columns: var(--split) 5px 1fr;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── LEFT PANEL ─────────────────────────────────────────────────── */
+.left-panel {
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.left-panel::-webkit-scrollbar { width: 5px; }
+.left-panel::-webkit-scrollbar-track { background: transparent; }
+.left-panel::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+
+/* ── HERO ───────────────────────────────────────────────────────── */
+.hero {
+  position: relative;
+  padding: 40px 28px 32px;
+  background: radial-gradient(ellipse at top, #1a2440 0%, var(--bg) 70%);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.hero-ambient { position:absolute; inset:0; pointer-events:none; }
+.hero-orb { position:absolute; border-radius:50%; filter:blur(45px); }
+.hero-orb-1 { width:240px;height:240px; background:radial-gradient(circle,rgba(0,118,206,.8)0%,transparent 70%); left:-8%;top:0%; animation:orb-a 16s ease-in-out infinite; opacity:.6; }
+.hero-orb-2 { width:200px;height:200px; background:radial-gradient(circle,rgba(118,185,0,.7)0%,transparent 70%); right:-4%;top:20%; animation:orb-b 19s ease-in-out infinite; opacity:.45; }
+.hero-orb-3 { width:180px;height:180px; background:radial-gradient(circle,rgba(147,197,253,.7)0%,transparent 70%); left:40%;bottom:-15%; animation:orb-c 13s ease-in-out infinite; opacity:.5; }
+@keyframes orb-a { 0%,100%{transform:translate(0,0);} 50%{transform:translate(30px,20px);} }
+@keyframes orb-b { 0%,100%{transform:translate(0,0);} 50%{transform:translate(-25px,35px);} }
+@keyframes orb-c { 0%,100%{transform:translate(0,0);} 50%{transform:translate(20px,-25px);} }
+.hero-grid-bg { position:absolute; inset:0; opacity:.5; mask-image:radial-gradient(ellipse at center,black 30%,transparent 75%); -webkit-mask-image:radial-gradient(ellipse at center,black 30%,transparent 75%); }
+
+.hero-inner { position:relative; z-index:1; }
+.hero-eyebrow {
+  font-size:.72rem; font-weight:700; letter-spacing:.2em; text-transform:uppercase; margin-bottom:10px;
+  background:linear-gradient(90deg,#0076ce,#76b900 40%,#ef4444 70%,#0076ce);
+  background-size:300% 100%; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+  animation:rainbow 6s linear infinite;
+}
+@keyframes rainbow { 0%{background-position:0%} 100%{background-position:300%} }
+.brand-lockup {
+  font-size:1.05rem; font-weight:800; letter-spacing:.05em;
+  background:linear-gradient(90deg,var(--dell-blue),#93c5fd 50%,var(--nv-green));
+  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+  margin-bottom:6px; display:block;
+}
+.hero h1 {
+  font-size:clamp(1.5rem,3.5vw,2.1rem); font-weight:800; letter-spacing:-.025em; line-height:1.1;
+  background:linear-gradient(135deg,#fff 0%,#93c5fd 100%);
+  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+  margin-bottom:8px;
+}
+.hero-sub {
+  display:inline-block; color:#fff; font-size:11px; font-weight:500; letter-spacing:.14em; text-transform:uppercase;
+  padding:6px 14px; border-radius:999px; border:1px solid rgba(255,255,255,.12);
+  background:linear-gradient(90deg,rgba(0,118,206,.2),rgba(118,185,0,.18));
+  margin-bottom:12px;
+}
+.hero-sub em { font-style:italic; color:#93c5fd; text-transform:none; letter-spacing:.02em; }
+.hero-tagline { color:var(--text-muted); font-size:.85rem; line-height:1.5; margin-bottom:14px; }
+.hero-meta { display:flex; flex-wrap:wrap; gap:12px; font-family:var(--mono); font-size:10px; color:var(--text-dim); letter-spacing:.07em; text-transform:uppercase; }
+.hero-meta span { display:flex; align-items:center; gap:5px; }
+.hero-meta .dot { width:5px; height:5px; border-radius:50%; background:var(--healthy); }
+
+/* ── TOC NAV ────────────────────────────────────────────────────── */
+.guide-nav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  gap: 1px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  padding: 0;
+  flex-shrink: 0;
+}
+.nav-step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 4px 7px;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 10px;
+  font-family: var(--mono);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  transition: color .15s, border-color .15s, background .15s;
+  user-select: none;
+}
+.nav-step:hover { color: var(--text-muted); background: rgba(255,255,255,.03); }
+.nav-step.active { color: #fff; border-bottom-color: var(--accent); background: rgba(59,130,246,.06); }
+.nav-step.visited { color: var(--healthy); }
+.nav-step.visited.active { color: #fff; }
+.nav-num { font-size: 12px; font-weight: 700; margin-bottom: 2px; display: block; }
+
+/* ── GUIDE CONTENT ──────────────────────────────────────────────── */
+.guide-main { padding: 28px 24px 48px; flex: 1; }
+h2 { font-size:1.3rem; font-weight:700; letter-spacing:-.01em; margin:44px 0 6px; padding-top:16px; border-top:1px solid var(--border); scroll-margin-top: 44px; }
+h2:first-child { border-top:none; padding-top:0; margin-top:0; }
+h3 { font-size:1.05rem; font-weight:600; margin:26px 0 8px; color:#f3f4f6; scroll-margin-top:44px; }
+h4 { font-size:.92rem; font-weight:600; margin:20px 0 6px; color:var(--text); }
+p { margin-bottom:12px; color:var(--text); font-size:.9rem; line-height:1.62; }
+.lead { color:var(--text-muted); font-size:.92rem; }
+strong { color:#fff; font-weight:600; }
+a { color:var(--accent); text-decoration:none; }
+a:hover { text-decoration:underline; }
+ul, ol { margin:10px 0 14px 20px; }
+li { margin-bottom:5px; font-size:.88rem; }
+section { padding-bottom:4px; }
+
+/* ── CODE / COPY ────────────────────────────────────────────────── */
+code { font-family:var(--mono); font-size:.8em; background:var(--bg-card); border:1px solid var(--border); border-radius:4px; padding:1px 5px; color:#e0e7ff; }
+.codeblock { position:relative; margin:12px 0; background:var(--bg-card); border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+.codeblock-header { display:flex; align-items:center; justify-content:space-between; padding:6px 12px; background:rgba(0,0,0,.25); border-bottom:1px solid var(--border); font-family:var(--mono); font-size:10px; color:var(--text-dim); letter-spacing:.08em; text-transform:uppercase; }
+.codeblock pre { margin:0; padding:10px 14px; white-space:pre-wrap; word-wrap:break-word; font-family:var(--mono); font-size:.78rem; line-height:1.55; color:#d4e3f5; }
+.codeblock pre code { background:transparent; border:none; padding:0; font-size:inherit; color:inherit; }
+.copy-btn { background:rgba(255,255,255,.05); color:var(--text-muted); border:1px solid var(--border-strong); border-radius:4px; padding:3px 8px; font-size:10px; letter-spacing:.05em; text-transform:uppercase; cursor:pointer; transition:all .15s; font-family:var(--sans); }
+.copy-btn:hover { background:var(--accent); border-color:var(--accent); color:#fff; }
+.copy-btn.copied { background:var(--healthy); border-color:var(--healthy); color:#042218; }
+
+/* ── CALLOUT ────────────────────────────────────────────────────── */
+.callout { margin:14px 0; padding:11px 14px; border-left:3px solid var(--accent); background:rgba(59,130,246,.06); border-radius:0 6px 6px 0; }
+.callout.warn { border-left-color:var(--warning); background:rgba(245,158,11,.06); }
+.callout.success { border-left-color:var(--healthy); background:rgba(16,185,129,.06); }
+.callout-title { font-weight:600; color:#fff; margin-bottom:3px; font-size:.8rem; letter-spacing:.02em; }
+.callout p:last-child { margin-bottom:0; }
+
+/* ── TAKEAWAY ───────────────────────────────────────────────────── */
+.takeaway { margin:20px 0 0; padding:18px 20px; background:linear-gradient(135deg,rgba(0,118,206,.06),rgba(118,185,0,.04)); border:1px solid rgba(255,255,255,.07); border-radius:10px; }
+.takeaway-title { font-family:var(--mono); font-size:10px; color:var(--accent); letter-spacing:.16em; text-transform:uppercase; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+.takeaway-title::before { content:""; width:7px; height:7px; border-radius:50%; background:var(--accent); box-shadow:0 0 10px var(--accent); flex-shrink:0; }
+.takeaway-list { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:7px; }
+.takeaway-list li { position:relative; padding-left:18px; font-size:.85rem; line-height:1.5; color:var(--text); }
+.takeaway-list li::before { content:"✓"; position:absolute; left:0; color:#76b900; font-weight:700; }
+
+/* ── BEAT STEPS ─────────────────────────────────────────────────── */
+.beat-list { list-style:none; padding:0; margin:14px 0; display:flex; flex-direction:column; }
+.beat-list li { display:grid; grid-template-columns:32px 1fr; gap:0 12px; padding:11px 0; border-bottom:1px solid var(--border); align-items:start; }
+.beat-list li:last-child { border-bottom:none; }
+.beat-num { width:26px; height:26px; border-radius:50%; background:var(--bg-card); border:1.5px solid var(--border-strong); display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:10px; font-weight:700; color:var(--text-muted); flex-shrink:0; margin-top:2px; }
+.beat-list li.active-beat .beat-num { background:var(--accent); border-color:var(--accent); color:#fff; }
+.beat-list li.agent-beat .beat-num { background:rgba(118,185,0,.15); border-color:#76b900; color:#76b900; }
+.beat-body strong { display:block; color:#fff; font-size:.9rem; margin-bottom:3px; }
+.beat-body p { color:var(--text-muted); font-size:.82rem; margin:0; line-height:1.5; }
+.beat-body .ui-cue { font-family:var(--mono); font-size:.75rem; color:var(--accent); display:block; margin-top:5px; }
+
+/* ── ARCH MAP ───────────────────────────────────────────────────── */
+.amap-chips { display:flex; flex-wrap:wrap; gap:6px; margin:12px 0 10px; }
+.amap-chip { font-size:.78rem; color:var(--text); cursor:pointer; background:var(--bg-card); border:1px solid var(--border-strong); border-radius:6px; padding:5px 10px; transition:.15s; font-family:var(--sans); }
+.amap-chip:hover { border-color:var(--accent); }
+.amap-chip.selected { border-color:var(--accent); background:rgba(59,130,246,.12); }
+.amap-info { background:var(--bg-panel); border:1px solid var(--border); border-radius:8px; padding:13px 15px; min-height:76px; margin-bottom:8px; }
+.amap-card h4 { margin:0 0 3px; font-size:.9rem; color:#fff; }
+.amap-card .role { font-family:var(--mono); font-size:.7rem; letter-spacing:.06em; text-transform:uppercase; color:var(--nv-green); margin-bottom:6px; }
+.amap-card p { margin:0; color:var(--text-muted); font-size:.82rem; }
+
+/* ── PANEL CARDS (2-col) ────────────────────────────────────────── */
+.panel-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:12px 0; }
+.panel-card { background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:13px; }
+.panel-card .panel-label { font-family:var(--mono); font-size:.7rem; color:var(--text-dim); letter-spacing:.14em; text-transform:uppercase; margin-bottom:6px; }
+.panel-card .panel-title { font-size:.9rem; font-weight:600; color:#fff; margin-bottom:6px; }
+.panel-card .panel-desc { font-size:.8rem; color:var(--text-muted); line-height:1.48; }
+.panel-card .panel-icon { font-size:18px; margin-bottom:7px; }
+
+/* ── TABLE ──────────────────────────────────────────────────────── */
+.table { width:100%; border-collapse:collapse; margin:12px 0; font-size:.8rem; }
+.table th, .table td { text-align:left; padding:7px 10px; border-bottom:1px solid var(--border); }
+.table th { color:var(--text-muted); font-family:var(--mono); font-size:.68rem; letter-spacing:.07em; text-transform:uppercase; background:var(--bg-card); }
+.table tr:last-child td { border-bottom:none; }
+.badge { display:inline-block; padding:1px 6px; border-radius:4px; font-family:var(--mono); font-size:.65rem; font-weight:600; letter-spacing:.04em; text-transform:uppercase; }
+.badge.active { background:rgba(16,185,129,.15); color:var(--healthy); border:1px solid rgba(16,185,129,.3); }
+.badge.scaffold { background:rgba(167,139,250,.15); color:#c4b5fd; border:1px solid rgba(167,139,250,.3); }
+
+/* ── TROUBLESHOOT ───────────────────────────────────────────────── */
+details.trouble { margin:14px 0; border-left:3px solid var(--critical); background:rgba(239,68,68,.04); border-radius:0 6px 6px 0; overflow:hidden; }
+details.trouble summary { list-style:none; cursor:pointer; padding:9px 14px; font-weight:600; font-size:.8rem; color:var(--critical); display:flex; align-items:center; gap:7px; user-select:none; }
+details.trouble summary::-webkit-details-marker { display:none; }
+details.trouble summary::before { content:""; width:6px; height:6px; border-right:2px solid var(--critical); border-bottom:2px solid var(--critical); transform:rotate(-45deg); flex-shrink:0; margin-left:2px; transition:transform .15s; }
+details.trouble[open] summary::before { transform:rotate(45deg); margin-top:-3px; }
+.trouble-body { padding:0 14px 11px; }
+.trouble-body p { font-size:.82rem; color:var(--text-muted); margin:0 0 6px; }
+
+/* ── FOOTER ─────────────────────────────────────────────────────── */
+.guide-footer { padding:20px 24px; border-top:1px solid var(--border); color:var(--text-dim); font-size:.72rem; font-family:var(--mono); text-align:center; flex-shrink:0; }
+
+/* ── RESIZER ────────────────────────────────────────────────────── */
+.resizer {
+  background: var(--border);
+  cursor: col-resize;
+  position: relative;
+  user-select: none;
+  transition: background .15s;
+  z-index: 20;
+}
+.resizer:hover, .resizer.dragging { background: var(--accent); }
+.resizer::after {
+  content: "⋮";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--text-dim);
+  font-size: 14px;
+  pointer-events: none;
+}
+.resizer:hover::after, .resizer.dragging::after { color: #fff; }
+
+/* ── RIGHT PANEL ────────────────────────────────────────────────── */
+.right-panel {
+  display: flex;
+  flex-direction: column;
+  background: #0d1117;
+  overflow: hidden;
+  position: relative;
+}
+.dash-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.dash-bar-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.dash-url-input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 4px 9px;
+  outline: none;
+  min-width: 0;
+}
+.dash-url-input:focus { border-color: var(--accent); }
+.dash-go-btn {
+  background: var(--dell-blue);
+  color: #fff;
+  border: 0;
+  border-radius: 5px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: var(--sans);
+  transition: filter .15s;
+}
+.dash-go-btn:hover { filter: brightness(1.15); }
+.dash-status {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--text-dim); flex-shrink: 0;
+  transition: background .3s;
+}
+.dash-status.live { background: var(--healthy); box-shadow: 0 0 6px var(--healthy); }
+
+#dash-frame {
+  flex: 1;
+  width: 100%;
+  border: none;
+  background: var(--bg);
+}
+
+/* ── IFRAME ERROR OVERLAY ───────────────────────────────────────── */
+.dash-error {
+  display: none;
+  position: absolute;
+  inset: 44px 0 0 0;
+  background: rgba(10,14,26,.94);
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  padding: 32px;
+  text-align: center;
+  flex-direction: column;
+  gap: 12px;
+}
+.dash-error.show { display: flex; }
+.dash-error h3 { color: var(--warning); font-size: 1.1rem; }
+.dash-error p { color: var(--text-muted); font-size: .88rem; max-width: 380px; }
+
+/* ── CURTAIN (full-viewport) ────────────────────────────────────── */
+.curtain-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: auto;
+  display: flex;
+}
+body.started .curtain-overlay { pointer-events: none; }
+.curtain-half {
+  flex: 1;
+  background: linear-gradient(135deg, #04080f 0%, #001f42 55%, #0076ce 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.curtain-half.right { background: linear-gradient(225deg, #04080f 0%, #00251a 55%, #3a6b00 100%); }
+.curtain-logo {
+  width: clamp(120px, 16vw, 200px);
+  height: auto;
+  object-fit: contain;
+  opacity: .88;
+  filter: brightness(1.1);
+}
+.curtain-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 101;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 24px;
+}
+body.started .curtain-stage { animation: stage-fade .6s ease-out forwards; }
+body.started .curtain-half.left  { animation: curtain-left  1.5s cubic-bezier(.65,0,.35,1) .1s forwards; }
+body.started .curtain-half.right { animation: curtain-right 1.5s cubic-bezier(.65,0,.35,1) .1s forwards; }
+@keyframes curtain-left  { to { transform: translateX(-100%); } }
+@keyframes curtain-right { to { transform: translateX(100%); } }
+@keyframes stage-fade { from{opacity:1;} to{opacity:0;} }
+
+.curtain-pre-text {
+  font-family: var(--sans);
+  font-size: clamp(.95rem,2vw,1.2rem);
+  color: #e5e7eb;
+  text-align: center;
+  max-width: 480px;
+  line-height: 1.55;
+}
+.curtain-sub {
+  font-family: var(--mono);
+  font-size: .75rem;
+  color: rgba(255,255,255,.45);
+  text-align: center;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.start-btn {
+  background: linear-gradient(135deg, #0558a5, #0672cb);
+  color: #fff; border: 0; border-radius: 999px;
+  font-size: 17px; font-weight: 700; letter-spacing: .04em;
+  padding: 14px 36px; cursor: pointer;
+  box-shadow: 0 0 0 0 rgba(6,114,203,.7), 0 10px 36px rgba(6,114,203,.45);
+  animation: btn-pulse 2.4s ease-in-out infinite;
+  transition: transform .2s, filter .2s;
+  font-family: var(--sans);
+}
+.start-btn::after { content: "→"; margin-left: 12px; display: inline-block; transition: transform .2s; }
+.start-btn:hover { transform: translateY(-2px); filter: brightness(1.1); }
+.start-btn:hover::after { transform: translateX(5px); }
+@keyframes btn-pulse {
+  0%,100%{ box-shadow: 0 0 0 0 rgba(6,114,203,.55), 0 10px 36px rgba(6,114,203,.45); }
+  50%{ box-shadow: 0 0 0 12px rgba(6,114,203,0), 0 12px 40px rgba(6,114,203,.55); }
+}
+
+/* ── MOBILE FALLBACK ────────────────────────────────────────────── */
+@media (max-width: 800px) {
+  .split-root { grid-template-columns: 1fr; grid-template-rows: 55vh 4px 45vh; height: 200vh; }
+  html, body { height: auto; overflow: auto; }
+  .left-panel { height: 55vh; }
+  .resizer { cursor: row-resize; }
+  .right-panel { height: 45vh; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── CURTAIN OVERLAY ─────────────────────────────────────────────── -->
+<div class="curtain-overlay" id="curtain">
+  <div class="curtain-stage">
+    <p class="curtain-sub">Lab guide · left &nbsp;|&nbsp; Live dashboard · right</p>
+    <button class="start-btn" onclick="startLab()">Start Your Lab</button>
+  </div>
+  <div class="curtain-half left">
+    <img src="./dell-logo.png" alt="Dell" class="curtain-logo" />
+  </div>
+  <div class="curtain-half right">
+    <img src="./nvidia-logo.png" alt="NVIDIA" class="curtain-logo" />
+  </div>
+</div>
+
+<!-- ── SPLIT ROOT ──────────────────────────────────────────────────── -->
+<div class="split-root" id="splitRoot">
+
+  <!-- LEFT: GUIDE ─────────────────────────────────────────────────── -->
+  <div class="left-panel" id="leftPanel">
+
+    <header class="hero">
+      <div class="hero-ambient" aria-hidden="true">
+        <div class="hero-orb hero-orb-1"></div>
+        <div class="hero-orb hero-orb-2"></div>
+        <div class="hero-orb hero-orb-3"></div>
+        <svg class="hero-grid-bg" viewBox="0 0 600 220" preserveAspectRatio="none">
+          <defs><pattern id="dots" x="0" y="0" width="28" height="28" patternUnits="userSpaceOnUse">
+            <circle cx="2" cy="2" r="1" fill="rgba(147,197,253,0.16)"/></pattern></defs>
+          <rect width="100%" height="100%" fill="url(#dots)"/>
+        </svg>
+      </div>
+      <div class="hero-inner">
+        <div class="hero-eyebrow" data-vi="eyebrow">NemoClaw AI Infrastructure Sentinel</div>
+        <span class="brand-lockup" data-vi="brand">DELL × NVIDIA</span>
+        <h1>SENTINEL LAB</h1>
+        <p class="hero-sub">detect · diagnose · <em>approve</em> · resolve</p>
+        <p class="hero-tagline" data-vi="tagline">An AI agent watches a simulated XE9780L GPU cluster. Your job: decide whether it gets to fix the fault it finds.</p>
+        <div class="hero-meta" data-vi="meta">
+          <span><span class="dot"></span>Live Demo</span>
+          <span>XE9780L · 4 Servers · 8× B300</span>
+          <span>NemoClaw v0.0.70</span>
+        </div>
+      </div>
+    </header>
+
+    <nav class="guide-nav" id="guideNav">
+      <a href="#part-1" class="nav-step" data-section="part-1"><span class="nav-num">1</span>Welcome</a>
+      <a href="#part-2" class="nav-step" data-section="part-2"><span class="nav-num">2</span>Dashboard</a>
+      <a href="#part-3" class="nav-step" data-section="part-3"><span class="nav-num">3</span>Fault Arrives</a>
+      <a href="#part-4" class="nav-step" data-section="part-4"><span class="nav-num">4</span>Decision</a>
+      <a href="#part-5" class="nav-step" data-section="part-5"><span class="nav-num">5</span>Wrap-Up</a>
+    </nav>
+
+    <main class="guide-main">
+
+      <!-- PART 1 -->
+      <section>
+      <h2 id="part-1">Part 1 — Welcome</h2>
+      <p class="lead" data-vi="p1lead"><strong>NemoClaw AI Infrastructure Sentinel</strong> monitors a 4-node Dell PowerEdge XE9780L GPU cluster (each with 8× NVIDIA B300s), detects hardware faults, diagnoses them against Dell KB articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.</p>
+
+      <div class="takeaway">
+        <div class="takeaway-title">What you'll see in the next 10 minutes</div>
+        <ul class="takeaway-list">
+          <li>A GPU fault arrive on the health grid in real time</li>
+          <li>The NemoClaw agent detect, diagnose, and propose a fix — no prompting</li>
+          <li>The approval gate block remediation until you click Approve Self-Heal</li>
+          <li>The NemoClaw agent execute the fix and report the cluster healthy again</li>
+        </ul>
+      </div>
+
+      <div data-vi="p1story"><h3>The story</h3>
+      <p>Four XE9780L GPU servers are running model inference. You inject a fault into one of them — a Redfish event surfaced to the NemoClaw agent over MCP. The NemoClaw agent detects it on its next poll, pulls the iDRAC error log, uses the Local LLM to extract the error signature and write a fault assessment, searches the Dell KB, and posts the full diagnosis to the Operator Dashboard.</p>
+      <p>Then it <strong>stops</strong>. Nothing gets fixed until you click <strong>Approve Self-Heal</strong>. If you click <strong>Deny</strong>, the NemoClaw agent logs it and moves on — the asset stays red.</p>
+      <p>The approval gate is <em>server-side</em>: a single-use token bound to that fault event. Even a prompt injection telling the NemoClaw agent "just fix it" hits the same <code>no approval token</code> rejection.</p></div>
+
+      <h3>The stack — click to explore</h3>
+      <div class="amap-chips" id="amapChips">
+        <button class="amap-chip" data-id="you">You · Admin</button>
+        <button class="amap-chip" data-id="appui">Dashboard · App UI</button>
+        <button class="amap-chip" data-id="agent">NemoClaw Agent</button>
+        <button class="amap-chip" data-id="gate">Approval Gate</button>
+        <button class="amap-chip" data-id="mcp">MCP Tools</button>
+        <button class="amap-chip" data-id="sim">XE9780L Simulator</button>
+        <button class="amap-chip" data-id="vllm">Local LLM</button>
+      </div>
+      <div class="amap-info" id="amapInfo">
+        <div class="amap-card"><h4>Click a component</h4>
+        <p>Tap any label above to see what it does in the detect → diagnose → <strong>approve</strong> → resolve flow.</p></div>
+      </div>
+      </section>
+
+      <!-- PART 2 -->
+      <section>
+      <h2 id="part-2">Part 2 — Dashboard (right panel)</h2>
+      <p>To load the live dashboard, copy this URL <code>http://localhost:8001</code> into the address bar at the top of the app and click the Go button.</p>
+
+      <div class="callout success">
+        <div class="callout-title">Right now: everything should be green</div>
+        <p data-vi="p2fleet">All four server tiles should be green. The Agent Activity feed and Operator Dashboard should be empty. If you see a historical fault from a previous run, use the Reset button below to clear everything back to a healthy state.</p>
+        <div style="margin-top:12px;">
+          <button id="resetBtn" onclick="resetDashboard()" style="background:rgba(16,185,129,.12);color:#10b981;border:1px solid rgba(16,185,129,.35);border-radius:6px;padding:7px 16px;font-size:12px;font-weight:700;letter-spacing:.04em;cursor:pointer;font-family:var(--sans);transition:background .15s;" onmouseover="this.style.background='rgba(16,185,129,.22)'" onmouseout="this.style.background='rgba(16,185,129,.12)'">
+            ↺ Reset to healthy state
+          </button>
+          <span id="resetStatus" style="margin-left:12px;font-family:var(--mono);font-size:11px;color:var(--text-dim);"></span>
+        </div>
+      </div>
+
+      <h3>The dashboard layout</h3>
+      <div class="panel-2">
+        <div class="panel-card">
+          <div class="panel-icon">🔲</div>
+          <div class="panel-label">Top left</div>
+          <div class="panel-title">Cluster Health</div>
+          <div class="panel-desc">One tile per server. Green = healthy, red = faulted. Updates live over SSE — no refresh needed. Watch this tile turn red the moment a fault is injected.</div>
+        </div>
+        <div class="panel-card">
+          <div class="panel-icon">📋</div>
+          <div class="panel-label">Top right</div>
+          <div class="panel-title">Agent Activity</div>
+          <div class="panel-desc">A chronological reasoning trace showing every agent step in real time, grouped by phase: DETECT → DIAGNOSE → SEARCH KB → PRESENT → REMEDIATE → RESOLVED. This is the agent thinking out loud.</div>
+        </div>
+      </div>
+      <div class="panel-2" style="margin-bottom:12px;">
+        <div class="panel-card" style="border-color:rgba(139,92,246,.3);">
+          <div class="panel-icon">🖥️</div>
+          <div class="panel-label">Bottom — full width</div>
+          <div class="panel-title">Operator Dashboard</div>
+          <div class="panel-desc">Appears the moment a fault is active. Shows the error signature, matched KB article, the agent's own analysis of the fault, numbered remediation steps, and the <strong>Approve Self-Heal / Deny</strong> buttons. This is where you make your decision.</div>
+        </div>
+        <div class="panel-card">
+          <div class="panel-icon">🔔</div>
+          <div class="panel-label">Header (bell icon)</div>
+          <div class="panel-title">Notification Inbox</div>
+          <div class="panel-desc">A badge appears when the agent posts a fault notification. Click it to see the alert history.</div>
+        </div>
+      </div>
+
+      </section>
+
+      <!-- PART 3 -->
+      <section>
+      <h2 id="part-3">Part 3 — Trigger &amp; Watch</h2>
+      <p data-vi="p3intro">This lab is self-driving. Click the button below to inject a fault into the cluster. The agent detects it automatically — no prompting required. Watch the right panel as each step unfolds.</p>
+
+      <!-- Self-driving fault trigger -->
+      <div style="margin:16px 0 20px;padding:16px 18px;background:linear-gradient(135deg,rgba(0,118,206,.08),rgba(118,185,0,.05));border:1px solid rgba(59,130,246,.25);border-radius:10px;">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);letter-spacing:.14em;text-transform:uppercase;margin-bottom:10px;">Fault Injection Control</div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <button id="startBtn" onclick="triggerFault()" style="background:linear-gradient(135deg,#0558a5,#0672cb);color:#fff;border:0;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;letter-spacing:.04em;cursor:pointer;font-family:var(--sans);transition:filter .15s,transform .15s;" onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''">
+            ▶ Let's get started
+          </button>
+          <div id="startStatus" style="font-family:var(--mono);font-size:12px;color:var(--text-dim);"></div>
+        </div>
+      </div>
+
+      <ul class="beat-list">
+        <li class="active-beat">
+          <span class="beat-num">1</span>
+          <div class="beat-body" data-vi="beat1">
+            <strong>Fault injected — server tile goes red</strong>
+            <p>After a few seconds, a hardware fault event is registered in the simulator. One of the four server tiles in the Cluster Health grid turns red immediately over SSE.</p>
+            <span class="ui-cue">→ Watch: Cluster Health grid (top left of dashboard)</span>
+          </div>
+        </li>
+        <li class="agent-beat">
+          <span class="beat-num">2</span>
+          <div class="beat-body" data-vi="beat2">
+            <strong>DETECT — NemoClaw agent spots the Redfish event</strong>
+            <p>The NemoClaw agent polls the MCP <code>monitor</code> tool every 5 seconds. On its next poll it sees the fault event and identifies the affected asset.</p>
+            <span class="ui-cue">→ Activity feed: DETECT phase lights up — "Scanning Redfish event stream…"</span>
+          </div>
+        </li>
+        <li class="agent-beat">
+          <span class="beat-num">3</span>
+          <div class="beat-body">
+            <strong>DETECT — iDRAC log bundle retrieved</strong>
+            <p>Calls <code>logs.get_bundle</code> to pull the raw iDRAC Lifecycle Log for the faulted server. The log is timestamped with today's date.</p>
+            <span class="ui-cue">→ Activity feed: "Log bundle retrieved — N entries collected"</span>
+          </div>
+        </li>
+        <li class="agent-beat">
+          <span class="beat-num">4</span>
+          <div class="beat-body" data-vi="beat4">
+            <strong>DIAGNOSE — NemoClaw agent analyses the logs and extracts the error signature</strong>
+            <p>Leverages the Local LLM to provide more detail on the error signature and a description of what exactly has occurred. The model uses chain-of-thought reasoning over the full log extract to identify the canonical fault class — <code>Xid 79</code>, <code>ECC uncorrectable error</code>, <code>NVLink fabric failure</code>, etc. — then writes its own plain-language technical assessment of the fault.</p>
+            <span class="ui-cue">→ Activity feed: "LLM identified error signature: …" then AGENT ANALYSIS block populates in Operator Dashboard</span>
+          </div>
+        </li>
+        <li class="agent-beat">
+          <span class="beat-num">5</span>
+          <div class="beat-body">
+            <strong>SEARCH KB — NemoClaw agent searches the local knowledge base</strong>
+            <p>NemoClaw agent leverages a local KB search — both semantic search (using fastembed &amp; FAISS) and word-match search — to retrieve the most accurate KB article with title, summary, and recommended resolution steps. Watch the three KB steps land one by one in the Activity feed.</p>
+            <span class="ui-cue">→ Activity feed: "Querying…" → "✓ KB article matched: KBXXXXXX (confidence N%)" → "Reading…"</span>
+          </div>
+        </li>
+        <li class="active-beat">
+          <span class="beat-num">6</span>
+          <div class="beat-body">
+            <strong>Operator Dashboard reports full detail and prompts for next steps</strong>
+            <p>The dashboard combines all data sources to give rich detail: the node and part affected, error ID, fault description, matching actual log from the hardware, the matching KB article, the recommended remediation steps, and an approval request to self-heal.</p>
+            <span class="ui-cue">→ Operator Dashboard: purple AWAITING APPROVAL badge + "✓ Approve Self-Heal" and "✕ Deny" buttons</span>
+          </div>
+        </li>
+      </ul>
+
+      <div class="callout warn">
+        <div class="callout-title">NemoClaw agent is waiting — it cannot proceed without you</div>
+        <p>The Activity feed shows <em>"⏸ Awaiting human approval — operator must Approve or Deny in the dashboard."</em> The NemoClaw agent is blocked. No remediation runs until you make a decision in the Operator Dashboard.</p>
+      </div>
+      </section>
+
+      <!-- PART 4 -->
+      <section>
+      <h2 id="part-4">Part 4 — Your Decision</h2>
+
+      <h3>What to read in the Operator Dashboard</h3>
+      <p>Now review what the NemoClaw agent is presenting in the Operator Dashboard before taking any action. Review the rich data the NemoClaw agent has returned, the recommended remediation steps, and approve to implement them — or deny to leave the asset in its current state (Human in the loop).</p>
+
+      <div class="panel-2" style="margin-bottom:12px;">
+        <div class="panel-card">
+          <div class="panel-icon" style="font-family:var(--mono);font-size:11px;color:#f59e0b;">SIG</div>
+          <div class="panel-title">Error Signature</div>
+          <div class="panel-desc">The canonical fault class extracted from the iDRAC log by the Local LLM — e.g. <code>Xid 79</code>, <code>ECC uncorrectable error</code>. This is what drove the KB search.</div>
+        </div>
+        <div class="panel-card">
+          <div class="panel-icon" style="font-family:var(--mono);font-size:11px;color:#60a5fa;">KB</div>
+          <div class="panel-title">Knowledge Base Match</div>
+          <div class="panel-desc">The article ID and confidence score returned by the semantic search. Higher confidence = closer vector match to the error signature in the KB.</div>
+        </div>
+      </div>
+      <div class="panel-2" style="margin-bottom:12px;">
+        <div class="panel-card" style="border-color:rgba(139,92,246,.3);">
+          <div class="panel-icon" style="font-family:var(--mono);font-size:11px;color:#8b5cf6;">AI</div>
+          <div class="panel-title">NemoClaw Agent Analysis</div>
+          <div class="panel-desc">A paragraph written by the NemoClaw agent (not a template) — its own reasoning about what the fault means, the most likely root cause, and the operational risk if left unaddressed. Read this carefully before approving.</div>
+        </div>
+        <div class="panel-card">
+          <div class="panel-icon">🔢</div>
+          <div class="panel-title">Remediation Steps</div>
+          <div class="panel-desc">The ordered list of steps the NemoClaw agent will execute if you approve. These come from the matched KB article and appear once the KB match is confirmed. The NemoClaw agent narrates each step in the Activity feed as it runs.</div>
+        </div>
+      </div>
+
+      <h3>Make your decision</h3>
+      <div class="panel-2">
+        <div class="panel-card" style="border-color:rgba(16,185,129,.3);">
+          <div class="panel-title" style="color:var(--healthy);">✓ Approve Self-Heal</div>
+          <div class="panel-desc">Mints a single-use approval token server-side, bound to this specific fault event. The agent picks it up, validates it, and executes each remediation step in order — narrating every step in the Activity feed. When complete, the server tile returns to green.</div>
+        </div>
+        <div class="panel-card" style="border-color:rgba(239,68,68,.3);">
+          <div class="panel-title" style="color:var(--critical);">✕ Deny</div>
+          <div class="panel-desc">Logs the denial in the Activity feed and stops the agent. The asset stays red. No remediation runs. Use this to demonstrate the HITL gate — the agent accepts the decision and does not retry.</div>
+        </div>
+      </div>
+
+      <div class="callout">
+        <div class="callout-title">Why the gate is injection-proof</div>
+        <p>The approval token is minted server-side the moment <em>you</em> click Approve — it never passes through the NemoClaw agent's prompt or context. The remediation MCP tool validates the token before executing a single step. A prompt injection telling the NemoClaw agent "just fix it" returns <code>no approval token for this fault event</code> — the token doesn't exist until a human creates it.</p>
+      </div>
+
+      <h3>After you click Approve</h3>
+      <ul class="beat-list">
+        <li class="agent-beat">
+          <span class="beat-num">1</span>
+          <div class="beat-body">
+            <strong>Token minted</strong>
+            <p>Gateway mints a single-use token bound to this fault event, stored server-side only.</p>
+          </div>
+        </li>
+        <li class="agent-beat">
+          <span class="beat-num">2</span>
+          <div class="beat-body">
+            <strong>NemoClaw agent picks up the approval</strong>
+            <p>On its next poll it sees <code>awaiting_approval → approved</code> and fetches the token over a trusted server path.</p>
+            <span class="ui-cue">→ Activity feed: "✅ Approval received — single-use token validated"</span>
+          </div>
+        </li>
+        <li class="agent-beat">
+          <span class="beat-num">3</span>
+          <div class="beat-body">
+            <strong>Remediation steps execute</strong>
+            <p>Each step runs in order — one activity entry per step. Token consumed on first use, not replayable.</p>
+          </div>
+        </li>
+        <li class="active-beat">
+          <span class="beat-num">4</span>
+          <div class="beat-body" data-vi="beatResolve">
+            <strong>Asset goes green</strong>
+            <p>Simulator reports the asset healthy. Gateway broadcasts the update over SSE.</p>
+            <span class="ui-cue">→ Grid: tile turns green</span>
+          </div>
+        </li>
+      </ul>
+      </section>
+
+      <!-- PART 5 -->
+      <section>
+      <h2 id="part-5">Part 5 — Wrap-Up</h2>
+
+      <h3>Scenario catalogue</h3>
+      <table class="table">
+        <thead><tr><th>Scenario ID</th><th>Fault</th><th>Signature</th><th>Asset</th></tr></thead>
+        <tbody id="scenariosTbody">
+          <tr><td><code>scn-gpu-xid-79</code></td><td>GPU off bus</td><td><code>Xid 79</code></td><td>gpu-server-02</td></tr>
+          <tr><td><code>scn-ecc-uncorrectable</code></td><td>HBM double-bit error</td><td><code>ECC uncorrectable</code></td><td>gpu-server-01</td></tr>
+          <tr><td><code>scn-nvlink-down</code></td><td>NVLink fabric failure</td><td><code>NVLink fabric failure</code></td><td>gpu-server-02</td></tr>
+          <tr><td><code>scn-psu-loss</code></td><td>PSU redundancy</td><td><code>PSU 2 input lost</code></td><td>gpu-server-01</td></tr>
+          <tr><td><code>scn-thermal-throttle</code></td><td>Over-temperature</td><td><code>thermal throttle</code></td><td>gpu-server-01</td></tr>
+          <tr><td colspan="4" style="color:var(--text-dim);font-style:italic;font-size:.78rem;">gpu-server-03 and gpu-server-04 remain healthy as background nodes</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Quick reference</h3>
+      <table class="table">
+        <thead><tr><th>What</th><th>How</th></tr></thead>
+        <tbody>
+          <tr><td>Change dashboard URL</td><td>Address bar at top of right panel → Go</td></tr>
+          <tr><td>Resize panels</td><td>Drag the vertical divider bar</td></tr>
+          <tr><td>Open fault detail</td><td>Click notification in inbox (right panel)</td></tr>
+          <tr><td>Approve remediation</td><td><strong>Approve</strong> button on fault detail</td></tr>
+          <tr><td>Deny remediation</td><td><strong>Deny</strong> button — asset stays red</td></tr>
+          <tr><td>Live agent log</td><td>Activity feed (bottom of right panel)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>NemoClaw agent architecture</h3>
+      <p>The sentinel runs as a NemoClaw v0.0.70 agent with four skills and a <code>soul.md</code> identity document. Each skill maps to one phase of the fault lifecycle:</p>
+      <table class="table">
+        <thead><tr><th>Skill</th><th>Phase</th><th>Tools used</th></tr></thead>
+        <tbody>
+          <tr><td><code>infra-sentinel-monitor</code></td><td>Detect</td><td><code>monitor_list_events</code></td></tr>
+          <tr><td><code>infra-sentinel-diagnose</code></td><td>Diagnose</td><td><code>logs_get_bundle</code>, Local LLM (chain-of-thought), <code>kb_search</code></td></tr>
+          <tr><td><code>infra-sentinel-notify</code></td><td>Present</td><td>Gateway <code>/api/agent/activity</code>, <code>PATCH /status</code></td></tr>
+          <tr><td><code>infra-sentinel-remediate</code></td><td>Remediate</td><td><code>remediation_execute</code>, approval token poll</td></tr>
+        </tbody>
+      </table>
+      <p>The <code>soul.md</code> defines the NemoClaw agent's identity, values, constraints, and reasoning style — including the rule that no remediation step may execute without a valid human approval token.</p>
+      <div class="codeblock">
+        <div class="codeblock-header"><span>view agent skills</span><button class="copy-btn" data-copy="ls agent/skills/">📋 Copy</button></div>
+        <pre><code>ls agent/skills/</code></pre>
+      </div>
+      <div class="codeblock">
+        <div class="codeblock-header"><span>view soul.md</span><button class="copy-btn" data-copy="cat agent/soul.md">📋 Copy</button></div>
+        <pre><code>cat agent/soul.md</code></pre>
+      </div>
+      </section>
+
+    </main>
+
+    <div class="guide-footer">NemoClaw Sentinel — Attendee Lab Guide · demo content is simulated · v0.1.0</div>
+  </div>
+
+  <!-- RESIZER ─────────────────────────────────────────────────────── -->
+  <div class="resizer" id="resizer" title="Drag to resize panels"></div>
+
+  <!-- RIGHT PANEL: DASHBOARD ─────────────────────────────────────── -->
+  <div class="right-panel" id="rightPanel">
+    <div class="dash-bar">
+      <span class="dash-bar-label">Dashboard</span>
+      <div class="dash-status" id="dashStatus"></div>
+      <input class="dash-url-input" id="dashUrl" type="url" value="http://localhost:8001" placeholder="http://localhost:8001" />
+      <button class="dash-go-btn" onclick="loadDash()">Go</button>
+    </div>
+    <iframe id="dash-frame" src="" title="NemoClaw Dashboard" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+    <div class="dash-error" id="dashError">
+      <h3>⚠ Dashboard couldn't load</h3>
+      <p>The App UI may be refusing to load inside an iframe (<code>X-Frame-Options</code>). Try opening the dashboard directly:</p>
+      <p><a id="dashDirectLink" href="http://localhost:8001" target="_blank" rel="noopener">Open dashboard in new tab →</a></p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── URL param override ─────────────────────────────────────────────
+const params = new URLSearchParams(location.search);
+const defaultUrl = params.get("url") || "http://localhost:8001";
+document.getElementById("dashUrl").value = defaultUrl;
+document.getElementById("dashDirectLink").href = defaultUrl;
+
+function loadDash() {
+  const url = document.getElementById("dashUrl").value.trim();
+  if (!url) return;
+  document.getElementById("dash-frame").src = url;
+  document.getElementById("dashDirectLink").href = url;
+  document.getElementById("dashError").classList.remove("show");
+}
+
+function startLab() {
+  // Always reset to healthy state before the lab begins
+  fetch(`${window.location.origin}/api/presenter/reset`, { method: "POST" }).catch(() => {});
+  document.body.classList.add("started");
+  setTimeout(() => {
+    loadDash();
+    document.getElementById("curtain").style.display = "none";
+  }, 1700);
+}
+
+// ── iframe feedback ────────────────────────────────────────────────
+document.getElementById("dash-frame").addEventListener("load", () => {
+  document.getElementById("dashStatus").classList.add("live");
+  document.getElementById("dashError").classList.remove("show");
+});
+document.getElementById("dash-frame").addEventListener("error", () => {
+  document.getElementById("dashStatus").classList.remove("live");
+  document.getElementById("dashError").classList.add("show");
+});
+
+// Enter key in URL bar
+document.getElementById("dashUrl").addEventListener("keydown", e => {
+  if (e.key === "Enter") loadDash();
+});
+
+// ── Draggable resizer ─────────────────────────────────────────────
+const resizer = document.getElementById("resizer");
+const splitRoot = document.getElementById("splitRoot");
+const frame = document.getElementById("dash-frame");
+let dragging = false;
+
+resizer.addEventListener("mousedown", e => {
+  dragging = true;
+  resizer.classList.add("dragging");
+  document.body.style.cursor = "col-resize";
+  document.body.style.userSelect = "none";
+  frame.style.pointerEvents = "none"; // prevent iframe swallowing events
+  e.preventDefault();
+});
+
+document.addEventListener("mousemove", e => {
+  if (!dragging) return;
+  const rect = splitRoot.getBoundingClientRect();
+  let pct = ((e.clientX - rect.left) / rect.width) * 100;
+  pct = Math.max(22, Math.min(78, pct));
+  splitRoot.style.gridTemplateColumns = `${pct}% 5px 1fr`;
+});
+
+document.addEventListener("mouseup", () => {
+  if (!dragging) return;
+  dragging = false;
+  resizer.classList.remove("dragging");
+  document.body.style.cursor = "";
+  document.body.style.userSelect = "";
+  frame.style.pointerEvents = "";
+});
+
+// Touch support
+resizer.addEventListener("touchstart", e => { dragging = true; e.preventDefault(); }, { passive: false });
+document.addEventListener("touchmove", e => {
+  if (!dragging) return;
+  const rect = splitRoot.getBoundingClientRect();
+  let pct = ((e.touches[0].clientX - rect.left) / rect.width) * 100;
+  pct = Math.max(22, Math.min(78, pct));
+  splitRoot.style.gridTemplateColumns = `${pct}% 5px 1fr`;
+}, { passive: false });
+document.addEventListener("touchend", () => { dragging = false; });
+
+// ── Dashboard reset ───────────────────────────────────────────────
+function resetDashboard() {
+  const btn = document.getElementById("resetBtn");
+  const status = document.getElementById("resetStatus");
+  if (!btn || !status) return;
+  btn.disabled = true;
+  btn.style.opacity = ".6";
+  status.style.color = "var(--warning)";
+  status.textContent = "Resetting…";
+  fetch(`${window.location.origin}/api/presenter/reset`, { method: "POST" })
+    .then(r => {
+      if (r.ok) {
+        status.style.color = "var(--healthy)";
+        status.textContent = "✓ All clear — cluster reset to healthy state";
+      } else {
+        status.style.color = "var(--critical)";
+        status.textContent = `Error ${r.status} — check gateway logs`;
+      }
+    })
+    .catch(() => {
+      status.style.color = "var(--critical)";
+      status.textContent = "Network error — is the gateway running?";
+    })
+    .finally(() => {
+      btn.disabled = false;
+      btn.style.opacity = "1";
+      setTimeout(() => { status.textContent = ""; }, 4000);
+    });
+}
+
+// ── Fault trigger countdown ───────────────────────────────────────
+let countdown = null;
+function triggerFault() {
+  if (countdown !== null) return;
+  const btn = document.getElementById("startBtn");
+  const status = document.getElementById("startStatus");
+
+  // Block when opened as file:// — browser prevents cross-origin fetch to http://
+  if (window.location.protocol === "file:") {
+    status.style.color = "var(--critical)";
+    status.innerHTML = `Open via the gateway instead: <a href="http://localhost:8001/lab/lab-guide.html" style="color:var(--accent)">http://localhost:8001/lab/lab-guide.html</a>`;
+    return;
+  }
+
+  const base = window.location.origin;
+  let secs = 5;
+  btn.disabled = true;
+  btn.style.opacity = ".6";
+  btn.textContent = "▶ Let's get started";
+  status.style.color = "var(--warning)";
+  status.textContent = `Injecting fault in ${secs}s…`;
+  countdown = setInterval(() => {
+    secs--;
+    if (secs > 0) {
+      status.textContent = `Injecting fault in ${secs}s…`;
+    } else {
+      clearInterval(countdown);
+      countdown = null;
+      status.textContent = "Injecting…";
+      fetch(`${base}/api/presenter/inject`, { method: "POST" })
+        .then(r => {
+          if (r.ok) {
+            status.style.color = "var(--healthy)";
+            status.textContent = "✓ Fault injected — watch the dashboard!";
+          } else {
+            status.style.color = "var(--critical)";
+            status.textContent = `Server returned ${r.status} — check gateway logs.`;
+          }
+        })
+        .catch((err) => {
+          console.error("inject failed:", err);
+          status.style.color = "var(--critical)";
+          status.textContent = `Network error (${err.message}) — is the gateway running at ${base}?`;
+        })
+        .finally(() => {
+          btn.disabled = false;
+          btn.style.opacity = "1";
+          btn.textContent = "▶ Inject another fault";
+        });
+    }
+  }, 1000);
+}
+
+// ── Vertical configuration ─────────────────────────────────────────
+const VERTICAL_CONFIG = {
+  "ai-infrastructure": {
+    eyebrow: "NemoClaw AI Infrastructure Sentinel",
+    brand: "DELL × NVIDIA",
+    tagline: "An AI agent watches a simulated XE9780L GPU cluster. Your job: decide whether it gets to fix the fault it finds.",
+    meta: `<span><span class="dot"></span>Live Demo</span><span>XE9780L · 4 Servers · 8× B300</span><span>NemoClaw v0.0.70</span>`,
+    p1lead: `<strong>NemoClaw AI Infrastructure Sentinel</strong> monitors a 4-node Dell PowerEdge XE9780L GPU cluster (each with 8× NVIDIA B300s), detects hardware faults, diagnoses them against Dell KB articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.`,
+    p1story: `<h3>The story</h3>
+      <p>Four XE9780L GPU servers are running model inference. You inject a fault into one of them — a Redfish event surfaced to the NemoClaw agent over MCP. The NemoClaw agent detects it on its next poll, pulls the iDRAC error log, uses the Local LLM to extract the error signature and write a fault assessment, searches the Dell KB, and posts the full diagnosis to the Operator Dashboard.</p>
+      <p>Then it <strong>stops</strong>. Nothing gets fixed until you click <strong>Approve Self-Heal</strong>. If you click <strong>Deny</strong>, the NemoClaw agent logs it and moves on — the asset stays red.</p>
+      <p>The approval gate is <em>server-side</em>: a single-use token bound to that fault event. Even a prompt injection telling the NemoClaw agent "just fix it" hits the same <code>no approval token</code> rejection.</p>`,
+    p2fleet: `All four server tiles should be green. The Agent Activity feed and Operator Dashboard should be empty. If you see a historical fault from a previous run, use the Reset button below to clear everything back to a healthy state.`,
+    p3intro: `This lab is self-driving. Click the button below to inject a fault into the cluster. The agent detects it automatically — no prompting required. Watch the right panel as each step unfolds.`,
+    beat1: `<strong>Fault injected — server tile goes red</strong><p>After a few seconds, a hardware fault event is registered in the simulator. One of the four server tiles in the Cluster Health grid turns red immediately over SSE.</p><span class="ui-cue">→ Watch: Cluster Health grid (top left of dashboard)</span>`,
+    beat2: `<strong>DETECT — NemoClaw agent spots the Redfish event</strong><p>The NemoClaw agent polls the MCP <code>monitor</code> tool every 5 seconds. On its next poll it sees the fault event and identifies the affected asset.</p><span class="ui-cue">→ Activity feed: DETECT phase lights up — "Scanning Redfish event stream…"</span>`,
+    beat4: `<strong>DIAGNOSE — NemoClaw agent analyses the logs and extracts the error signature</strong><p>Leverages the Local LLM to provide more detail on the error signature and a description of what exactly has occurred. The model uses chain-of-thought reasoning over the full log extract to identify the canonical fault class — <code>Xid 79</code>, <code>ECC uncorrectable error</code>, <code>NVLink fabric failure</code>, etc. — then writes its own plain-language technical assessment of the fault.</p><span class="ui-cue">→ Activity feed: "LLM identified error signature: …" then AGENT ANALYSIS block populates in Operator Dashboard</span>`,
+    beatResolve: `<strong>Server goes green</strong><p>Simulator reports the asset healthy. Gateway broadcasts the update over SSE.</p><span class="ui-cue">→ Grid: server tile turns green</span>`,
+    simChipLabel: "XE9780L Simulator",
+    amapSim: { role: "fake XE9780L · Redfish surface", body: "Simulated Dell PowerEdge XE9780L GPU cluster. Emits Redfish events and log entries on fault injection. Reports healthy again after successful remediation. Safe to reset at any time." },
+    scenarios: [
+      ["scn-gpu-xid-79","GPU off bus","Xid 79","gpu-server-02"],
+      ["scn-ecc-uncorrectable","HBM double-bit error","ECC uncorrectable error","gpu-server-01"],
+      ["scn-nvlink-down","NVLink fabric failure","NVLink fabric failure","gpu-server-02"],
+      ["scn-psu-loss","PSU redundancy","PSU 2 input lost","gpu-server-01"],
+      ["scn-thermal-throttle","Over-temperature","thermal throttle","gpu-server-01"],
+    ],
+    scenarioNote: "gpu-server-03 and gpu-server-04 remain healthy as background nodes",
+  },
+  "laptop-fleet": {
+    eyebrow: "NemoClaw Device Fleet Sentinel",
+    brand: "DELL × NVIDIA",
+    tagline: "An AI agent monitors a simulated Precision laptop fleet. Your job: decide whether it gets to resolve the device fault it finds.",
+    meta: `<span><span class="dot"></span>Live Demo</span><span>Dell Precision · 3 Laptops · NVIDIA RTX</span><span>NemoClaw v0.0.70</span>`,
+    p1lead: `<strong>NemoClaw Device Fleet Sentinel</strong> monitors a 3-device Dell Precision laptop fleet, detects hardware and driver faults, diagnoses them against Dell KB articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.`,
+    p1story: `<h3>The story</h3>
+      <p>Three Dell Precision laptops are in active use. You inject a fault into one of them — a device event surfaced to the NemoClaw agent over MCP. The NemoClaw agent detects it on its next poll, pulls the device event log, uses the Local LLM to extract the error signature and write a fault assessment, searches the Dell KB, and posts the full diagnosis to the Operator Dashboard.</p>
+      <p>Then it <strong>stops</strong>. Nothing gets fixed until you click <strong>Approve Self-Heal</strong>. If you click <strong>Deny</strong>, the NemoClaw agent logs it and moves on — the device stays red.</p>
+      <p>The approval gate is <em>server-side</em>: a single-use token bound to that fault event. Even a prompt injection telling the NemoClaw agent "just fix it" hits the same <code>no approval token</code> rejection.</p>`,
+    p2fleet: `All three laptop tiles should be green. The Agent Activity feed and Operator Dashboard should be empty. If you see a historical fault from a previous run, use the Reset button below to clear everything back to a healthy state.`,
+    p3intro: `This lab is self-driving. Click the button below to inject a fault into the fleet. The agent detects it automatically — no prompting required. Watch the right panel as each step unfolds.`,
+    beat1: `<strong>Fault injected — laptop tile goes red</strong><p>After a few seconds, a device fault event is registered in the simulator. One of the three laptop tiles in the Fleet Health grid turns red immediately over SSE.</p><span class="ui-cue">→ Watch: Fleet Health grid (top left of dashboard)</span>`,
+    beat2: `<strong>DETECT — NemoClaw agent spots the device event</strong><p>The NemoClaw agent polls the MCP <code>monitor</code> tool every 5 seconds. On its next poll it sees the fault event and identifies the affected device.</p><span class="ui-cue">→ Activity feed: DETECT phase lights up — "Scanning device event stream…"</span>`,
+    beat4: `<strong>DIAGNOSE — NemoClaw agent analyses the logs and extracts the error signature</strong><p>Leverages the Local LLM to provide more detail on the error signature and a description of what exactly has occurred. The model uses chain-of-thought reasoning over the full log extract to identify the canonical fault class — <code>TDR</code>, <code>ECC uncorrectable error</code>, <code>GPU OOM</code>, etc. — then writes its own plain-language technical assessment of the fault.</p><span class="ui-cue">→ Activity feed: "LLM identified error signature: …" then AGENT ANALYSIS block populates in Operator Dashboard</span>`,
+    beatResolve: `<strong>Laptop goes green</strong><p>Simulator reports the device healthy. Gateway broadcasts the update over SSE.</p><span class="ui-cue">→ Grid: laptop tile turns green</span>`,
+    simChipLabel: "Precision Simulator",
+    amapSim: { role: "fake Precision fleet · event surface", body: "Simulated Dell Precision laptop fleet (3 devices). Emits device events and log entries on fault injection. Reports healthy again after successful remediation. Safe to reset at any time." },
+    scenarios: [
+      ["scn-driver-tdr","Display driver TDR","TDR","laptop-02"],
+      ["scn-gpu-oom","GPU out of memory","GPU OOM","laptop-01"],
+      ["scn-nvgpu-ecc-error","ECC uncorrectable error","ECC uncorrectable error","laptop-03"],
+    ],
+    scenarioNote: "All three laptops are active; faults rotate across the fleet",
+  },
+};
+
+function applyVertical() {
+  const vertical = new URLSearchParams(location.search).get("vertical") || "ai-infrastructure";
+  const cfg = VERTICAL_CONFIG[vertical] || VERTICAL_CONFIG["ai-infrastructure"];
+  document.querySelectorAll("[data-vi]").forEach(el => {
+    const key = el.getAttribute("data-vi");
+    if (cfg[key] !== undefined) el.innerHTML = cfg[key];
+  });
+  if (cfg.amapSim) {
+    AMAP.sim = cfg.amapSim;
+    document.querySelectorAll(".amap-chip[data-id='sim']").forEach(chip => {
+      chip.textContent = cfg.simChipLabel || cfg.amapSim.role;
+    });
+  }
+  if (cfg.scenarios) {
+    const tbody = document.getElementById("scenariosTbody");
+    if (tbody) {
+      tbody.innerHTML = cfg.scenarios.map(([id, fault, sig, asset]) =>
+        `<tr><td><code>${id}</code></td><td>${fault}</td><td><code>${sig}</code></td><td>${asset}</td></tr>`
+      ).join("") + `<tr><td colspan="4" style="color:var(--text-dim);font-style:italic;font-size:.78rem;">${cfg.scenarioNote}</td></tr>`;
+    }
+  }
+}
+document.addEventListener("DOMContentLoaded", applyVertical);
+
+// ── Arch map ───────────────────────────────────────────────────────
+const AMAP = {
+  you:   { role: "the human in the loop", body: "You watch the Operator Dashboard, read the NemoClaw agent's fault diagnosis and analysis, and click Approve Self-Heal or Deny. Nothing is remediated without your explicit decision." },
+  appui: { role: "port :8001 · React/Vite · SSE", body: "Cluster health grid, Operator Dashboard, and Agent Activity feed. All panels update live via Server-Sent Events — no page refresh needed." },
+  agent: { role: "NemoClaw v0.0.70 · 4 skills · soul.md", body: "NemoClaw AI agent running the infra-sentinel skill set: monitor → diagnose → notify → remediate. Uses a Local LLM with chain-of-thought reasoning for log analysis and fault assessment. Cannot remediate without a valid human approval token." },
+  gate:  { role: "server-side HITL enforcement", body: "Lives in the Gateway service, not the NemoClaw agent prompt. When you click Approve Self-Heal, a single-use token is minted server-side and bound to that specific fault event. The remediation tool validates it before running anything." },
+  mcp:   { role: "monitor · logs · kb · remediation", body: "Four MCP tools over Streamable HTTP. monitor reads Redfish events. logs fetches the iDRAC log bundle. kb runs fastembed ONNX + FAISS semantic search plus word-match fallback. remediation executes approved steps — refuses without a valid token." },
+  sim:   { role: "fake XE9780L · Redfish surface", body: "Simulated Dell PowerEdge XE9780L GPU cluster. Emits Redfish events and log entries on fault injection. Reports healthy again after successful remediation. Safe to reset at any time." },
+  vllm:  { role: "Local LLM · on-cluster inference", body: "The Local LLM the NemoClaw agent uses for chain-of-thought reasoning and log analysis. Runs two passes per fault: signature extraction (with thinking) and a natural-language fault assessment (clean prose). Served via an OpenAI-compatible vLLM endpoint." }
+};
+
+const amapInfo = document.getElementById("amapInfo");
+document.getElementById("amapChips").addEventListener("click", e => {
+  const chip = e.target.closest(".amap-chip");
+  if (!chip) return;
+  document.querySelectorAll(".amap-chip").forEach(c => c.classList.remove("selected"));
+  chip.classList.add("selected");
+  const i = AMAP[chip.dataset.id];
+  if (!i) return;
+  amapInfo.innerHTML = `<div class="amap-card"><h4>${chip.textContent.trim()}</h4><div class="role">${i.role}</div><p>${i.body}</p></div>`;
+});
+
+// ── Copy buttons ───────────────────────────────────────────────────
+document.querySelectorAll(".copy-btn").forEach(btn => {
+  const text = btn.dataset.copy || "";
+  btn.addEventListener("click", () => {
+    navigator.clipboard.writeText(text.trim()).then(() => {
+      btn.classList.add("copied");
+      const orig = btn.textContent;
+      btn.textContent = "✓ Copied";
+      setTimeout(() => { btn.classList.remove("copied"); btn.textContent = orig; }, 1400);
+    });
+  });
+});
+
+// ── TOC scroll spy ────────────────────────────────────────────────
+const navSteps = Array.from(document.querySelectorAll(".nav-step"));
+const sections = navSteps.map(s => document.getElementById(s.dataset.section));
+const leftPanel = document.getElementById("leftPanel");
+
+function updateNav() {
+  const y = leftPanel.scrollTop + 80;
+  let active = 0;
+  sections.forEach((s, i) => { if (s && s.offsetTop <= y) active = i; });
+  navSteps.forEach((s, i) => {
+    s.classList.remove("active", "visited");
+    if (i < active) s.classList.add("visited");
+    else if (i === active) s.classList.add("active");
+  });
+}
+leftPanel.addEventListener("scroll", updateNav, { passive: true });
+updateNav();
+</script>
+</body>
+</html>
