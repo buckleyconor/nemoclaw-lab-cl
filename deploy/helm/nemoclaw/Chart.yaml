@@ -1,0 +1,17 @@
+apiVersion: v2
+name: nemoclaw
+description: NemoClaw Infrastructure Sentinel — autonomous AIOps demo lab
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - nvidia
+  - nemoclaw
+  - aiops
+  - demo
+home: https://github.com/buckleyconor/nemoclaw-lab-cl
+sources:
+  - https://github.com/buckleyconor/nemoclaw-lab-cl
+maintainers:
+  - name: buckleyconor
+    email: buckleyconor@gmail.com

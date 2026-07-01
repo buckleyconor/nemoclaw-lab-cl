@@ -1,0 +1,36 @@
+# Python artifacts
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.mypy_cache
+.ruff_cache
+*.egg-info
+dist/
+
+# Tests / docs (not needed in images)
+tests/
+docs/
+
+# UI source (gateway image uses Node build stage; other images don't need it)
+ui/node_modules/
+ui/src/
+ui/public/
+ui/tsconfig*.json
+ui/vite.config.ts
+ui/package*.json
+ui/README.md
+ui/.oxlintrc.json
+
+# Git / IDE
+.git/
+.gitignore
+.DS_Store
+*.swp
+
+# Deploy tooling (not needed inside images)
+deploy/
+Makefile
+docker/

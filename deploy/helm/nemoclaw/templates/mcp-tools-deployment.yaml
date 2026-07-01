@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nemoclaw.fullname" . }}-mcp-tools
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "nemoclaw.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mcp-tools
+spec:
+  replicas: {{ .Values.mcpTools.replicas }}
+  selector:
+    matchLabels:
+      {{- include "nemoclaw.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: mcp-tools
+  template:
+    metadata:
+      labels:
+        {{- include "nemoclaw.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: mcp-tools
+    spec:
+      serviceAccountName: {{ include "nemoclaw.serviceAccountName" . }}
+      containers:
+        - name: mcp-tools
+          image: {{ include "nemoclaw.image" (dict "root" . "name" .Values.mcpTools.image) }}
+          imagePullPolicy: {{ .Values.global.pullPolicy }}
+          command:
+            {{- toYaml .Values.mcpTools.command | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.mcpTools.port }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "nemoclaw.fullname" . }}-config
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.mcpTools.resources | nindent 12 }}

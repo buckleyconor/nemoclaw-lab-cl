@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nemoclaw.fullname" . }}-simulator
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "nemoclaw.labels" . | nindent 4 }}
+    app.kubernetes.io/component: simulator
+spec:
+  replicas: {{ .Values.simulator.replicas }}
+  selector:
+    matchLabels:
+      {{- include "nemoclaw.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: simulator
+  template:
+    metadata:
+      labels:
+        {{- include "nemoclaw.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: simulator
+    spec:
+      serviceAccountName: {{ include "nemoclaw.serviceAccountName" . }}
+      containers:
+        - name: simulator
+          image: {{ include "nemoclaw.image" (dict "root" . "name" .Values.simulator.image) }}
+          imagePullPolicy: {{ .Values.global.pullPolicy }}
+          command:
+            {{- toYaml .Values.simulator.command | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.simulator.port }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "nemoclaw.fullname" . }}-config
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.simulator.resources | nindent 12 }}

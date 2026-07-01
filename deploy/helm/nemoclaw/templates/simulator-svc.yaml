@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "nemoclaw.fullname" . }}-simulator
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "nemoclaw.labels" . | nindent 4 }}
+    app.kubernetes.io/component: simulator
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "nemoclaw.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: simulator
+  ports:
+    - name: http
+      port: {{ .Values.simulator.port }}
+      targetPort: http
+      protocol: TCP

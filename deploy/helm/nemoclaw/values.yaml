@@ -1,0 +1,133 @@
+# NemoClaw Helm chart — default values for MicroK8s / GB10 (arm64).
+# Override for production: see deploy/helm/nemoclaw/values.prod.yaml (M9).
+
+# ── Global ────────────────────────────────────────────────────────────────────
+global:
+  # Image registry prefix. MicroK8s built-in: localhost:32000
+  # Docker Hub example: docker.io/yourusername
+  registry: "localhost:32000"
+  tag: "latest"
+  pullPolicy: IfNotPresent
+  packId: "datacenter-xe9680"
+
+# ── Simulator ────────────────────────────────────────────────────────────────
+simulator:
+  image: "nemoclaw-backend"
+  port: 8003
+  command:
+    - python
+    - -m
+    - uvicorn
+    - services.simulator.main:app
+    - --host
+    - "0.0.0.0"
+    - --port
+    - "8003"
+  replicas: 1
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+# ── Orchestrator ─────────────────────────────────────────────────────────────
+orchestrator:
+  image: "nemoclaw-backend"
+  port: 8002
+  command:
+    - python
+    - -m
+    - uvicorn
+    - services.orchestrator.main:app
+    - --host
+    - "0.0.0.0"
+    - --port
+    - "8002"
+  replicas: 1
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+# ── MCP Tools ────────────────────────────────────────────────────────────────
+mcpTools:
+  image: "nemoclaw-backend"
+  port: 8004
+  command:
+    - python
+    - -m
+    - uvicorn
+    - services.mcp_tools.main:app
+    - --host
+    - "0.0.0.0"
+    - --port
+    - "8004"
+  replicas: 1
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1536Mi"  # headroom for fastembed model + FAISS index
+
+# ── Gateway ──────────────────────────────────────────────────────────────────
+gateway:
+  image: "nemoclaw-gateway"
+  port: 8001
+  command:
+    - python
+    - -m
+    - uvicorn
+    - services.gateway.main:app
+    - --host
+    - "0.0.0.0"
+    - --port
+    - "8001"
+  replicas: 1
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+# ── Ingress (gateway only) ────────────────────────────────────────────────────
+ingress:
+  enabled: true
+  className: "nginx"
+  # Set to the hostname you point at the MicroK8s node IP (or /etc/hosts entry).
+  host: "nemoclaw.lab"
+  # TLS disabled by default; enable in values.prod.yaml.
+  tls: []
+
+# ── Agent ─────────────────────────────────────────────────────────────────────
+agent:
+  image: "nemoclaw-backend"
+  replicas: 1
+  pollIntervalSeconds: "5"
+  approvalTimeoutSeconds: "600"
+  # LLM credentials — override via --set or a sealed secret in prod.
+  llm:
+    baseUrl: "http://192.168.68.131:8000/v1"
+    apiKey: "vllm"
+    model: "qwen3.6-35b-a3b-dflash"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+# ── ServiceAccount (minimal RBAC — no K8s API access needed) ────────────────
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}

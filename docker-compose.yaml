@@ -1,0 +1,120 @@
+# Local development stack — builds images from source.
+# Usage:
+#   docker compose up --build
+#
+# Override the LLM endpoint:
+#   LLM_BASE_URL=http://192.168.68.131:8000/v1 \
+#   LLM_MODEL=qwen3.6-35b-a3b-dflash \
+#   docker compose up --build
+
+x-backend-build: &backend-build
+  context: .
+  dockerfile: docker/Dockerfile.backend
+
+x-env-common: &env-common
+  PACK_ID: ${PACK_ID:-datacenter-xe9680}
+
+x-env-llm: &env-llm
+  LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:8000/v1}
+  LLM_API_KEY: ${LLM_API_KEY:-vllm}
+  LLM_MODEL: ${LLM_MODEL:-qwen3.6-35b-a3b-dflash}
+
+services:
+
+  # ── Simulator ────────────────────────────────────────────────────────────────
+  simulator:
+    build: *backend-build
+    command: >
+      python -m uvicorn services.simulator.main:app
+      --host 0.0.0.0 --port 8003
+    environment:
+      <<: *env-common
+    ports:
+      - "8003:8003"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/healthz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Orchestrator ─────────────────────────────────────────────────────────────
+  orchestrator:
+    build: *backend-build
+    command: >
+      python -m uvicorn services.orchestrator.main:app
+      --host 0.0.0.0 --port 8002
+    environment:
+      <<: *env-common
+      SIMULATOR_URL: http://simulator:8003
+    ports:
+      - "8002:8002"
+    depends_on:
+      simulator:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/healthz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── MCP Tools ────────────────────────────────────────────────────────────────
+  mcp-tools:
+    build: *backend-build
+    command: >
+      python -m uvicorn services.mcp_tools.main:app
+      --host 0.0.0.0 --port 8004
+    environment:
+      <<: *env-common
+      SIMULATOR_URL: http://simulator:8003
+      ORCHESTRATOR_URL: http://orchestrator:8002
+    ports:
+      - "8004:8004"
+    depends_on:
+      simulator:
+        condition: service_healthy
+      orchestrator:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/healthz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Gateway (API + React SPA) ─────────────────────────────────────────────────
+  gateway:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.gateway
+    environment:
+      <<: *env-common
+      ORCHESTRATOR_URL: http://orchestrator:8002
+      MCP_TOOLS_URL: http://mcp-tools:8004
+    ports:
+      - "8001:8001"
+    depends_on:
+      orchestrator:
+        condition: service_healthy
+      mcp-tools:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/healthz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Agent ─────────────────────────────────────────────────────────────────────
+  agent:
+    build: *backend-build
+    command: python -m agent.main
+    environment:
+      <<: [*env-common, *env-llm]
+      GATEWAY_URL: http://gateway:8001
+      MCP_TOOLS_URL: http://mcp-tools:8004
+      AGENT_POLL_INTERVAL_SECONDS: "5"
+      AGENT_APPROVAL_TIMEOUT_SECONDS: "600"
+    depends_on:
+      gateway:
+        condition: service_healthy
+      mcp-tools:
+        condition: service_healthy
+    restart: on-failure

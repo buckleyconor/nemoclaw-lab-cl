@@ -1,0 +1,60 @@
+# syntax=docker/dockerfile:1
+# Gateway image — multi-stage: Node 22 builds the React SPA, Python 3.11 serves it.
+# The built ui/dist is embedded in this image so the gateway serves the UI from
+# FastAPI's StaticFiles mount with no separate nginx needed.
+
+ARG NODE_VERSION=22
+ARG PYTHON_VERSION=3.11
+ARG UV_VERSION=0.5.11
+
+# ── Stage 1: build React SPA ──────────────────────────────────────────────────
+FROM node:${NODE_VERSION}-alpine AS ui-builder
+
+WORKDIR /ui
+COPY ui/package.json ui/package-lock.json ./
+RUN npm ci --prefer-offline
+
+COPY ui/ ./
+# VITE_GATEWAY_URL is intentionally left empty: the UI is served from the same
+# origin as the Gateway, so API calls go to "/" (no cross-origin needed).
+RUN npm run build
+
+
+# ── Stage 2: install Python deps ──────────────────────────────────────────────
+FROM python:${PYTHON_VERSION}-slim AS py-deps
+
+COPY --from=ghcr.io/astral-sh/uv:${UV_VERSION} /uv /usr/local/bin/uv
+
+WORKDIR /app
+ENV UV_SYSTEM_PYTHON=1 \
+    UV_CACHE_DIR=/tmp/uv-cache
+
+COPY pyproject.toml uv.lock ./
+# Gateway does not need the [ml] group (KB search runs in mcp-tools).
+RUN uv sync --no-dev --frozen --no-install-project
+
+
+# ── Stage 3: runtime ──────────────────────────────────────────────────────────
+FROM python:${PYTHON_VERSION}-slim
+
+COPY --from=ghcr.io/astral-sh/uv:${UV_VERSION} /uv /usr/local/bin/uv
+
+WORKDIR /app
+
+COPY --from=py-deps /usr/local/lib /usr/local/lib
+COPY --from=py-deps /usr/local/bin /usr/local/bin
+
+# Application source
+COPY libs/ libs/
+COPY services/ services/
+COPY packs/ packs/
+
+# Embed the built SPA so FastAPI's StaticFiles mount serves it at "/"
+COPY --from=ui-builder /ui/dist ui/dist/
+
+ENV PYTHONPATH=/app \
+    PYTHONUNBUFFERED=1
+
+EXPOSE 8001
+CMD ["python", "-m", "uvicorn", "services.gateway.main:app", \
+     "--host", "0.0.0.0", "--port", "8001"]

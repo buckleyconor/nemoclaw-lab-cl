@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nemoclaw.fullname" . }}-agent
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "nemoclaw.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+spec:
+  replicas: {{ .Values.agent.replicas }}
+  selector:
+    matchLabels:
+      {{- include "nemoclaw.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: agent
+  template:
+    metadata:
+      labels:
+        {{- include "nemoclaw.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: agent
+    spec:
+      serviceAccountName: {{ include "nemoclaw.serviceAccountName" . }}
+      containers:
+        - name: agent
+          image: {{ include "nemoclaw.image" (dict "root" . "name" .Values.agent.image) }}
+          imagePullPolicy: {{ .Values.global.pullPolicy }}
+          command:
+            - python
+            - -m
+            - agent.main
+          envFrom:
+            - configMapRef:
+                name: {{ include "nemoclaw.fullname" . }}-config
+          env:
+            - name: LLM_BASE_URL
+              value: {{ .Values.agent.llm.baseUrl | quote }}
+            - name: LLM_API_KEY
+              value: {{ .Values.agent.llm.apiKey | quote }}
+            - name: LLM_MODEL
+              value: {{ .Values.agent.llm.model | quote }}
+          # No HTTP port — agent is a long-running loop process.
+          resources:
+            {{- toYaml .Values.agent.resources | nindent 12 }}
+          # Graceful shutdown: SIGTERM triggers clean loop exit.
+          terminationMessagePolicy: FallbackToLogsOnError

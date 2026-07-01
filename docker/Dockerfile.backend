@@ -1,0 +1,71 @@
+# syntax=docker/dockerfile:1
+# Backend image — used by: simulator, orchestrator, mcp-tools, agent.
+# Multi-arch: linux/arm64 (GB10 / MicroK8s dev) + linux/amd64 (prod).
+# The [ml] dep group (fastembed + faiss-cpu) is installed here; on arm64 this
+# requires onnxruntime-aarch64 wheels which are published since onnxruntime 1.18.
+
+ARG PYTHON_VERSION=3.11
+ARG UV_VERSION=0.5.11
+
+# ── Stage 1: install dependencies ─────────────────────────────────────────────
+FROM python:${PYTHON_VERSION}-slim AS deps
+
+COPY --from=ghcr.io/astral-sh/uv:${UV_VERSION} /uv /usr/local/bin/uv
+
+WORKDIR /app
+
+# Install system libs required by faiss-cpu / onnxruntime (libgomp)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV UV_SYSTEM_PYTHON=1 \
+    UV_CACHE_DIR=/tmp/uv-cache
+
+COPY pyproject.toml uv.lock ./
+# Install all production deps + optional [ml] group; do not install project itself yet.
+RUN uv sync --no-dev --frozen --no-install-project --group ml
+
+
+# ── Stage 2: runtime ──────────────────────────────────────────────────────────
+FROM python:${PYTHON_VERSION}-slim
+
+COPY --from=ghcr.io/astral-sh/uv:0.5.11 /uv /usr/local/bin/uv
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy installed site-packages from deps stage (system Python, no venv).
+# We copy from the system site-packages location directly.
+COPY --from=deps /usr/local/lib /usr/local/lib
+COPY --from=deps /usr/local/bin /usr/local/bin
+
+# Copy application source
+COPY libs/ libs/
+COPY services/ services/
+COPY agent/ agent/
+COPY packs/ packs/
+
+# PYTHONPATH lets Python find libs/, services/, agent/ as packages without
+# installing the project wheel.
+ENV PYTHONPATH=/app \
+    PYTHONUNBUFFERED=1
+
+# Warm up fastembed model cache at build time so pod startup is instant.
+# Model files land in /root/.cache/fastembed (~125 MB baked into image layer).
+RUN python - <<'EOF'
+try:
+    from fastembed import TextEmbedding
+    list(TextEmbedding("BAAI/bge-small-en-v1.5").embed(["warmup"]))
+    print("fastembed model cached.")
+except Exception as e:
+    print(f"fastembed warmup skipped: {e}")
+EOF
+
+# Default: simulator. Override CMD in K8s / docker-compose per service.
+EXPOSE 8003
+CMD ["python", "-m", "uvicorn", "services.simulator.main:app", \
+     "--host", "0.0.0.0", "--port", "8003"]
