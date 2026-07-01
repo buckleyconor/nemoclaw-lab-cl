@@ -13,15 +13,19 @@ class RedfishAdapter:
     Satisfies the ``MonitoringAdapter`` protocol (verified by PACK-04).
     """
 
-    def __init__(self, simulator_url: str) -> None:
+    def __init__(self, simulator_url: str, *, _transport=None) -> None:
         self._base = simulator_url.rstrip("/")
+        self._transport = _transport  # None → real HTTP; ASGI transport → tests
+
+    def _client(self) -> httpx.AsyncClient:
+        return httpx.AsyncClient(transport=self._transport)
 
     # ──────────────────────────────────────────────────────────────────────────
     # MonitoringAdapter protocol
     # ──────────────────────────────────────────────────────────────────────────
 
     async def list_assets(self) -> list[MonitorAsset]:
-        async with httpx.AsyncClient() as client:
+        async with self._client() as client:
             r = await client.get(f"{self._base}/redfish/v1/Systems")
             r.raise_for_status()
             data = r.json()
@@ -43,7 +47,7 @@ class RedfishAdapter:
             return assets
 
     async def list_events(self, asset_id: str | None = None) -> list[MonitorEvent]:
-        async with httpx.AsyncClient() as client:
+        async with self._client() as client:
             if asset_id:
                 url = (
                     f"{self._base}/redfish/v1/Systems/{asset_id}"
@@ -81,7 +85,7 @@ class RedfishAdapter:
             return events
 
     async def get_asset(self, asset_id: str) -> MonitorAsset:
-        async with httpx.AsyncClient() as client:
+        async with self._client() as client:
             r = await client.get(f"{self._base}/redfish/v1/Systems/{asset_id}")
             r.raise_for_status()
             data = r.json()
