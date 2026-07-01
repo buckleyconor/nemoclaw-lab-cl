@@ -27,13 +27,13 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from libs.common.models import ApprovalDecision, FaultEventStatus
-from services.gateway.store import AssetRecord, GatewayStore
+from libs.common.models import ApprovalDecision, AssetState, FaultEventStatus
+from services.gateway.store import AssetRecord
 
 router = APIRouter()
 
 
-def _store(request: Request) -> GatewayStore:
+def _store(request: Request):
     return request.app.state.store
 
 
@@ -69,6 +69,7 @@ async def get_pack(request: Request) -> dict:
 async def list_assets(request: Request) -> dict:
     """Fleet health grid — all assets with their current state."""
     store = _store(request)
+    assets = await store.list_assets()
     return {
         "assets": [
             {
@@ -77,7 +78,7 @@ async def list_assets(request: Request) -> dict:
                 "state": a.state.value,
                 "active_fault_event_id": a.active_fault_event_id,
             }
-            for a in store.assets.values()
+            for a in assets
         ]
     }
 
@@ -88,17 +89,17 @@ async def list_assets(request: Request) -> dict:
 @router.get("/api/notifications")
 async def list_notifications(request: Request) -> dict:
     store = _store(request)
-    notifs = sorted(store.notifications, key=lambda n: n.ts, reverse=True)
+    notifs = sorted(await store.list_notifications(), key=lambda n: n.ts, reverse=True)
     return {
         "notifications": [n.model_dump(mode="json") for n in notifs],
-        "unread_count": store.unread_count,
+        "unread_count": await store.get_unread_count(),
     }
 
 
 @router.post("/api/notifications/{notification_id}/read")
 async def mark_notification_read(notification_id: str, request: Request) -> dict:
     store = _store(request)
-    if not store.mark_read(notification_id):
+    if not await store.mark_read(notification_id):
         raise HTTPException(status_code=404, detail="notification_not_found")
     return {"status": "read"}
 
@@ -124,14 +125,14 @@ class DecisionRequest(BaseModel):
 @router.get("/api/faults")
 async def list_faults(request: Request) -> dict:
     store = _store(request)
-    evts = sorted(store.fault_events.values(), key=lambda e: e.detected_at, reverse=True)
+    evts = sorted(await store.list_faults(), key=lambda e: e.detected_at, reverse=True)
     return {"faults": [e.model_dump(mode="json") for e in evts]}
 
 
 @router.get("/api/faults/{fault_id}")
 async def get_fault(fault_id: str, request: Request) -> dict:
     store = _store(request)
-    evt = store.fault_events.get(fault_id)
+    evt = await store.get_fault(fault_id)
     if evt is None:
         raise HTTPException(status_code=404, detail="fault_not_found")
     return evt.model_dump(mode="json")
@@ -139,27 +140,27 @@ async def get_fault(fault_id: str, request: Request) -> dict:
 
 @router.post("/api/faults", status_code=201)
 async def create_fault(body: CreateFaultRequest, request: Request) -> dict:
-    """Agent: register a detected fault event.  Triggers an SSE notification."""
+    """Agent: register a detected fault event. Triggers an SSE notification."""
     store = _store(request)
-    evt = store.create_fault_event(
+    evt = await store.create_fault_event(
         scenario_id=body.scenario_id,
         asset_id=body.asset_id,
         kb_article_id=body.kb_article_id,
         log_extract=body.log_extract,
     )
+
     # Update asset state to faulted
-    if body.asset_id in store.assets:
-        asset = store.assets[body.asset_id]
-        from libs.common.models import AssetState
-        store.assets[body.asset_id] = AssetRecord(
+    if await store.has_asset(body.asset_id):
+        asset = await store.get_asset(body.asset_id)
+        await store.set_asset(AssetRecord(
             id=asset.id,
             type=asset.type,
             state=AssetState.faulted,
             active_fault_event_id=evt.id,
-        )
+        ))
 
     # Inbox notification
-    notif = store.create_notification(
+    notif = await store.create_notification(
         fault_event_id=evt.id,
         title=f"Fault detected on {body.asset_id}",
         body=body.log_extract or f"Scenario {body.scenario_id} triggered.",
@@ -181,7 +182,7 @@ async def create_fault(body: CreateFaultRequest, request: Request) -> dict:
 async def update_fault_status(fault_id: str, body: UpdateStatusRequest, request: Request) -> dict:
     """Agent: update fault lifecycle status."""
     store = _store(request)
-    updated = store.update_fault_status(fault_id, body.status)
+    updated = await store.update_fault_status(fault_id, body.status)
     if updated is None:
         raise HTTPException(status_code=404, detail="fault_not_found")
     await store.sse.publish("fault", updated.model_dump(mode="json"))
@@ -199,12 +200,12 @@ async def post_decision(fault_id: str, body: DecisionRequest, request: Request) 
       4. Pushes SSE event
     """
     store = _store(request)
-    evt = store.fault_events.get(fault_id)
+    evt = await store.get_fault(fault_id)
     if evt is None:
         raise HTTPException(status_code=404, detail="fault_not_found")
 
     if body.decision == ApprovalDecision.denied:
-        updated = store.update_fault_status(fault_id, FaultEventStatus.denied)
+        updated = await store.update_fault_status(fault_id, FaultEventStatus.denied)
         await store.sse.publish("fault", updated.model_dump(mode="json"))
         await store.sse.publish("decision", {
             "fault_event_id": fault_id,
@@ -252,10 +253,10 @@ async def post_decision(fault_id: str, body: DecisionRequest, request: Request) 
         raise HTTPException(status_code=502, detail=f"mcp_tools_error: {exc}") from exc
 
     # Store token for agent retrieval
-    store.pending_tokens[fault_id] = token_str
+    await store.set_pending_token(fault_id, token_str)
 
     # Update status
-    updated = store.update_fault_status(fault_id, FaultEventStatus.awaiting_approval)
+    updated = await store.update_fault_status(fault_id, FaultEventStatus.awaiting_approval)
 
     await store.sse.publish("fault", updated.model_dump(mode="json"))
     await store.sse.publish("decision", {
@@ -278,9 +279,9 @@ async def get_token(fault_id: str, request: Request) -> dict:
     programmatically over this trusted path right before calling remediation.execute.
     """
     store = _store(request)
-    if fault_id not in store.fault_events:
+    if not await store.has_fault(fault_id):
         raise HTTPException(status_code=404, detail="fault_not_found")
-    token = store.pending_tokens.get(fault_id)
+    token = await store.get_pending_token(fault_id)
     if token is None:
         raise HTTPException(status_code=404, detail="token_not_available")
     return {"token": token, "fault_event_id": fault_id}
@@ -298,7 +299,7 @@ class ActivityRequest(BaseModel):
 @router.get("/api/activity")
 async def list_activity(request: Request) -> dict:
     store = _store(request)
-    evts = sorted(store.activity_events, key=lambda e: e.ts)
+    evts = sorted(await store.list_activity_events(), key=lambda e: e.ts)
     return {"activity": [e.model_dump(mode="json") for e in evts]}
 
 
@@ -306,7 +307,7 @@ async def list_activity(request: Request) -> dict:
 async def post_activity(body: ActivityRequest, request: Request) -> dict:
     """Agent: log an activity step to the real-time feed."""
     store = _store(request)
-    evt = store.create_activity(
+    evt = await store.create_activity(
         fault_event_id=body.fault_event_id,
         step=body.step,
         message=body.message,

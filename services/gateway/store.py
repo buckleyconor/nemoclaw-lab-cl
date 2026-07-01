@@ -1,7 +1,8 @@
-"""In-memory state stores for the Gateway.
+"""In-memory gateway state store (development).
 
-Dev implementation — state lives in process memory.  Single-process demo
-only; M9 upgrades to Redis-backed shared state for the 30-user prod deployment.
+All state-access methods are ``async def`` so the router uses ``await store.X()``
+everywhere — both GatewayStore and RedisGatewayStore share the same async interface
+without any router changes between environments.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from libs.common.models import (
 )
 
 
-# ── Per-asset record held by Gateway ─────────────────────────────────────────
+# ── Per-asset record ──────────────────────────────────────────────────────────
 
 @dataclass
 class AssetRecord:
@@ -29,10 +30,10 @@ class AssetRecord:
     active_fault_event_id: str | None = None
 
 
-# ── SSE broker ───────────────────────────────────────────────────────────────
+# ── SSE broker ────────────────────────────────────────────────────────────────
 
 class SSEBroker:
-    """Fan-out SSE broker.  One asyncio.Queue per subscriber."""
+    """Fan-out SSE broker. One asyncio.Queue per subscriber."""
 
     def __init__(self) -> None:
         self._queues: list[asyncio.Queue[str]] = []
@@ -58,63 +59,96 @@ class SSEBroker:
         return len(self._queues)
 
 
-# ── Main store ────────────────────────────────────────────────────────────────
+# ── In-memory store ───────────────────────────────────────────────────────────
 
 @dataclass
 class GatewayStore:
-    """Holds all mutable Gateway runtime state."""
+    """In-memory gateway state. All methods async to match RedisGatewayStore."""
 
-    fault_events: dict[str, FaultEvent] = field(default_factory=dict)
-    notifications: list[Notification] = field(default_factory=list)
-    activity_events: list[ActivityEvent] = field(default_factory=list)
-    assets: dict[str, AssetRecord] = field(default_factory=dict)
-
-    # fault_event_id → approval token string (set after human decision)
-    pending_tokens: dict[str, str] = field(default_factory=dict)
-
+    _fault_events: dict[str, FaultEvent] = field(default_factory=dict)
+    _notifications: dict[str, Notification] = field(default_factory=dict)
+    _activity_events: list[ActivityEvent] = field(default_factory=list)
+    _assets: dict[str, AssetRecord] = field(default_factory=dict)
+    _pending_tokens: dict[str, str] = field(default_factory=dict)
     sse: SSEBroker = field(default_factory=SSEBroker)
 
-    # ── FaultEvent helpers ────────────────────────────────────────────────────
+    # ── FaultEvent ────────────────────────────────────────────────────────────
 
-    def create_fault_event(self, **kwargs) -> FaultEvent:
+    async def create_fault_event(self, **kwargs) -> FaultEvent:
         evt = FaultEvent(**kwargs)
-        self.fault_events[evt.id] = evt
+        self._fault_events[evt.id] = evt
         return evt
 
-    def update_fault_status(
+    async def update_fault_status(
         self,
         fault_event_id: str,
         status: FaultEventStatus,
         **extra,
     ) -> FaultEvent | None:
-        evt = self.fault_events.get(fault_event_id)
+        evt = self._fault_events.get(fault_event_id)
         if evt is None:
             return None
         updated = evt.model_copy(update={"status": status, **extra})
-        self.fault_events[fault_event_id] = updated
+        self._fault_events[fault_event_id] = updated
         return updated
 
-    # ── Notification helpers ──────────────────────────────────────────────────
+    async def list_faults(self) -> list[FaultEvent]:
+        return list(self._fault_events.values())
 
-    def create_notification(self, **kwargs) -> Notification:
+    async def get_fault(self, fault_id: str) -> FaultEvent | None:
+        return self._fault_events.get(fault_id)
+
+    async def has_fault(self, fault_id: str) -> bool:
+        return fault_id in self._fault_events
+
+    # ── Asset ─────────────────────────────────────────────────────────────────
+
+    async def list_assets(self) -> list[AssetRecord]:
+        return list(self._assets.values())
+
+    async def get_asset(self, asset_id: str) -> AssetRecord | None:
+        return self._assets.get(asset_id)
+
+    async def has_asset(self, asset_id: str) -> bool:
+        return asset_id in self._assets
+
+    async def set_asset(self, asset: AssetRecord) -> None:
+        self._assets[asset.id] = asset
+
+    # ── Notification ──────────────────────────────────────────────────────────
+
+    async def create_notification(self, **kwargs) -> Notification:
         notif = Notification(**kwargs)
-        self.notifications.append(notif)
+        self._notifications[notif.id] = notif
         return notif
 
-    def mark_read(self, notification_id: str) -> bool:
-        for i, n in enumerate(self.notifications):
-            if n.id == notification_id:
-                self.notifications[i] = n.model_copy(update={"read": True})
-                return True
-        return False
+    async def mark_read(self, notification_id: str) -> bool:
+        if notification_id not in self._notifications:
+            return False
+        n = self._notifications[notification_id]
+        self._notifications[notification_id] = n.model_copy(update={"read": True})
+        return True
 
-    @property
-    def unread_count(self) -> int:
-        return sum(1 for n in self.notifications if not n.read)
+    async def list_notifications(self) -> list[Notification]:
+        return list(self._notifications.values())
 
-    # ── Activity helpers ──────────────────────────────────────────────────────
+    async def get_unread_count(self) -> int:
+        return sum(1 for n in self._notifications.values() if not n.read)
 
-    def create_activity(self, **kwargs) -> ActivityEvent:
+    # ── Activity ──────────────────────────────────────────────────────────────
+
+    async def create_activity(self, **kwargs) -> ActivityEvent:
         evt = ActivityEvent(**kwargs)
-        self.activity_events.append(evt)
+        self._activity_events.append(evt)
         return evt
+
+    async def list_activity_events(self) -> list[ActivityEvent]:
+        return list(self._activity_events)
+
+    # ── Pending tokens ────────────────────────────────────────────────────────
+
+    async def set_pending_token(self, fault_id: str, token: str) -> None:
+        self._pending_tokens[fault_id] = token
+
+    async def get_pending_token(self, fault_id: str) -> str | None:
+        return self._pending_tokens.get(fault_id)

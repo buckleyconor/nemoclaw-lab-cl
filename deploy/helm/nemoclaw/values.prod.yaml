@@ -1,0 +1,73 @@
+# NemoClaw production values — Charmed K8s on RTX PRO 6000 Workstations (amd64).
+# Usage: helm upgrade --install nemoclaw ./deploy/helm/nemoclaw \
+#          -f deploy/helm/nemoclaw/values.prod.yaml \
+#          --set global.tag=<release-tag> \
+#          --set agent.llm.apiKey=<vllm-api-key>
+
+global:
+  registry: "registry.nemoclaw.lab"   # Internal Harbor / registry mirror
+  tag: "v0.1.0"
+  pullPolicy: Always
+  packId: "datacenter-xe9680"
+
+simulator:
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "256Mi"
+    limits:
+      cpu: "1000m"
+      memory: "512Mi"
+
+orchestrator:
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "256Mi"
+    limits:
+      cpu: "1000m"
+      memory: "512Mi"
+
+mcpTools:
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2000m"
+      memory: "3Gi"   # fastembed ONNX model + FAISS index
+
+gateway:
+  replicas: 2   # Two replicas share state via Redis
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "256Mi"
+    limits:
+      cpu: "1000m"
+      memory: "512Mi"
+
+agent:
+  replicas: 1
+  pollIntervalSeconds: "10"
+  approvalTimeoutSeconds: "600"
+  llm:
+    baseUrl: "http://192.168.68.131:8000/v1"
+    apiKey: "vllm"
+    model: "qwen3.6-35b-a3b-dflash"
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "256Mi"
+    limits:
+      cpu: "1000m"
+      memory: "512Mi"
+
+ingress:
+  enabled: true
+  className: "nginx"
+  host: "nemoclaw.dell-demo.lab"
+  tls:
+    - secretName: nemoclaw-tls
+      hosts:
+        - nemoclaw.dell-demo.lab

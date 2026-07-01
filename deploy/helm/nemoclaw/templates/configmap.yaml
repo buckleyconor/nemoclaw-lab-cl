@@ -13,3 +13,5 @@ data:
   GATEWAY_URL: {{ printf "http://%s-gateway:%d" (include "nemoclaw.fullname" .) (.Values.gateway.port | int) | quote }}
   AGENT_POLL_INTERVAL_SECONDS: {{ .Values.agent.pollIntervalSeconds | quote }}
   AGENT_APPROVAL_TIMEOUT_SECONDS: {{ .Values.agent.approvalTimeoutSeconds | quote }}
+  REDIS_URL: {{ printf "redis://%s-redis:6379" (include "nemoclaw.fullname" .) | quote }}
+  REDIS_KEY_PREFIX: {{ .Release.Name | quote }}

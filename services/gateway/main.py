@@ -2,6 +2,9 @@
 
 HTTP clients for Orchestrator and MCP Tools are injected via ``create_app()`` so tests
 can pass ASGI transports instead of real network clients.
+
+Set REDIS_URL to enable Redis-backed shared state (required for multi-pod / 30-user
+deployments). When unset, state lives in process memory (single-process dev mode).
 """
 
 from __future__ import annotations
@@ -44,19 +47,26 @@ def create_app(
     resolved_dir = _resolve_pack_dir(pack_dir)
     orch_url = os.environ.get("ORCHESTRATOR_URL", "http://localhost:8002")
     mcp_url = os.environ.get("MCP_TOOLS_URL", "http://localhost:8004")
+    redis_url = os.environ.get("REDIS_URL")
+    redis_prefix = os.environ.get("REDIS_KEY_PREFIX", "nemoclaw")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         loaded = load_pack(resolved_dir)
 
-        store = GatewayStore()
+        if redis_url:
+            from services.gateway.redis_store import RedisGatewayStore
+            store = RedisGatewayStore(redis_url, prefix=redis_prefix)
+        else:
+            store = GatewayStore()
+
         # Seed asset records from pack (all healthy at startup)
         for pack_asset in loaded.pack.assets:
-            store.assets[pack_asset.id] = AssetRecord(
+            await store.set_asset(AssetRecord(
                 id=pack_asset.id,
                 type=loaded.pack.asset_noun.singular,
                 state=AssetState.healthy,
-            )
+            ))
 
         app.state.store = store
         app.state.loaded_pack = loaded
