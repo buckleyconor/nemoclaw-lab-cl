@@ -144,4 +144,4 @@ uv run pytest tests/e2e/      # end-to-end (requires running stack)
 | M7 Lab guide + welcome page (multi-vertical) | ✅ Complete |
 | M8 Extensibility: second pack (laptop-fleet) | ✅ Complete |
 | M9 Prod hardening (Kubernetes, 30 users) | ⬜ Planned |
-| M10 LLM-driven skill-calling agent (ADR-010) | 📝 Spec'd — not yet implemented |
+| M10 LLM-driven skill-calling agent (ADR-010) | 🚧 Implemented — pending live vLLM tool-calling validation |

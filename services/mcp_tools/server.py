@@ -1,11 +1,18 @@
-"""FastMCP server — registers all four NemoClaw MCP tools.
+"""FastMCP server — registers the NemoClaw MCP tools.
 
 Tool names exposed over Streamable HTTP:
   monitor.list_events   — list events from the active monitoring surface
   monitor.get_asset     — inspect a single asset's health state
+  monitor.list_assets   — list all assets with health state
   logs.get_bundle       — fetch scenario log bundle from Orchestrator
   kb.search             — semantic + deterministic KB article search
+  notify.post_activity  — post agent narration to the operator dashboard
+  remediation.propose   — record a remediation plan, request human approval
   remediation.execute   — HITL-gated fault remediation (token required)
+
+remediation.execute is registered here like any other tool, but the agent
+never includes it in the schema set sent to the LLM (ADR-010): only the
+harness calls it, with a token retrieved out-of-band after human approval.
 
 The server reads its runtime state from ``app.state`` (populated by
 ``create_app()`` in main.py).  Tools receive injected dependencies so
@@ -29,7 +36,12 @@ from services.mcp_tools.tools.monitor import (
     monitor_list_assets,
     monitor_list_events,
 )
-from services.mcp_tools.tools.remediation import RemediationError, remediation_execute
+from services.mcp_tools.tools.notify import notify_post_activity
+from services.mcp_tools.tools.remediation import (
+    RemediationError,
+    remediation_execute,
+    remediation_propose,
+)
 
 # Module-level state — initialised by create_app() in main.py before the
 # uvicorn worker accepts requests.
@@ -127,8 +139,57 @@ async def _kb_search(signature: str, fallback_kb_id: str = "") -> str:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# notify.*
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+@mcp.tool(name="notify.post_activity")
+async def _notify_post_activity(fault_event_id: str, step: str, message: str) -> str:
+    """Post a plain-language progress update to the operator dashboard activity feed.
+
+    Display-only narration in your own words — it cannot change fault status
+    or infrastructure state. Use it whenever you have learned something worth
+    telling the operator.
+
+    Args:
+        fault_event_id: The FaultEvent id this update relates to.
+        step:           Feed category: detect | diagnose | search_kb | present.
+        message:        Plain-language description (keep it under 120 characters).
+    """
+    gateway_url = _state["gateway_url"]
+    async with httpx.AsyncClient(base_url=gateway_url) as client:
+        result = await notify_post_activity(
+            client, fault_event_id=fault_event_id, step=step, message=message
+        )
+    return json.dumps(result)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # remediation.*
 # ──────────────────────────────────────────────────────────────────────────────
+
+
+@mcp.tool(name="remediation.propose")
+async def _remediation_propose(fault_event_id: str, step_ids: list[str]) -> str:
+    """Record your recommended remediation steps and request operator approval.
+
+    This is a proposal, not an action: it changes no infrastructure state and
+    returns no token. A human operator approves or denies from the dashboard;
+    execution happens outside your control. After calling this once, stop
+    calling tools and wait.
+
+    Args:
+        fault_event_id: The FaultEvent id being diagnosed.
+        step_ids:       Ordered remediation step ids from the matched KB
+                        article or scenario defaults
+                        (e.g. ["drain_node", "gpu_reset", "verify_health"]).
+    """
+    gateway_url = _state["gateway_url"]
+    async with httpx.AsyncClient(base_url=gateway_url) as client:
+        result = await remediation_propose(
+            client, fault_event_id=fault_event_id, step_ids=step_ids
+        )
+    return json.dumps(result)
 
 
 @mcp.tool(name="remediation.execute")

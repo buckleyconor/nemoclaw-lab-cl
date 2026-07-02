@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from typing import Protocol
 
+import httpx
+
 from services.mcp_tools.fault_registry import FaultEventRegistry
 from services.mcp_tools.token_store import ApprovalTokenStore
 from libs.common.models import ApprovalDecision
@@ -22,6 +24,53 @@ from libs.common.models import ApprovalDecision
 
 class _ClearFn(Protocol):
     async def __call__(self, asset_id: str) -> None: ...
+
+
+async def remediation_propose(
+    gateway_client: httpx.AsyncClient,
+    fault_event_id: str,
+    step_ids: list[str],
+) -> dict:
+    """Record the agent's recommended remediation plan and request approval.
+
+    The LLM-callable half of the propose/execute split (ADR-010). Takes no
+    token and returns no token: its only side effects are moving the fault to
+    ``awaiting_approval`` and posting the proposal to the activity feed. The
+    actual execution path (``remediation_execute`` below) is never exposed to
+    the LLM and validates a human-minted token independently of anything that
+    happens here.
+
+    Args:
+        gateway_client:  Configured httpx.AsyncClient pointed at the Gateway.
+        fault_event_id:  FaultEvent id being diagnosed.
+        step_ids:        Ordered remediation step ids the agent recommends.
+
+    Returns:
+        dict with status "proposal_recorded", or an error dict.
+    """
+    r = await gateway_client.patch(
+        f"/api/faults/{fault_event_id}/status",
+        json={"status": "awaiting_approval"},
+    )
+    if r.status_code == 404:
+        return {"status": "error", "error": "fault_not_found"}
+    r.raise_for_status()
+
+    steps_label = ", ".join(step_ids) if step_ids else "(scenario defaults)"
+    await gateway_client.post(
+        "/api/agent/activity",
+        json={
+            "fault_event_id": fault_event_id,
+            "step": "present",
+            "message": f"⏸ Remediation plan proposed — awaiting operator approval: {steps_label}",
+        },
+    )
+    return {
+        "status": "proposal_recorded",
+        "fault_event_id": fault_event_id,
+        "step_ids": step_ids,
+        "note": "Execution requires human approval. Stop calling tools and wait.",
+    }
 
 
 class RemediationError(Exception):

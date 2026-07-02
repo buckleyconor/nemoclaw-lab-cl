@@ -1,14 +1,15 @@
-"""E-01 — Full agent happy-path loop with stub LLM.
+"""E-01 — Full agent happy-path loop with stub LLM (ADR-010 tool-calling).
 
 Stack:
   Simulator     — in-process (TestClient)
   Orchestrator  — in-process (TestClient, FakeSimulatorClient)
   Gateway       — in-process (ASGITransport, shared token_store + fault_registry)
   MCP Tools     — DirectAgentTools (bypass MCP protocol; call logic directly)
-  LLM           — StubLLMClient (returns "Xid 79")
+  LLM           — StubLLMClient (rule-based tool-calling policy, signature "Xid 79")
 
 Verified:
-  E-01  Full sequence: detect → diagnose → present → approve → remediate → resolved.
+  E-01  Full sequence: detect → diagnose → present → approve → remediate → resolved,
+        driven by LLM tool calls (monitor → logs → notify → kb → propose).
   SC1   Agent never auto-remediates; always waits for a human-minted token.
   SC2   After approval the fault is fully resolved.
 """
@@ -132,6 +133,7 @@ def stub_llm() -> StubLLMClient:
 def _build_tools(
     simulator_tc: TestClient,
     orchestrator_tc: TestClient,
+    gateway_tc: TestClient,
     loaded_pack,
     token_store: ApprovalTokenStore,
     fault_registry: FaultEventRegistry,
@@ -139,6 +141,7 @@ def _build_tools(
 ) -> DirectAgentTools:
     sim_transport = ASGITransport(app=simulator_tc.app)
     orch_transport = ASGITransport(app=orchestrator_tc.app)
+    gw_transport = ASGITransport(app=gateway_tc.app)
 
     return DirectAgentTools(
         # RedfishAdapter now accepts _transport= to avoid real HTTP in tests
@@ -150,6 +153,10 @@ def _build_tools(
         token_store=token_store,
         fault_registry=fault_registry,
         sim_client=fake_sim,
+        # notify.post_activity / remediation.propose land on the Gateway (ADR-010)
+        gateway_client=httpx.AsyncClient(
+            transport=gw_transport, base_url="http://gateway"
+        ),
     )
 
 
@@ -164,7 +171,7 @@ async def test_e01_no_fault_returns_no_fault(
     token_store, fault_registry, fake_sim, stub_llm,
 ) -> None:
     """E-01 base case: no active fault → loop exits immediately."""
-    tools = _build_tools(simulator_tc, orchestrator_tc, loaded_pack, token_store, fault_registry, fake_sim)
+    tools = _build_tools(simulator_tc, orchestrator_tc, gateway_tc, loaded_pack, token_store, fault_registry, fake_sim)
     gw_transport = ASGITransport(app=gateway_tc.app)
     async with httpx.AsyncClient(transport=gw_transport, base_url="http://gateway") as gw:
         result = await run_agent_loop(
@@ -191,7 +198,7 @@ async def test_e01_full_happy_path_resolves(
     # Inject into simulator's Redfish surface
     simulator_tc.post("/control/inject", json={"asset_id": target_asset, "scenario_id": "scn-gpu-xid-79"})
 
-    tools = _build_tools(simulator_tc, orchestrator_tc, loaded_pack, token_store, fault_registry, fake_sim)
+    tools = _build_tools(simulator_tc, orchestrator_tc, gateway_tc, loaded_pack, token_store, fault_registry, fake_sim)
     gw_transport = ASGITransport(app=gateway_tc.app)
     loop_result: list[LoopResult] = []
 
@@ -237,7 +244,7 @@ async def test_e01_sc1_timeout_without_approval(
     target_asset = r.json()["target_asset"]
     simulator_tc.post("/control/inject", json={"asset_id": target_asset, "scenario_id": "scn-gpu-xid-79"})
 
-    tools = _build_tools(simulator_tc, orchestrator_tc, loaded_pack, token_store, fault_registry, fake_sim)
+    tools = _build_tools(simulator_tc, orchestrator_tc, gateway_tc, loaded_pack, token_store, fault_registry, fake_sim)
     gw_transport = ASGITransport(app=gateway_tc.app)
 
     async with httpx.AsyncClient(transport=gw_transport, base_url="http://gateway") as gw:
@@ -265,7 +272,7 @@ async def test_e01_deny_flow(
     target_asset = r.json()["target_asset"]
     simulator_tc.post("/control/inject", json={"asset_id": target_asset, "scenario_id": "scn-gpu-xid-79"})
 
-    tools = _build_tools(simulator_tc, orchestrator_tc, loaded_pack, token_store, fault_registry, fake_sim)
+    tools = _build_tools(simulator_tc, orchestrator_tc, gateway_tc, loaded_pack, token_store, fault_registry, fake_sim)
     gw_transport = ASGITransport(app=gateway_tc.app)
     loop_result: list[LoopResult] = []
 

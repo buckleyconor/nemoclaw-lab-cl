@@ -1,21 +1,26 @@
-"""SEC-06 — Prompt injection in logs cannot trigger auto-remediation.
+"""SEC-06 — Prompt injection cannot trigger auto-remediation (ADR-010).
 
 Even if log text contains strings that look like tool calls or approval
-commands, the agent loop still blocks on a human-minted token before
-calling remediation.execute.
+commands — or the model itself is hijacked into emitting a
+remediation_execute tool call — the agent loop still blocks on a
+human-minted token before calling remediation.execute.
 
 Design rationale:
-  - The agent loop always polls GET /api/faults/{id}/token before calling
+  - remediation.execute is never in the tool schema set sent to the LLM,
+    and the harness dispatch allowlist refuses it if the model emits the
+    call anyway (ADR-010 propose/execute split).
+  - The harness always polls GET /api/faults/{id}/token before calling
     remediation_execute.  That endpoint only returns a token if a human
     has POSTed to /api/faults/{id}/decision.
   - Even if the LLM were hijacked to output an attacker-crafted signature,
     remediation.execute checks for a valid, unconsumed, bound token.
-  - Therefore there is no code path from log text → remediation without
-    human action.
+  - Therefore there is no code path from log text or model output →
+    remediation without human action.
 """
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import httpx
@@ -23,7 +28,7 @@ import pytest
 from fastapi.testclient import TestClient
 from httpx import ASGITransport
 
-from agent.llm import StubLLMClient
+from agent.llm import ScriptedLLMClient, StubLLMClient, make_tool_call
 from agent.loop import run_agent_loop
 from agent.tools import DirectAgentTools
 from libs.common.pack_loader import load_pack
@@ -108,7 +113,7 @@ def reset_state(orchestrator_tc, simulator_tc, token_store, fault_registry, fake
     orchestrator_tc.post("/api/reset")
 
 
-def _build_tools(simulator_tc, orchestrator_tc, loaded_pack, token_store, fault_registry, fake_sim):
+def _build_tools(simulator_tc, orchestrator_tc, gateway_tc, loaded_pack, token_store, fault_registry, fake_sim):
     return DirectAgentTools(
         adapter=RedfishAdapter("http://simulator", _transport=ASGITransport(app=simulator_tc.app)),
         orchestrator_client=httpx.AsyncClient(
@@ -118,6 +123,10 @@ def _build_tools(simulator_tc, orchestrator_tc, loaded_pack, token_store, fault_
         token_store=token_store,
         fault_registry=fault_registry,
         sim_client=fake_sim,
+        # notify.post_activity / remediation.propose land on the Gateway (ADR-010)
+        gateway_client=httpx.AsyncClient(
+            transport=ASGITransport(app=gateway_tc.app), base_url="http://gateway"
+        ),
     )
 
 
@@ -159,7 +168,7 @@ async def test_sec06_prompt_injection_cannot_bypass_hitl(
     # LLM returns the injection payload instead of a clean signature
     adversarial_llm = StubLLMClient(default_response=injection)
 
-    tools = _build_tools(simulator_tc, orchestrator_tc, loaded_pack, token_store, fault_registry, fake_sim)
+    tools = _build_tools(simulator_tc, orchestrator_tc, gateway_tc, loaded_pack, token_store, fault_registry, fake_sim)
     gw_transport = ASGITransport(app=gateway_tc.app)
 
     async with httpx.AsyncClient(transport=gw_transport, base_url="http://gateway") as gw:
@@ -200,7 +209,7 @@ async def test_sec06_token_still_required_after_llm_hijack(
     # LLM produces the correct signature — this is the best-case scenario for an attacker
     clean_llm = StubLLMClient(default_response="Xid 79")
 
-    tools = _build_tools(simulator_tc, orchestrator_tc, loaded_pack, token_store, fault_registry, fake_sim)
+    tools = _build_tools(simulator_tc, orchestrator_tc, gateway_tc, loaded_pack, token_store, fault_registry, fake_sim)
     gw_transport = ASGITransport(app=gateway_tc.app)
 
     async with httpx.AsyncClient(transport=gw_transport, base_url="http://gateway") as gw:
@@ -216,3 +225,101 @@ async def test_sec06_token_still_required_after_llm_hijack(
     # Still times out: correct diagnosis is necessary but not sufficient for remediation
     assert result.status == "timeout"
     assert len(fake_sim.cleared) == 0
+
+
+@pytest.mark.asyncio
+async def test_sec06_hijacked_model_cannot_call_remediation_execute(
+    simulator_tc, orchestrator_tc, gateway_tc, loaded_pack,
+    token_store, fault_registry, fake_sim,
+) -> None:
+    """SEC-06 (ADR-010): a hijacked model emitting a remediation_execute tool
+    call is refused by the harness dispatch allowlist — the call never reaches
+    the MCP layer, and remediation still requires a human-minted token."""
+
+    r = orchestrator_tc.post("/api/run/scn-gpu-xid-79")
+    target_asset = r.json()["target_asset"]
+    simulator_tc.post("/control/inject", json={"asset_id": target_asset, "scenario_id": "scn-gpu-xid-79"})
+
+    # Hijacked model: investigates normally, then tries to execute directly
+    # with a fabricated token instead of proposing.
+    hijacked_llm = ScriptedLLMClient(script=[
+        make_tool_call("monitor_list_events", {}, call_id="evil-1"),
+        make_tool_call("logs_get_bundle", {"asset_id": target_asset}, call_id="evil-2"),
+        make_tool_call(
+            "remediation_execute",
+            {
+                "fault_event_id": "whatever",
+                "approval_token": "fabricated-token",
+                "step_ids": ["drain_node", "gpu_reset", "verify_health"],
+            },
+            call_id="evil-3",
+        ),
+        # Script exhausted afterwards → plain completion, loop ends.
+    ])
+
+    tools = _build_tools(simulator_tc, orchestrator_tc, gateway_tc, loaded_pack, token_store, fault_registry, fake_sim)
+    gw_transport = ASGITransport(app=gateway_tc.app)
+
+    async with httpx.AsyncClient(transport=gw_transport, base_url="http://gateway") as gw:
+        result = await run_agent_loop(
+            tools=tools,
+            gateway_client=gw,
+            llm_client=hijacked_llm,
+            loaded_pack=loaded_pack,
+            approval_timeout=0.2,  # no human approves
+            poll_interval=0.05,
+        )
+
+    # The fault was registered (logs were fetched), the fallback proposed the
+    # scenario defaults, and the gate then timed out without a human token.
+    assert result.status == "timeout", f"got: {result.status}"
+    # The fabricated execute call never reached the simulator.
+    assert len(fake_sim.cleared) == 0
+
+    # The dispatch refused the un-exposed tool and told the model so.
+    final_messages = hijacked_llm.calls[-1]["messages"]
+    refusals = [
+        m for m in final_messages
+        if m.get("role") == "tool" and "unknown_tool: remediation_execute" in (m.get("content") or "")
+    ]
+    assert refusals, "expected an explicit refusal tool-result for remediation_execute"
+
+
+@pytest.mark.asyncio
+async def test_sec06_execute_tool_and_tokens_never_reach_llm_context(
+    simulator_tc, orchestrator_tc, gateway_tc, loaded_pack,
+    token_store, fault_registry, fake_sim,
+) -> None:
+    """SEC-06 (ADR-010): across a full investigation, the schema set sent to
+    the LLM never contains remediation_execute, and no approval-token material
+    appears in any message the LLM reads."""
+
+    r = orchestrator_tc.post("/api/run/scn-gpu-xid-79")
+    target_asset = r.json()["target_asset"]
+    simulator_tc.post("/control/inject", json={"asset_id": target_asset, "scenario_id": "scn-gpu-xid-79"})
+
+    stub = StubLLMClient(default_response="Xid 79")
+    tools = _build_tools(simulator_tc, orchestrator_tc, gateway_tc, loaded_pack, token_store, fault_registry, fake_sim)
+    gw_transport = ASGITransport(app=gateway_tc.app)
+
+    async with httpx.AsyncClient(transport=gw_transport, base_url="http://gateway") as gw:
+        result = await run_agent_loop(
+            tools=tools,
+            gateway_client=gw,
+            llm_client=stub,
+            loaded_pack=loaded_pack,
+            approval_timeout=0.2,  # no human approves — we only inspect LLM I/O
+            poll_interval=0.05,
+        )
+    assert result.status == "timeout"
+
+    assert stub.calls, "the LLM was never invoked"
+    for call in stub.calls:
+        schema_names = {s["function"]["name"] for s in call["tools"]}
+        assert "remediation_execute" not in schema_names
+        # The only remediation-shaped power the model has is the proposal tool.
+        assert "remediation_propose" in schema_names
+        for message in call["messages"]:
+            assert "approval_token" not in json.dumps(message), (
+                "approval-token material leaked into LLM context"
+            )

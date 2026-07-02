@@ -67,7 +67,8 @@ spec:
           {{- include "nemoclaw.selectorLabels" . | nindent 10 }}
           app.kubernetes.io/component: simulator
 ---
-# MCP Tools: ingress from gateway + agent + egress to simulator
+# MCP Tools: ingress from gateway + agent + egress to simulator and gateway
+# (gateway egress: notify.post_activity / remediation.propose tools, ADR-010)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -101,6 +102,10 @@ spec:
         matchLabels:
           {{- include "nemoclaw.selectorLabels" . | nindent 10 }}
           app.kubernetes.io/component: simulator
+    - podSelector:
+        matchLabels:
+          {{- include "nemoclaw.selectorLabels" . | nindent 10 }}
+          app.kubernetes.io/component: gateway
 ---
 # Simulator: ingress from orchestrator + mcp-tools only
 apiVersion: networking.k8s.io/v1
