@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Backend image — used by: simulator, orchestrator, mcp-tools, agent.
+# Backend image — used by: simulator, orchestrator, mcp-tools.
 # Multi-arch: linux/arm64 (GB10 / MicroK8s dev) + linux/amd64 (prod).
 # The [ml] dep group (fastembed + faiss-cpu) is installed here; on arm64 this
 # requires onnxruntime-aarch64 wheels which are published since onnxruntime 1.18.
@@ -44,7 +44,6 @@ COPY --from=deps /app/.venv /app/.venv
 # Copy application source
 COPY libs/ libs/
 COPY services/ services/
-COPY agent/ agent/
 COPY packs/ packs/
 
 # Activate the virtualenv for all subsequent commands
