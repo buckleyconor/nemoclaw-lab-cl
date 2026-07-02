@@ -60,6 +60,11 @@ Pack (content)  →  Framework (agent + services)  →  Lab UI
                └─────────────────────┘
 ```
 
+> **Planned (ADR-011, spec'd):** the NemoClaw Agent box above is replaced by the
+> real NVIDIA NemoClaw stack — OpenClaw running in an OpenShell sandbox, managed
+> by `nemoclaw onboard` as a host process outside Compose, reaching MCP Tools
+> and the Gateway via their published ports. See `docs/adr/ADR-011.md`.
+
 ## Project layout
 
 ```
@@ -73,7 +78,7 @@ services/
 packs/          Domain Pack content per vertical (YAML + Markdown + logs)
 ui/             React + TypeScript dashboard (Vite, SSE-driven)
 docs/           Lab guide (split-screen HTML), welcome page, ADRs
-  adr/          Architecture Decision Records (10 decisions)
+  adr/          Architecture Decision Records (11 decisions)
 docker/         Dockerfiles (backend + gateway with UI build)
 deploy/helm/    Helm chart for Kubernetes deployment
 tests/          Unit + integration + e2e test suite
@@ -145,3 +150,4 @@ uv run pytest tests/e2e/      # end-to-end (requires running stack)
 | M8 Extensibility: second pack (laptop-fleet) | ✅ Complete |
 | M9 Prod hardening (Kubernetes, 30 users) | ⬜ Planned |
 | M10 LLM-driven skill-calling agent (ADR-010) | ✅ Complete — validated live against vLLM/Qwen tool-calling |
+| M11 Real NemoClaw/OpenClaw agent runtime (ADR-011) | 📝 Spec'd — validation spike required before implementation |
