@@ -19,8 +19,7 @@ Endpoints:
 from __future__ import annotations
 
 import asyncio
-import json
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
@@ -171,16 +170,26 @@ async def get_fault(fault_id: str, request: Request) -> dict:
 
 @router.post("/api/faults", status_code=201)
 async def create_fault(body: CreateFaultRequest, request: Request) -> dict:
-    """Agent: register a detected fault event. Triggers an SSE notification."""
+    """Agent: register a detected fault event. Triggers an SSE notification.
+
+    When the caller omits remediation_step_labels (the OpenClaw plugin has no
+    pack access), they default to the scenario's step labels from the
+    Gateway's own loaded pack.
+    """
     store = _store(request)
+    step_labels = body.remediation_step_labels
+    if not step_labels:
+        scenario = request.app.state.loaded_pack.scenarios_by_id.get(body.scenario_id)
+        if scenario is not None:
+            step_labels = [s.label for s in scenario.remediation_steps]
     evt = await store.create_fault_event(
         scenario_id=body.scenario_id,
         asset_id=body.asset_id,
         kb_article_id=body.kb_article_id,
         log_extract=body.log_extract,
-        remediation_step_labels=body.remediation_step_labels,
+        remediation_step_labels=step_labels,
         impact=_impact_for_scenario(
-            request, body.scenario_id, body.asset_id, len(body.remediation_step_labels)
+            request, body.scenario_id, body.asset_id, len(step_labels)
         ),
     )
 
@@ -263,11 +272,13 @@ async def update_fault_diagnosis(
 async def post_decision(fault_id: str, body: DecisionRequest, request: Request) -> dict:
     """Human: approve or deny remediation.
 
-    On approval:
+    On approval (ADR-011 — the Gateway is the execution trigger):
       1. Registers fault event + allowed steps in MCP Tools
       2. Mints a single-use approval token in MCP Tools
-      3. Stores token against fault_event_id for agent retrieval
-      4. Pushes SSE event
+      3. Pushes SSE decision event
+      4. Starts remediation execution immediately (background task) — no
+         polling, no LLM; the token goes straight into the trusted
+         server-to-server remediation.execute call
     """
     store = _store(request)
     evt = await store.get_fault(fault_id)
@@ -292,9 +303,14 @@ async def post_decision(fault_id: str, body: DecisionRequest, request: Request) 
         scenario_r.raise_for_status()
         scenario_data = scenario_r.json()
         allowed_step_ids = [s["id"] for s in scenario_data.get("remediation_steps", [])]
+        step_labels = {
+            s["id"]: s.get("label", s["id"])
+            for s in scenario_data.get("remediation_steps", [])
+        }
     except httpx.HTTPError:
         # Fall back to empty allowlist — remediation will fail step validation
         allowed_step_ids = []
+        step_labels = {}
 
     # Register fault event + allowed steps in MCP Tools
     mcp_client = _mcp_tools_client(request)
@@ -322,22 +338,30 @@ async def post_decision(fault_id: str, body: DecisionRequest, request: Request) 
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"mcp_tools_error: {exc}") from exc
 
-    # Store token for agent retrieval
+    # Keep the token retrievable over the trusted path for audit/API compat.
     await store.set_pending_token(fault_id, token_str)
 
-    # Update status
-    updated = await store.update_fault_status(fault_id, FaultEventStatus.awaiting_approval)
-
-    await store.sse.publish("fault", updated.model_dump(mode="json"))
     await store.sse.publish("decision", {
         "fault_event_id": fault_id,
         "decision": "approved",
     })
 
+    # Execute immediately (ADR-011): background task so this POST returns at
+    # once; the executor narrates progress and resolves the fault over SSE.
+    request.app.state.remediation_executor.start(
+        store,
+        fault_id=fault_id,
+        asset_id=evt.asset_id,
+        scenario_id=evt.scenario_id,
+        step_ids=allowed_step_ids,
+        step_labels=step_labels,
+        token=token_str,
+    )
+
     return {
         "decision": "approved",
         "fault_event_id": fault_id,
-        "token_available": True,
+        "execution": "started",
     }
 
 
@@ -409,7 +433,7 @@ async def events_stream(request: Request) -> StreamingResponse:
                 try:
                     payload = await asyncio.wait_for(queue.get(), timeout=25.0)
                     yield f"data: {payload}\n\n"
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     yield ": keepalive\n\n"
         finally:
             store.sse.unsubscribe(queue)
@@ -426,6 +450,38 @@ async def events_stream(request: Request) -> StreamingResponse:
 
 # ── Presenter controls (proxy to orchestrator) ────────────────────────────────
 
+
+async def _fire_agent_webhook(scenario_id: str, asset_id: str) -> None:
+    """Wake the OpenClaw agent the instant a scenario is injected (ADR-011).
+
+    Event-driven replacement for the retired agent's fixed-interval poll; a
+    cron job on the agent side remains as the safety net. Best-effort: an
+    unreachable agent must never fail scenario injection. No-op unless
+    OPENCLAW_HOOK_URL and OPENCLAW_HOOK_TOKEN are configured.
+    """
+    import os
+
+    hook_url = os.environ.get("OPENCLAW_HOOK_URL")
+    hook_token = os.environ.get("OPENCLAW_HOOK_TOKEN")
+    if not hook_url or not hook_token:
+        return
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.post(
+                f"{hook_url.rstrip('/')}/hooks/wake",
+                headers={"Authorization": f"Bearer {hook_token}"},
+                json={
+                    "text": (
+                        f"fault-event: scenario {scenario_id} injected on {asset_id} — "
+                        "run the Infrastructure Fault Response program now"
+                    ),
+                    "mode": "now",
+                },
+            )
+    except httpx.HTTPError:
+        pass
+
+
 @router.post("/api/presenter/inject")
 async def presenter_inject(request: Request, scenario: str | None = None):
     """Inject a fault scenario. Proxies to the orchestrator /api/run endpoint.
@@ -438,7 +494,9 @@ async def presenter_inject(request: Request, scenario: str | None = None):
     else:
         resp = await orch.post("/api/run")
     resp.raise_for_status()
-    return resp.json()
+    data = resp.json()
+    await _fire_agent_webhook(data.get("scenario_id", ""), data.get("target_asset", ""))
+    return data
 
 
 @router.post("/api/presenter/reset")

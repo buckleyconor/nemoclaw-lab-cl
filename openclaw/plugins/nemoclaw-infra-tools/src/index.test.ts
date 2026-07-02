@@ -1,0 +1,136 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getToolPluginMetadata } from "openclaw/plugin-sdk/tool-plugin";
+import plugin from "./index.js";
+import {
+  registerFaultFromLogs,
+  recordKbResult,
+  resetInvestigation,
+  currentInvestigation,
+  noRegisteredFaultError,
+} from "./harness.js";
+import {
+  assertAllowlistExcludesExecute,
+  assertServerContract,
+  LLM_EXPOSED_TOOLS,
+  toFunctionName,
+} from "./mcp.js";
+
+const EXPECTED_TOOLS = [
+  "monitor_list_events",
+  "monitor_get_asset",
+  "monitor_list_assets",
+  "logs_get_bundle",
+  "kb_search",
+  "notify_post_activity",
+  "remediation_propose",
+];
+
+describe("plugin metadata", () => {
+  const metadata = getToolPluginMetadata(plugin);
+
+  it("registers exactly the seven allowlisted tools", () => {
+    expect(metadata).toBeDefined();
+    expect(metadata!.tools.map((t) => t.name).sort()).toEqual([...EXPECTED_TOOLS].sort());
+  });
+
+  it("never registers remediation_execute", () => {
+    const names = metadata!.tools.map((t) => t.name);
+    expect(names).not.toContain("remediation_execute");
+    expect(names.some((n) => n.toLowerCase().includes("execute"))).toBe(false);
+  });
+
+  it("mirrors the MCP allowlist one-to-one", () => {
+    const fromAllowlist = LLM_EXPOSED_TOOLS.map(toFunctionName).sort();
+    expect(metadata!.tools.map((t) => t.name).sort()).toEqual(fromAllowlist);
+  });
+
+  it("activates on gateway startup", () => {
+    expect(metadata!.activation.onStartup).toBe(true);
+  });
+});
+
+describe("execute-tool guards", () => {
+  it("rejects an allowlist containing the dotted execute name", () => {
+    expect(() => assertAllowlistExcludesExecute(["remediation.execute"])).toThrow(
+      /must never be exposed/,
+    );
+  });
+
+  it("rejects an allowlist containing the underscored execute name", () => {
+    expect(() => assertAllowlistExcludesExecute(["remediation_execute"])).toThrow(
+      /must never be exposed/,
+    );
+  });
+
+  it("accepts the server listing remediation.execute for the Gateway's trusted path", () => {
+    // The server legitimately lists it; it must simply never be dispatchable
+    // through this plugin.
+    expect(() =>
+      assertServerContract([...LLM_EXPOSED_TOOLS, "remediation.execute"]),
+    ).not.toThrow();
+  });
+
+  it("hard-fails when the server is missing an allowlisted tool", () => {
+    expect(() => assertServerContract(["monitor.list_events"])).toThrow(/missing expected tools/);
+  });
+});
+
+describe("harness side-work", () => {
+  const gatewayUrl = "http://gateway.test";
+  let calls: Array<{ method: string; url: string; body: unknown }>;
+
+  beforeEach(() => {
+    resetInvestigation();
+    calls = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        const body = init?.body ? JSON.parse(init.body as string) : undefined;
+        calls.push({ method: init?.method ?? "GET", url: String(url), body });
+        if (String(url).endsWith("/api/faults") && init?.method === "POST") {
+          return new Response(JSON.stringify({ id: "fault-123" }), { status: 201 });
+        }
+        return new Response(JSON.stringify({ status: "ok" }), { status: 200 });
+      }),
+    );
+  });
+
+  it("registers the fault once and stamps fault_event_id into the bundle", async () => {
+    const bundle = { log_text: "line1\nline2", scenario_id: "scn-1", asset_id: "gpu-01" };
+    const first = await registerFaultFromLogs(gatewayUrl, bundle);
+    expect(first.fault_event_id).toBe("fault-123");
+    expect(currentInvestigation()?.faultId).toBe("fault-123");
+
+    const posts = calls.filter((c) => c.url.endsWith("/api/faults") && c.method === "POST");
+    expect(posts).toHaveLength(1);
+    expect(posts[0].body.log_extract).toBe("line1\nline2");
+
+    const statusPatch = calls.find((c) => c.url.includes("/status"));
+    expect(statusPatch?.body).toEqual({ status: "diagnosing" });
+  });
+
+  it("passes error payloads through without registering", async () => {
+    const result = await registerFaultFromLogs(gatewayUrl, { status: "error", error: "http_404" });
+    expect(result.fault_event_id).toBeUndefined();
+    expect(currentInvestigation()).toBeNull();
+  });
+
+  it("persists the diagnosis after a KB match", async () => {
+    await registerFaultFromLogs(gatewayUrl, {
+      log_text: "x", scenario_id: "scn-1", asset_id: "gpu-01",
+    });
+    await recordKbResult(gatewayUrl, "Xid 79", {
+      kb_id: "KB000123", title: "GPU Xid 79", score: 0.92, via: "faiss",
+    });
+    const diag = calls.find((c) => c.url.includes("/diagnosis"));
+    expect(diag?.body).toMatchObject({
+      error_signature: "Xid 79",
+      kb_article_id: "KB000123",
+      kb_score: 0.92,
+    });
+  });
+
+  it("refuses narration before evidence exists", () => {
+    expect(noRegisteredFaultError()).toMatchObject({ error: "no_registered_fault" });
+  });
+});

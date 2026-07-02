@@ -2,10 +2,10 @@
 # Usage:
 #   docker compose up --build
 #
-# Override the LLM endpoint:
-#   LLM_BASE_URL=http://YOUR_VLLM_HOST:8000/v1 \
-#   LLM_MODEL=qwen3.6-35b-a3b-dflash \
-#   docker compose up --build
+# The agent is NOT a Compose service (ADR-011): the real NemoClaw/OpenClaw
+# stack runs as a peer host process. After the stack is up, onboard it with:
+#   deploy/scripts/onboard-openclaw.sh
+# The agent's LLM endpoint is configured during onboarding, not here.
 
 x-backend-build: &backend-build
   context: .
@@ -13,11 +13,6 @@ x-backend-build: &backend-build
 
 x-env-common: &env-common
   PACK_ID: ${PACK_ID:-datacenter-xe9680}
-
-x-env-llm: &env-llm
-  LLM_BASE_URL: ${LLM_BASE_URL:-http://YOUR_VLLM_HOST:8000/v1}
-  LLM_API_KEY: ${LLM_API_KEY:-vllm}
-  LLM_MODEL: ${LLM_MODEL:-qwen3.6-35b-a3b-dflash}
 
 services:
 
@@ -90,6 +85,10 @@ services:
       <<: *env-common
       ORCHESTRATOR_URL: http://orchestrator:8002
       MCP_TOOLS_URL: http://mcp-tools:8004
+      # OpenClaw webhook wake-up (ADR-011). The OpenClaw gateway runs on the
+      # host, so from this container it is host.docker.internal:18789.
+      OPENCLAW_HOOK_URL: ${OPENCLAW_HOOK_URL:-}
+      OPENCLAW_HOOK_TOKEN: ${OPENCLAW_HOOK_TOKEN:-}
     ports:
       - "8001:8001"
     depends_on:
@@ -103,19 +102,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── Agent ─────────────────────────────────────────────────────────────────────
-  agent:
-    build: *backend-build
-    command: python -m agent.main
-    environment:
-      <<: [*env-common, *env-llm]
-      GATEWAY_URL: http://gateway:8001
-      MCP_TOOLS_URL: http://mcp-tools:8004
-      AGENT_POLL_INTERVAL_SECONDS: "5"
-      AGENT_APPROVAL_TIMEOUT_SECONDS: "600"
-    depends_on:
-      gateway:
-        condition: service_healthy
-      mcp-tools:
-        condition: service_healthy
-    restart: on-failure
+  # The agent runtime is real NemoClaw/OpenClaw, onboarded as a host process
+  # via deploy/scripts/onboard-openclaw.sh (ADR-011). It reaches mcp-tools and
+  # gateway through the ports published above.

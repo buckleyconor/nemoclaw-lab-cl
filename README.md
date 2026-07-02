@@ -1,6 +1,6 @@
 # NemoClaw Sentinel Lab
 
-Autonomous AIOps demo: a NemoClaw v0.0.70 agent monitors simulated hardware infrastructure, detects faults, analyses logs with a chain-of-thought LLM, matches Dell KB articles, and proposes remediation — blocked by a server-side human-in-the-loop approval gate until an operator decides.
+Autonomous AIOps demo: a real NemoClaw/OpenClaw agent (OpenShell-sandboxed, ADR-011) monitors simulated hardware infrastructure, detects faults, analyses logs with a local LLM, matches Dell KB articles, and proposes remediation — blocked by a server-side human-in-the-loop approval gate until an operator decides.
 
 One codebase. Swap the **Domain Pack** to switch verticals — GPU cluster, laptop fleet, edge nodes, oil-field rigs — with no code changes.
 
@@ -45,30 +45,31 @@ Pack (content)  →  Framework (agent + services)  →  Lab UI
       │  Emits fault events + iDRAC log bundles        │
       └───────────────────────────────────────────────┘
                           ▲
-               ┌──────────┴──────────┐
-               │  NemoClaw Agent     │
-               │  v0.0.70            │
-               │  soul.md + 5 skills │
-               │  LLM tool-calling   │
-               │  loop (loop.py)     │
-               └─────────────────────┘
+               ┌──────────┴──────────────────┐
+               │  NemoClaw / OpenClaw agent  │
+               │  (host process, ADR-011)    │
+               │  OpenShell sandbox          │
+               │  SOUL.md + AGENTS.md +      │
+               │  4 skills + infra plugin    │
+               └──────────┬──────────────────┘
                           │
                ┌──────────▼──────────┐
                │  Local LLM          │
                │  vLLM endpoint      │
-               │  chain-of-thought   │
+               │  (OpenClaw provider)│
                └─────────────────────┘
 ```
 
-> **Planned (ADR-011, spec'd):** the NemoClaw Agent box above is replaced by the
-> real NVIDIA NemoClaw stack — OpenClaw running in an OpenShell sandbox, managed
-> by `nemoclaw onboard` as a host process outside Compose, reaching MCP Tools
-> and the Gateway via their published ports. See `docs/adr/ADR-011.md`.
+The agent is **not** a Compose service: `deploy/scripts/onboard-openclaw.sh`
+onboards the real NVIDIA NemoClaw stack — OpenClaw in an OpenShell sandbox —
+as a peer host process that reaches MCP Tools and the Gateway via their
+published ports. See `docs/adr/ADR-011.md` and `openclaw/README.md`.
 
 ## Project layout
 
 ```
-agent/          NemoClaw agent: soul.md, skills/ (5), loop.py (LLM tool-calling loop), llm.py
+openclaw/       OpenClaw agent runtime: SOUL.md, AGENTS.md, skills/ (4),
+                plugins/nemoclaw-infra-tools (tool plugin, MCP client)
 libs/common/    Shared Pydantic models, pack loader
 services/
   gateway/      FastAPI: REST API, SSE, HITL token store, SPA host
@@ -99,17 +100,16 @@ See [`docs/VERTICAL-PACK-GUIDE.md`](docs/VERTICAL-PACK-GUIDE.md) to create or ex
 
 ## Agent
 
-The agent is a NemoClaw v0.0.70 instance with a `soul.md` identity document and five skills. Unlike a fixed pipeline, the agent dynamically decides which skill/tool to invoke and in what order — see ADR-010.
+The agent is real OpenClaw running in an OpenShell sandbox managed by NemoClaw (ADR-011). Its identity lives in `openclaw/SOUL.md`, its standing order in `openclaw/AGENTS.md` (auto-injected every session), and four skills teach the fault workflow. The agent dynamically decides which skill/tool to invoke and in what order.
 
-| Skill | Phase | MCP tools |
-|-------|-------|-----------|
-| `infra-sentinel-guide` | Orientation | none — always loaded, orients on the other four skills |
+| Skill | Phase | Tools |
+|-------|-------|-------|
 | `infra-sentinel-monitor` | Detect | `monitor_list_events`, `monitor_get_asset`, `monitor_list_assets` |
 | `infra-sentinel-diagnose` | Diagnose | `logs_get_bundle`, `kb_search` (signature identified via the agent's own reasoning, not a separate LLM call) |
-| `infra-sentinel-notify` | Present | `notify_post_activity` |
-| `infra-sentinel-remediate` | Remediate | `remediation_propose` (LLM-callable) → human approval → `remediation_execute` (harness-only, never exposed to the LLM) |
+| `infra-sentinel-notify` | Narrate | `notify_post_activity` |
+| `infra-sentinel-remediate` | Propose | `remediation_propose` (LLM-callable) → human approval → `remediation.execute` (Gateway-only, never exposed to the LLM) |
 
-`agent/loop.py` runs a bounded, LLM-driven tool-calling loop: `soul.md` and the five `SKILL.md` files are loaded into the system prompt, and the MCP tool catalog is surfaced to the LLM as OpenAI-style function-calling tools. The LLM decides which tool to call, in which order, based on what it observes — not a fixed script. The one exception is `remediation_execute`: it is never exposed to the LLM. It is called only by deterministic harness code, after a human operator has approved and the single-use approval token has been retrieved out-of-band (see [HITL approval gate](#hitl-approval-gate) below and ADR-004, ADR-010).
+The `nemoclaw-infra-tools` OpenClaw plugin registers exactly those seven tools, bridging to the MCP Tools service as an MCP client. It also carries the deterministic harness side-work the old loop performed (fault registration on first log fetch, diagnosis persistence, narration pinning). OpenClaw's built-in tools (`exec`, `browser`, `web_search`, …) are denied via tool policy at onboard time. On approval, the Gateway's `post_decision()` mints the token and calls `remediation.execute` server-to-server immediately — no polling (see [HITL approval gate](#hitl-approval-gate) below and ADR-004, ADR-010, ADR-011).
 
 ## HITL approval gate
 
@@ -130,10 +130,10 @@ uv run pytest tests/e2e/      # end-to-end (requires running stack)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `VLLM_BASE_URL` | `http://YOUR_VLLM_HOST:8000/v1` | LLM inference endpoint (OpenAI-compatible) |
-| `VLLM_API_KEY` | `token-abc123` | API key for vLLM endpoint |
 | `PACK_ID` | `datacenter-xe9680` | Active domain pack |
-| `POLL_INTERVAL` | `5.0` | Agent poll interval in seconds |
+| `OPENCLAW_HOOK_URL` | unset | OpenClaw gateway URL for webhook wake-up (e.g. `http://host.docker.internal:18789`) |
+| `OPENCLAW_HOOK_TOKEN` | unset | Webhook shared secret (printed by `onboard-openclaw.sh`) |
+| `LLM_BASE_URL` / `LLM_MODEL` / `LLM_API_KEY` | — | Consumed by `onboard-openclaw.sh` only; the Compose stack no longer talks to the LLM |
 
 ## Milestones
 
@@ -150,4 +150,4 @@ uv run pytest tests/e2e/      # end-to-end (requires running stack)
 | M8 Extensibility: second pack (laptop-fleet) | ✅ Complete |
 | M9 Prod hardening (Kubernetes, 30 users) | ⬜ Planned |
 | M10 LLM-driven skill-calling agent (ADR-010) | ✅ Complete — validated live against vLLM/Qwen tool-calling |
-| M11 Real NemoClaw/OpenClaw agent runtime (ADR-011) | 📝 Spec'd — validation spike required before implementation |
+| M11 Real NemoClaw/OpenClaw agent runtime (ADR-011) | 🚧 Implemented — spike partially validated (MCP interop, plugin manifest, docs-level unknowns); live sandbox run blocked on Intel-Mac host (OpenShell has no macOS x86_64 assets), needs a supported host |

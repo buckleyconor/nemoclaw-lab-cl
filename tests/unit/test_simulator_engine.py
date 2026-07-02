@@ -9,7 +9,6 @@ import pytest
 from libs.common.pack_loader import load_pack
 from services.simulator.engine import InjectedFault, SimulatorEngine
 
-
 PACK_DIR = Path(__file__).parent.parent.parent / "packs" / "datacenter-xe9680"
 
 
@@ -39,7 +38,9 @@ def test_all_assets_start_healthy(engine: SimulatorEngine) -> None:
 
 
 def test_asset_ids_match_pack(engine: SimulatorEngine) -> None:
-    assert set(engine.asset_ids) == {"gpu-server-01", "gpu-server-02"}
+    loaded = load_pack(PACK_DIR)
+    assert set(engine.asset_ids) == {a.id for a in loaded.pack.assets}
+    assert {"gpu-server-01", "gpu-server-02"} <= set(engine.asset_ids)
 
 
 def test_asset_type_is_server(engine: SimulatorEngine) -> None:

@@ -16,7 +16,6 @@ dependencies = [
     "httpx>=0.27.0",
     "pyyaml>=6.0.2",
     "redis>=5.0.0",
-    "openai>=1.50.0",
     "sse-starlette>=2.1.0",
     "python-multipart>=0.0.9",
 ]
@@ -40,7 +39,7 @@ ml = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["services", "libs", "agent"]
+packages = ["services", "libs"]
 
 # ---------------------------------------------------------------------------
 # Ruff — lint + format
@@ -57,7 +56,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["libs", "services", "agent"]
+known-first-party = ["libs", "services"]
 
 [tool.ruff.format]
 quote-style = "double"

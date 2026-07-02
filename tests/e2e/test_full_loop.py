@@ -1,22 +1,28 @@
-"""E-01 — Full agent happy-path loop with stub LLM (ADR-010 tool-calling).
+"""E-01 — Full fault lifecycle with the Gateway as execution trigger (ADR-011).
 
 Stack:
   Simulator     — in-process (TestClient)
   Orchestrator  — in-process (TestClient, FakeSimulatorClient)
-  Gateway       — in-process (ASGITransport, shared token_store + fault_registry)
-  MCP Tools     — DirectAgentTools (bypass MCP protocol; call logic directly)
-  LLM           — StubLLMClient (rule-based tool-calling policy, signature "Xid 79")
+  Gateway       — in-process (ASGITransport, injected remediation_execute_fn)
+  MCP Tools     — business-logic functions called directly (no MCP wire)
+  LLM           — none. The OpenClaw agent's tool calls are simulated by
+                  driving the same Gateway/MCP surfaces the
+                  nemoclaw-infra-tools plugin uses; genuine LLM tool-calling
+                  coverage lives in the plugin's test suite and the ADR-011
+                  validation spike, outside pytest (see ADR-011).
 
 Verified:
-  E-01  Full sequence: detect → diagnose → present → approve → remediate → resolved,
-        driven by LLM tool calls (monitor → logs → notify → kb → propose).
-  SC1   Agent never auto-remediates; always waits for a human-minted token.
-  SC2   After approval the fault is fully resolved.
+  E-01  detect → diagnose → propose → approve → Gateway executes → resolved.
+  SC1   Nothing executes without a human decision; the token is minted only
+        by POST /decision and consumed server-side.
+  SC2   After approval the fault resolves, the asset heals, and the operator
+        feed shows the execution narration.
 """
 
 from __future__ import annotations
 
 import asyncio
+import os
 from pathlib import Path
 
 import httpx
@@ -24,21 +30,24 @@ import pytest
 from fastapi.testclient import TestClient
 from httpx import ASGITransport
 
-from agent.llm import StubLLMClient
-from agent.loop import LoopResult, run_agent_loop
-from agent.tools import DirectAgentTools
 from libs.common.pack_loader import load_pack
 from services.gateway.main import create_app as create_gateway
-from services.mcp_tools.adapters.redfish import RedfishAdapter
 from services.mcp_tools.fault_registry import FaultEventRegistry
-from services.mcp_tools.kb_index import KBIndex
 from services.mcp_tools.main import create_app as create_mcp_tools
 from services.mcp_tools.token_store import ApprovalTokenStore
+from services.mcp_tools.tools.remediation import (
+    RemediationError,
+    remediation_execute,
+    remediation_propose,
+)
 from services.orchestrator.main import create_app as create_orchestrator
 from services.orchestrator.simulator_client import FakeSimulatorClient
 from services.simulator.main import create_app as create_simulator
 
 PACK_DIR = Path(__file__).parent.parent.parent / "packs" / "datacenter-xe9680"
+
+# Execution narration must not sleep in tests.
+os.environ["GATEWAY_NARRATION_DELAY_SCALE"] = "0"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -79,7 +88,7 @@ def fault_registry() -> FaultEventRegistry:
 
 
 @pytest.fixture(scope="module")
-def gateway_tc(orchestrator_tc, token_store, fault_registry) -> TestClient:
+def gateway_tc(orchestrator_tc, token_store, fault_registry, fake_sim) -> TestClient:
     orch_transport = ASGITransport(app=orchestrator_tc.app)
     orch_client = httpx.AsyncClient(transport=orch_transport, base_url="http://orchestrator")
 
@@ -92,10 +101,30 @@ def gateway_tc(orchestrator_tc, token_store, fault_registry) -> TestClient:
         transport=ASGITransport(app=mcp_app), base_url="http://mcp-tools"
     )
 
+    # The Gateway's post-approval executor, wired to in-process business
+    # logic — the same shape make_mcp_remediation_execute produces over the
+    # MCP wire in production.
+    async def execute_fn(fault_event_id: str, approval_token: str, step_ids: list[str]) -> dict:
+        async def _clear(asset_id: str) -> None:
+            await fake_sim.clear(asset_id)
+
+        try:
+            return await remediation_execute(
+                fault_event_id=fault_event_id,
+                approval_token=approval_token,
+                step_ids=step_ids,
+                token_store=token_store,
+                fault_registry=fault_registry,
+                clear_fn=_clear,
+            )
+        except RemediationError as exc:
+            return exc.to_dict()
+
     gw_app = create_gateway(
         pack_dir=PACK_DIR,
         orchestrator_client=orch_client,
         mcp_tools_client=mcp_client,
+        remediation_execute_fn=execute_fn,
     )
     with TestClient(gw_app) as c:
         yield c
@@ -109,55 +138,80 @@ def reset_state(
     fault_registry: FaultEventRegistry,
     fake_sim: FakeSimulatorClient,
 ) -> None:
-    # Before each test: reset all mutable state
     orchestrator_tc.post("/api/reset")
     simulator_tc.post("/control/clear", json={})
     token_store.clear()
     fault_registry.clear()
     fake_sim.reset_history()
     yield
-    # After: also reset so tests don't bleed state forward
     orchestrator_tc.post("/api/reset")
 
 
-@pytest.fixture()
-def stub_llm() -> StubLLMClient:
-    return StubLLMClient(default_response="Xid 79")
-
-
 # ─────────────────────────────────────────────────────────────────────────────
-# Helper — build DirectAgentTools wired to in-process services
+# Helpers — drive the same surfaces the OpenClaw plugin drives
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def _build_tools(
-    simulator_tc: TestClient,
-    orchestrator_tc: TestClient,
-    gateway_tc: TestClient,
-    loaded_pack,
-    token_store: ApprovalTokenStore,
-    fault_registry: FaultEventRegistry,
-    fake_sim: FakeSimulatorClient,
-) -> DirectAgentTools:
-    sim_transport = ASGITransport(app=simulator_tc.app)
-    orch_transport = ASGITransport(app=orchestrator_tc.app)
-    gw_transport = ASGITransport(app=gateway_tc.app)
-
-    return DirectAgentTools(
-        # RedfishAdapter now accepts _transport= to avoid real HTTP in tests
-        adapter=RedfishAdapter("http://simulator", _transport=sim_transport),
-        orchestrator_client=httpx.AsyncClient(
-            transport=orch_transport, base_url="http://orchestrator"
-        ),
-        kb_index=KBIndex(loaded_pack),
-        token_store=token_store,
-        fault_registry=fault_registry,
-        sim_client=fake_sim,
-        # notify.post_activity / remediation.propose land on the Gateway (ADR-010)
-        gateway_client=httpx.AsyncClient(
-            transport=gw_transport, base_url="http://gateway"
-        ),
+def _gw(gateway_tc: TestClient) -> httpx.AsyncClient:
+    return httpx.AsyncClient(
+        transport=ASGITransport(app=gateway_tc.app), base_url="http://gateway"
     )
+
+
+async def _register_and_propose(gw: httpx.AsyncClient, scenario_id: str, asset_id: str) -> str:
+    """The plugin's deterministic side-work: register the fault on first log
+    evidence, mark diagnosing, record the diagnosis, then propose (which the
+    LLM triggers via the remediation_propose tool)."""
+    r = await gw.post("/api/faults", json={
+        "scenario_id": scenario_id,
+        "asset_id": asset_id,
+        "log_extract": "iDRAC: GPU3 has fallen off the bus (Xid 79)",
+    })
+    assert r.status_code == 201
+    fault_id = r.json()["id"]
+
+    await gw.patch(f"/api/faults/{fault_id}/status", json={"status": "diagnosing"})
+    await gw.patch(f"/api/faults/{fault_id}/diagnosis", json={
+        "error_signature": "Xid 79",
+        "kb_article_id": "KB000123",
+        "kb_title": "GPU Xid 79: GPU Has Fallen Off the Bus",
+        "kb_score": 0.92,
+    })
+
+    result = await remediation_propose(
+        gw,
+        fault_event_id=fault_id,
+        step_ids=[],
+        summary="GPU3 on the asset has fallen off the bus (Xid 79); a drain, "
+                "reset and health-check cycle is the validated KB remediation. "
+                "Workloads on the node will be interrupted during the reset.",
+    )
+    assert result["status"] == "proposal_recorded"
+    return fault_id
+
+
+async def _wait_for_status(
+    gw: httpx.AsyncClient, fault_id: str, status: str, timeout: float = 5.0
+) -> dict:
+    deadline = asyncio.get_event_loop().time() + timeout
+    while asyncio.get_event_loop().time() < deadline:
+        r = await gw.get(f"/api/faults/{fault_id}")
+        fault = r.json()
+        if fault.get("status") == status:
+            return fault
+        await asyncio.sleep(0.02)
+    raise AssertionError(f"fault {fault_id} never reached {status}: last={fault.get('status')}")
+
+
+def _inject(orchestrator_tc: TestClient, simulator_tc: TestClient) -> tuple[str, str]:
+    r = orchestrator_tc.post("/api/run/scn-gpu-xid-79")
+    assert r.status_code == 200
+    target_asset = r.json()["target_asset"]
+    simulator_tc.post(
+        "/control/inject",
+        json={"asset_id": target_asset, "scenario_id": "scn-gpu-xid-79"},
+    )
+    return "scn-gpu-xid-79", target_asset
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -166,154 +220,100 @@ def _build_tools(
 
 
 @pytest.mark.asyncio
-async def test_e01_no_fault_returns_no_fault(
-    simulator_tc, orchestrator_tc, gateway_tc, loaded_pack,
-    token_store, fault_registry, fake_sim, stub_llm,
-) -> None:
-    """E-01 base case: no active fault → loop exits immediately."""
-    tools = _build_tools(simulator_tc, orchestrator_tc, gateway_tc, loaded_pack, token_store, fault_registry, fake_sim)
-    gw_transport = ASGITransport(app=gateway_tc.app)
-    async with httpx.AsyncClient(transport=gw_transport, base_url="http://gateway") as gw:
-        result = await run_agent_loop(
-            tools=tools,
-            gateway_client=gw,
-            llm_client=stub_llm,
-            loaded_pack=loaded_pack,
-            poll_interval=0.05,
-        )
-    assert result.status == "no_fault"
-
-
-@pytest.mark.asyncio
 async def test_e01_full_happy_path_resolves(
-    simulator_tc, orchestrator_tc, gateway_tc, loaded_pack,
-    token_store, fault_registry, fake_sim, stub_llm,
+    simulator_tc, orchestrator_tc, gateway_tc, fake_sim,
 ) -> None:
-    """E-01 (SC1, SC2): inject fault → detect → diagnose → present → human approves → resolved."""
-    # Inject scenario via Orchestrator (makes log bundle available)
-    r = orchestrator_tc.post("/api/run/scn-gpu-xid-79")
-    assert r.status_code == 200
-    target_asset = r.json()["target_asset"]
+    """E-01 (SC2): inject → register → propose → human approves → Gateway
+    executes immediately → resolved, asset healthy, feed narrated."""
+    scenario_id, target_asset = _inject(orchestrator_tc, simulator_tc)
 
-    # Inject into simulator's Redfish surface
-    simulator_tc.post("/control/inject", json={"asset_id": target_asset, "scenario_id": "scn-gpu-xid-79"})
+    async with _gw(gateway_tc) as gw:
+        fault_id = await _register_and_propose(gw, scenario_id, target_asset)
+        await _wait_for_status(gw, fault_id, "awaiting_approval")
 
-    tools = _build_tools(simulator_tc, orchestrator_tc, gateway_tc, loaded_pack, token_store, fault_registry, fake_sim)
-    gw_transport = ASGITransport(app=gateway_tc.app)
-    loop_result: list[LoopResult] = []
+        r = await gw.post(f"/api/faults/{fault_id}/decision", json={"decision": "approved"})
+        assert r.status_code == 200
+        assert r.json()["execution"] == "started"
 
-    async def run_loop(gw: httpx.AsyncClient) -> None:
-        loop_result.append(await run_agent_loop(
-            tools=tools,
-            gateway_client=gw,
-            llm_client=stub_llm,
-            loaded_pack=loaded_pack,
-            approval_timeout=10.0,
-            poll_interval=0.05,
-        ))
+        fault = await _wait_for_status(gw, fault_id, "resolved")
 
-    async def approve_when_ready(gw: httpx.AsyncClient) -> None:
-        for _ in range(100):
-            await asyncio.sleep(0.1)
-            resp = await gw.get("/api/faults")
-            for f in resp.json().get("faults", []):
-                if f["status"] == "awaiting_approval":
-                    await gw.post(f"/api/faults/{f['id']}/decision", json={"decision": "approved"})
-                    return
-        raise AssertionError("fault never reached awaiting_approval")
+        # Diagnosis fields persisted for the Operator Dashboard
+        assert fault["error_signature"] == "Xid 79"
+        assert fault["kb_article_id"] == "KB000123"
+        assert fault["kb_score"] is not None
+        assert fault["analysis"], "agent summary missing from fault detail"
+        assert fault["impact"] is not None
+        for key in ("summary", "workload_impact", "service_risk", "estimated_duration"):
+            assert fault["impact"][key], f"impact.{key} empty"
+        # Step labels defaulted from the Gateway's own pack (plugin sends none)
+        assert fault["remediation_step_labels"], "step labels not defaulted from pack"
 
-    async with httpx.AsyncClient(transport=gw_transport, base_url="http://gateway") as gw:
-        await asyncio.gather(
-            asyncio.create_task(run_loop(gw)),
-            asyncio.create_task(approve_when_ready(gw)),
-        )
+        # Remediation actually ran against the simulator
+        assert target_asset in fake_sim.cleared
 
-    assert len(loop_result) == 1
-    result = loop_result[0]
-    assert result.status == "resolved", f"got: {result.status}"
-    assert result.scenario_id == "scn-gpu-xid-79"
+        # Asset returned to healthy
+        assets = (await gw.get("/api/assets")).json()["assets"]
+        state = next(a["state"] for a in assets if a["id"] == target_asset)
+        assert state == "healthy"
 
-    # Diagnosis fields were persisted for the Operator Dashboard along the way
-    fault_r = gateway_tc.get(f"/api/faults/{result.fault_id}")
-    fault = fault_r.json()
-    assert fault["error_signature"] == "Xid 79"
-    assert fault["kb_article_id"] == "KB000123"
-    assert fault["kb_title"], "KB title missing from fault detail"
-    assert fault["kb_score"] is not None
-    assert fault["analysis"], "agent summary missing from fault detail"
-    # Impact assessment comes from pack content at fault creation
-    assert fault["impact"] is not None
-    for key in ("summary", "workload_impact", "service_risk", "estimated_duration"):
-        assert fault["impact"][key], f"impact.{key} empty"
+        # Execution narration reached the operator feed
+        activity = (await gw.get("/api/activity")).json()["activity"]
+        steps = [a["step"] for a in activity if a["fault_event_id"] == fault_id]
+        assert "remediate" in steps and "resolved" in steps
 
 
 @pytest.mark.asyncio
-async def test_e01_sc1_timeout_without_approval(
-    simulator_tc, orchestrator_tc, gateway_tc, loaded_pack,
-    token_store, fault_registry, fake_sim, stub_llm,
+async def test_e01_sc1_no_decision_no_execution(
+    simulator_tc, orchestrator_tc, gateway_tc, fake_sim,
 ) -> None:
-    """SC1/SC3: when no approval comes within timeout, loop returns 'timeout'; no remediation runs."""
-    r = orchestrator_tc.post("/api/run/scn-gpu-xid-79")
-    target_asset = r.json()["target_asset"]
-    simulator_tc.post("/control/inject", json={"asset_id": target_asset, "scenario_id": "scn-gpu-xid-79"})
+    """SC1: without a human decision nothing executes and no token exists."""
+    scenario_id, target_asset = _inject(orchestrator_tc, simulator_tc)
 
-    tools = _build_tools(simulator_tc, orchestrator_tc, gateway_tc, loaded_pack, token_store, fault_registry, fake_sim)
-    gw_transport = ASGITransport(app=gateway_tc.app)
+    async with _gw(gateway_tc) as gw:
+        fault_id = await _register_and_propose(gw, scenario_id, target_asset)
+        await _wait_for_status(gw, fault_id, "awaiting_approval")
 
-    async with httpx.AsyncClient(transport=gw_transport, base_url="http://gateway") as gw:
-        result = await run_agent_loop(
-            tools=tools,
-            gateway_client=gw,
-            llm_client=stub_llm,
-            loaded_pack=loaded_pack,
-            approval_timeout=0.2,  # expires fast in tests
-            poll_interval=0.05,
-        )
+        token_r = await gw.get(f"/api/faults/{fault_id}/token")
+        assert token_r.status_code == 404
 
-    assert result.status == "timeout"
-    # SC1: no remediation — FakeSimulatorClient records nothing cleared
-    assert len(fake_sim.cleared) == 0
+        await asyncio.sleep(0.1)  # give any (wrongly) started task time to act
+        fault = (await gw.get(f"/api/faults/{fault_id}")).json()
+        assert fault["status"] == "awaiting_approval"
+        assert len(fake_sim.cleared) == 0
 
 
 @pytest.mark.asyncio
 async def test_e01_deny_flow(
-    simulator_tc, orchestrator_tc, gateway_tc, loaded_pack,
-    token_store, fault_registry, fake_sim, stub_llm,
+    simulator_tc, orchestrator_tc, gateway_tc, fake_sim,
 ) -> None:
-    """E-01: human denies → loop returns 'denied', no remediation executes."""
-    r = orchestrator_tc.post("/api/run/scn-gpu-xid-79")
-    target_asset = r.json()["target_asset"]
-    simulator_tc.post("/control/inject", json={"asset_id": target_asset, "scenario_id": "scn-gpu-xid-79"})
+    """E-01: human denies → fault marked denied, no remediation executes."""
+    scenario_id, target_asset = _inject(orchestrator_tc, simulator_tc)
 
-    tools = _build_tools(simulator_tc, orchestrator_tc, gateway_tc, loaded_pack, token_store, fault_registry, fake_sim)
-    gw_transport = ASGITransport(app=gateway_tc.app)
-    loop_result: list[LoopResult] = []
+    async with _gw(gateway_tc) as gw:
+        fault_id = await _register_and_propose(gw, scenario_id, target_asset)
+        await _wait_for_status(gw, fault_id, "awaiting_approval")
 
-    async def run_loop(gw: httpx.AsyncClient) -> None:
-        loop_result.append(await run_agent_loop(
-            tools=tools,
-            gateway_client=gw,
-            llm_client=stub_llm,
-            loaded_pack=loaded_pack,
-            approval_timeout=10.0,
-            poll_interval=0.05,
-        ))
+        r = await gw.post(f"/api/faults/{fault_id}/decision", json={"decision": "denied"})
+        assert r.status_code == 200
 
-    async def deny_when_ready(gw: httpx.AsyncClient) -> None:
-        for _ in range(100):
-            await asyncio.sleep(0.1)
-            resp = await gw.get("/api/faults")
-            for f in resp.json().get("faults", []):
-                if f["status"] == "awaiting_approval":
-                    await gw.post(f"/api/faults/{f['id']}/decision", json={"decision": "denied"})
-                    return
-        raise AssertionError("fault never reached awaiting_approval")
+        fault = await _wait_for_status(gw, fault_id, "denied")
+        assert fault["status"] == "denied"
+        await asyncio.sleep(0.1)
+        assert len(fake_sim.cleared) == 0
 
-    async with httpx.AsyncClient(transport=gw_transport, base_url="http://gateway") as gw:
-        await asyncio.gather(
-            asyncio.create_task(run_loop(gw)),
-            asyncio.create_task(deny_when_ready(gw)),
-        )
 
-    assert loop_result[0].status == "denied"
-    assert len(fake_sim.cleared) == 0
+@pytest.mark.asyncio
+async def test_e01_approval_token_retrievable_for_audit(
+    simulator_tc, orchestrator_tc, gateway_tc,
+) -> None:
+    """The trusted token endpoint still serves the minted token (audit/API
+    compat) even though nothing polls it anymore."""
+    scenario_id, target_asset = _inject(orchestrator_tc, simulator_tc)
+
+    async with _gw(gateway_tc) as gw:
+        fault_id = await _register_and_propose(gw, scenario_id, target_asset)
+        await gw.post(f"/api/faults/{fault_id}/decision", json={"decision": "approved"})
+        token_r = await gw.get(f"/api/faults/{fault_id}/token")
+        assert token_r.status_code == 200
+        assert token_r.json()["token"]
+        await _wait_for_status(gw, fault_id, "resolved")

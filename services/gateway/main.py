@@ -21,6 +21,11 @@ from fastapi.staticfiles import StaticFiles
 
 from libs.common.models import AssetState
 from libs.common.pack_loader import load_pack
+from services.gateway.executor import (
+    RemediationExecuteFn,
+    RemediationExecutor,
+    make_mcp_remediation_execute,
+)
 from services.gateway.router import router
 from services.gateway.store import AssetRecord, GatewayStore
 
@@ -37,6 +42,7 @@ def create_app(
     pack_dir: Path | None = None,
     orchestrator_client: httpx.AsyncClient | None = None,
     mcp_tools_client: httpx.AsyncClient | None = None,
+    remediation_execute_fn: RemediationExecuteFn | None = None,
 ) -> FastAPI:
     """Create the Gateway FastAPI application.
 
@@ -44,12 +50,16 @@ def create_app(
         pack_dir:             Pack directory.  Defaults to ``packs/$PACK_ID``.
         orchestrator_client:  Injected httpx client for Orchestrator (tests).
         mcp_tools_client:     Injected httpx client for MCP Tools (tests).
+        remediation_execute_fn: Injected remediation.execute call (tests).
+                              Defaults to a Streamable HTTP MCP call against
+                              $MCP_TOOLS_URL (ADR-011).
     """
     resolved_dir = _resolve_pack_dir(pack_dir)
     orch_url = os.environ.get("ORCHESTRATOR_URL", "http://localhost:8002")
     mcp_url = os.environ.get("MCP_TOOLS_URL", "http://localhost:8004")
     redis_url = os.environ.get("REDIS_URL")
     redis_prefix = os.environ.get("REDIS_KEY_PREFIX", "nemoclaw")
+    narration_delay_scale = float(os.environ.get("GATEWAY_NARRATION_DELAY_SCALE", "1.0"))
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -77,6 +87,14 @@ def create_app(
         mcp = mcp_tools_client or httpx.AsyncClient(base_url=mcp_url)
         app.state.orchestrator_client = orch
         app.state.mcp_tools_client = mcp
+
+        # Post-approval execution trigger (ADR-011) — deterministic harness
+        # code; the LLM has no path to it.
+        execute_fn = remediation_execute_fn or make_mcp_remediation_execute(mcp_url)
+        app.state.remediation_executor = RemediationExecutor(
+            execute_fn=execute_fn,
+            delay_scale=narration_delay_scale,
+        )
 
         yield
 

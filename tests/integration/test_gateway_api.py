@@ -10,7 +10,6 @@ This lets tests verify the full human approval flow without any network calls.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import httpx
@@ -18,7 +17,6 @@ import pytest
 from fastapi.testclient import TestClient
 from httpx import ASGITransport
 
-from libs.common.models import ApprovalDecision
 from services.gateway.main import create_app as create_gateway
 from services.mcp_tools.fault_registry import FaultEventRegistry
 from services.mcp_tools.main import create_app as create_mcp_tools
@@ -65,7 +63,9 @@ def mcp_tools_app(token_store, fault_registry):
 
 
 @pytest.fixture(scope="module")
-def gateway_client(orchestrator_app, mcp_tools_app) -> TestClient:
+def gateway_client(
+    orchestrator_app, mcp_tools_app, token_store, fault_registry, fake_sim
+) -> TestClient:
     # Wire Gateway's HTTP clients to the in-process ASGI apps.
     orch_transport = ASGITransport(app=orchestrator_app)
     mcp_transport = ASGITransport(app=mcp_tools_app)
@@ -77,13 +77,47 @@ def gateway_client(orchestrator_app, mcp_tools_app) -> TestClient:
     orch_client = httpx.AsyncClient(transport=orch_transport, base_url="http://orchestrator")
     mcp_client = httpx.AsyncClient(transport=mcp_transport, base_url="http://mcp-tools")
 
+    # In-process remediation.execute for the Gateway's post-approval executor
+    # (ADR-011) — same business logic the MCP wire reaches in production.
+    async def execute_fn(fault_event_id: str, approval_token: str, step_ids: list[str]) -> dict:
+        async def _clear(asset_id: str) -> None:
+            await fake_sim.clear(asset_id)
+
+        try:
+            return await remediation_execute(
+                fault_event_id=fault_event_id,
+                approval_token=approval_token,
+                step_ids=step_ids,
+                token_store=token_store,
+                fault_registry=fault_registry,
+                clear_fn=_clear,
+            )
+        except RemediationError as exc:
+            return exc.to_dict()
+
     gateway_app = create_gateway(
         pack_dir=PACK_DIR,
         orchestrator_client=orch_client,
         mcp_tools_client=mcp_client,
+        remediation_execute_fn=execute_fn,
     )
     with TestClient(gateway_app) as c:
         yield c
+
+
+def _wait_for_status(gateway_client: TestClient, fault_id: str, status: str) -> dict:
+    """Poll until the Gateway's background executor lands the fault on
+    ``status`` (narration delays are zeroed in tests/conftest.py)."""
+    import time
+
+    fault: dict = {}
+    deadline = time.monotonic() + 5.0
+    while time.monotonic() < deadline:
+        fault = gateway_client.get(f"/api/faults/{fault_id}").json()
+        if fault.get("status") == status:
+            return fault
+        time.sleep(0.02)
+    raise AssertionError(f"fault never reached {status}: last={fault.get('status')}")
 
 
 @pytest.fixture(autouse=True)
@@ -257,8 +291,11 @@ def test_i05_deny_no_token_available(gateway_client: TestClient) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def test_i04_approve_mints_token(gateway_client: TestClient) -> None:
-    """I-04: Human approves → token is available for agent retrieval."""
+def test_i04_approve_starts_execution_and_keeps_token_auditable(
+    gateway_client: TestClient,
+) -> None:
+    """I-04: Human approves → the Gateway starts execution immediately
+    (ADR-011) and the token stays retrievable over the trusted path."""
     create_r = gateway_client.post(
         "/api/faults",
         json={"scenario_id": "scn-gpu-xid-79", "asset_id": "gpu-server-02"},
@@ -271,34 +308,21 @@ def test_i04_approve_mints_token(gateway_client: TestClient) -> None:
     )
     assert approve_r.status_code == 200
     assert approve_r.json()["decision"] == "approved"
-    assert approve_r.json()["token_available"] is True
+    assert approve_r.json()["execution"] == "started"
 
-    # Agent retrieves token
     token_r = gateway_client.get(f"/api/faults/{fault_id}/token")
     assert token_r.status_code == 200
     token = token_r.json()["token"]
     assert len(token) > 20
+    _wait_for_status(gateway_client, fault_id, "resolved")
 
 
-def test_i04_approve_sets_status_awaiting_approval(gateway_client: TestClient) -> None:
-    create_r = gateway_client.post(
-        "/api/faults",
-        json={"scenario_id": "scn-gpu-xid-79", "asset_id": "gpu-server-02"},
-    )
-    fault_id = create_r.json()["id"]
-    gateway_client.post(f"/api/faults/{fault_id}/decision", json={"decision": "approved"})
-    fault_r = gateway_client.get(f"/api/faults/{fault_id}")
-    assert fault_r.json()["status"] == "awaiting_approval"
-
-
-@pytest.mark.asyncio
-async def test_i04_full_approve_remediate_flow(
+def test_i04_full_approve_remediate_flow(
     gateway_client: TestClient,
-    token_store: ApprovalTokenStore,
-    fault_registry: FaultEventRegistry,
+    fake_sim: FakeSimulatorClient,
 ) -> None:
-    """I-04: Full end-to-end: create fault → approve → retrieve token → remediation.execute."""
-    # Create a fault event
+    """I-04: Full flow: create fault → approve → Gateway executes
+    remediation.execute server-side → fault resolved, asset cleared."""
     create_r = gateway_client.post(
         "/api/faults",
         json={
@@ -309,31 +333,16 @@ async def test_i04_full_approve_remediate_flow(
     )
     fault_id = create_r.json()["id"]
 
-    # Human approves
     gateway_client.post(f"/api/faults/{fault_id}/decision", json={"decision": "approved"})
 
-    # Agent retrieves token
-    token_r = gateway_client.get(f"/api/faults/{fault_id}/token")
-    token_str = token_r.json()["token"]
+    fault = _wait_for_status(gateway_client, fault_id, "resolved")
+    assert fault["status"] == "resolved"
+    assert "gpu-server-02" in fake_sim.cleared
 
-    # Agent calls remediation.execute (using shared token_store + fault_registry)
-    cleared: list[str] = []
-
-    async def _fake_clear(asset_id: str) -> None:
-        cleared.append(asset_id)
-
-    result = await remediation_execute(
-        fault_event_id=fault_id,
-        approval_token=token_str,
-        step_ids=["drain_node", "gpu_reset", "verify_health"],
-        token_store=token_store,
-        fault_registry=fault_registry,
-        clear_fn=_fake_clear,
-    )
-
-    assert result["status"] == "resolved"
-    assert result["asset_state"] == "healthy"
-    assert "gpu-server-02" in cleared
+    # The executor's narration reached the operator feed
+    activity = gateway_client.get("/api/activity").json()["activity"]
+    steps = {a["step"] for a in activity if a["fault_event_id"] == fault_id}
+    assert "remediate" in steps and "resolved" in steps
 
 
 @pytest.mark.asyncio
@@ -342,7 +351,8 @@ async def test_i04_token_single_use_after_remediation(
     token_store: ApprovalTokenStore,
     fault_registry: FaultEventRegistry,
 ) -> None:
-    """I-04: Token consumed after first execute; second attempt fails (SEC-03)."""
+    """I-04 (SEC-03): the Gateway's execution consumes the token; any later
+    replay with the same token fails."""
     create_r = gateway_client.post(
         "/api/faults",
         json={"scenario_id": "scn-gpu-xid-79", "asset_id": "gpu-server-02"},
@@ -351,20 +361,12 @@ async def test_i04_token_single_use_after_remediation(
     gateway_client.post(f"/api/faults/{fault_id}/decision", json={"decision": "approved"})
     token_str = gateway_client.get(f"/api/faults/{fault_id}/token").json()["token"]
 
+    _wait_for_status(gateway_client, fault_id, "resolved")
+
     async def _noop_clear(asset_id: str) -> None:
         pass
 
-    # First execute — succeeds
-    await remediation_execute(
-        fault_event_id=fault_id,
-        approval_token=token_str,
-        step_ids=["drain_node", "gpu_reset", "verify_health"],
-        token_store=token_store,
-        fault_registry=fault_registry,
-        clear_fn=_noop_clear,
-    )
-
-    # Second execute — token consumed
+    # Replay after the Gateway already executed — token consumed
     with pytest.raises(RemediationError) as exc_info:
         await remediation_execute(
             fault_event_id=fault_id,
@@ -410,7 +412,11 @@ def test_post_activity_appears_in_feed(gateway_client: TestClient) -> None:
 
     gateway_client.post(
         "/api/agent/activity",
-        json={"fault_event_id": fault_id, "step": "detect", "message": "Fault detected on gpu-server-02"},
+        json={
+            "fault_event_id": fault_id,
+            "step": "detect",
+            "message": "Fault detected on gpu-server-02",
+        },
     )
     gateway_client.post(
         "/api/agent/activity",
