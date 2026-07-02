@@ -1,89 +1,38 @@
 ---
 name: "infra-sentinel-remediate"
-description: "Executes operator-approved remediation steps against a faulted cluster node. Polls for the human approval token, validates it, runs each remediation step in sequence via the MCP tools server, and marks the fault resolved. Use after the operator has been presented with the diagnosis and has approved action."
+description: "Records a recommended remediation plan and requests operator approval. This is the only remediation-related action available to you — execution happens outside your control, only after a human approves."
 license: "Apache-2.0"
 ---
 
-# Skill: Fault Remediation
+# Skill: Fault Remediation (Proposal Only)
 
 ## Purpose
 
-Execute the approved remediation procedure step-by-step, report progress to the operator dashboard, and mark the fault resolved once all steps complete successfully.
+Once you have a diagnosis you're confident in, recommend a fix and ask a human to approve it. That's the full extent of your authority here.
 
-## Prerequisites
+## Using `remediation_propose`
 
-- `fault_id`, `asset_id`, `remediation_steps` from `infra-sentinel-diagnose`
-- Fault status has been set to `awaiting_approval` by `infra-sentinel-notify`
+Call with:
 
-## Steps
-
-### 1. Poll for Approval Token
-
-`GET /api/faults/<fault_id>/token` — returns `{ "token": "<jwt>" }` once the operator has approved.
-
-Check every 500ms. If the fault status transitions to `denied`, stop immediately.
-
-**If denied:**
-Post activity: `"Remediation denied by operator — fault logged, no action taken"` (step: `denied`)
-Return `{ "status": "denied" }`.
-
-**If no approval within 600 seconds:**
-Escalate via notification channel and return `{ "status": "timeout" }`. Do not auto-remediate.
-
-**If approved:**
-Post activity: `"✅ Approval received — single-use token validated"` (step: `remediate`)
-
-### 2. Announce Remediation Start
-
-Post activity: `"Beginning remediation: <N> approved steps"` (step: `remediate`)
-
-### 3. Execute Steps
-
-For each step in `remediation_steps` (in order):
-
-Post activity: `"  ▶ <step_label>…"` (step: `remediate`) — wait ~1.2 seconds.
-Post activity: `"  ✓ <step_label> — complete"` (step: `remediate`) — wait ~1.5 seconds.
-
-After announcing all steps, call:
-
-```
-remediation_execute(
-  fault_event_id=<fault_id>,
-  approval_token=<token>,
-  step_ids=[<step-01>, <step-02>, ...]
-)
-```
-
-The tool validates the token server-side and executes each step atomically. It returns:
 ```json
-{ "status": "resolved" }
+{
+  "fault_event_id": "<fault_id>",
+  "step_ids": ["step-01", "step-02", ...]
+}
 ```
-or
-```json
-{ "status": "error", "error": "<description>" }
-```
 
-### 4. Verify and Resolve
+Use the step ids from your KB match or the scenario's default remediation steps — don't invent step ids that weren't given to you by `kb_search` or the scenario data.
 
-If the tool returns `{ "status": "resolved" }`:
+This call has one effect: it records your proposed plan and moves the fault into the operator's approval queue. **It does not execute anything.** There is no token, no confirmation, no infrastructure change from this call.
 
-Post activity: `"Remediation complete — verifying <asset_id> health…"` (step: `remediate`)
+## After you call it
 
-`PATCH /api/faults/<fault_id>/status` with `{ "status": "resolved" }`
+Stop calling tools and wait. You do not have — and will never be given — a tool that executes remediation. A human operator approves or denies from the dashboard; if approved, a separate part of the system (outside this conversation) retrieves a single-use approval token and runs the actual remediation. You will not see that happen, and you should not ask for or expect a token.
 
-Post activity: `"✅ <asset_id> returned to healthy state — fault cleared"` (step: `resolved`)
+If you're ever unsure whether an action requires approval, assume it does — you don't have any tool that bypasses that gate, so there's nothing to reconsider.
 
-Return `{ "status": "resolved" }`.
+## Judgment notes
 
-If the tool returns an error:
-
-Post activity: `"⚠ Remediation error: <error>"` (step: `remediate`)
-
-Do not mark the fault resolved. Escalate via the notification channel. Return `{ "status": "error", "error": "<error>" }`.
-
-## Notes
-
-- The approval token is single-use. Do not retry `remediation_execute` with the same token if it fails — request a new approval.
-- Steps must be executed in the order defined in the scenario. Do not skip or reorder.
-- If a step is a no-op (already in the desired state), the MCP tool handles this gracefully — continue to the next step.
-- The `PATCH status → resolved` triggers an asset state update (healthy) and SSE broadcast to the dashboard automatically.
+- Call `remediation_propose` once per investigation, after you have enough evidence — not before you've stated a signature and consulted the KB, and not more than once for the same fault.
+- If your diagnosis was low-confidence or your KB match was weak, say so plainly in your notification before proposing — the operator is deciding based on what you tell them, not just what you recommend.
+- If a fault turns out not to need remediation (e.g. it's already resolved, or the event was stale), say so and don't force a proposal.

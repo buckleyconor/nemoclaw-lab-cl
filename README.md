@@ -48,8 +48,9 @@ Pack (content)  →  Framework (agent + services)  →  Lab UI
                ┌──────────┴──────────┐
                │  NemoClaw Agent     │
                │  v0.0.70            │
-               │  soul.md + 4 skills │
-               │  Python loop        │
+               │  soul.md + 5 skills │
+               │  LLM tool-calling   │
+               │  loop (loop.py)     │
                └─────────────────────┘
                           │
                ┌──────────▼──────────┐
@@ -62,7 +63,7 @@ Pack (content)  →  Framework (agent + services)  →  Lab UI
 ## Project layout
 
 ```
-agent/          NemoClaw agent: soul.md, skills/, loop.py, llm.py
+agent/          NemoClaw agent: soul.md, skills/ (5), loop.py (LLM tool-calling loop), llm.py
 libs/common/    Shared Pydantic models, pack loader
 services/
   gateway/      FastAPI: REST API, SSE, HITL token store, SPA host
@@ -72,7 +73,7 @@ services/
 packs/          Domain Pack content per vertical (YAML + Markdown + logs)
 ui/             React + TypeScript dashboard (Vite, SSE-driven)
 docs/           Lab guide (split-screen HTML), welcome page, ADRs
-  adr/          Architecture Decision Records (9 decisions)
+  adr/          Architecture Decision Records (10 decisions)
 docker/         Dockerfiles (backend + gateway with UI build)
 deploy/helm/    Helm chart for Kubernetes deployment
 tests/          Unit + integration + e2e test suite
@@ -93,16 +94,17 @@ See [`docs/VERTICAL-PACK-GUIDE.md`](docs/VERTICAL-PACK-GUIDE.md) to create or ex
 
 ## Agent
 
-The agent is a NemoClaw v0.0.70 instance with a `soul.md` identity document and four skills:
+The agent is a NemoClaw v0.0.70 instance with a `soul.md` identity document and five skills. Unlike a fixed pipeline, the agent dynamically decides which skill/tool to invoke and in what order — see ADR-010.
 
 | Skill | Phase | MCP tools |
 |-------|-------|-----------|
-| `infra-sentinel-monitor` | Detect | `monitor_list_events` |
-| `infra-sentinel-diagnose` | Diagnose | `logs_get_bundle`, LLM, `kb_search` |
-| `infra-sentinel-notify` | Present | Gateway activity API |
-| `infra-sentinel-remediate` | Remediate | `remediation_execute` + HITL token |
+| `infra-sentinel-guide` | Orientation | none — always loaded, orients on the other four skills |
+| `infra-sentinel-monitor` | Detect | `monitor_list_events`, `monitor_get_asset`, `monitor_list_assets` |
+| `infra-sentinel-diagnose` | Diagnose | `logs_get_bundle`, `kb_search` (signature identified via the agent's own reasoning, not a separate LLM call) |
+| `infra-sentinel-notify` | Present | `notify_post_activity` |
+| `infra-sentinel-remediate` | Remediate | `remediation_propose` (LLM-callable) → human approval → `remediation_execute` (harness-only, never exposed to the LLM) |
 
-The Python `agent/loop.py` implements the runtime — the skills are Markdown instruction documents the agent's character and reasoning style; the loop is the execution engine.
+`agent/loop.py` runs a bounded, LLM-driven tool-calling loop: `soul.md` and the five `SKILL.md` files are loaded into the system prompt, and the MCP tool catalog is surfaced to the LLM as OpenAI-style function-calling tools. The LLM decides which tool to call, in which order, based on what it observes — not a fixed script. The one exception is `remediation_execute`: it is never exposed to the LLM. It is called only by deterministic harness code, after a human operator has approved and the single-use approval token has been retrieved out-of-band (see [HITL approval gate](#hitl-approval-gate) below and ADR-004, ADR-010).
 
 ## HITL approval gate
 
@@ -142,3 +144,4 @@ uv run pytest tests/e2e/      # end-to-end (requires running stack)
 | M7 Lab guide + welcome page (multi-vertical) | ✅ Complete |
 | M8 Extensibility: second pack (laptop-fleet) | ✅ Complete |
 | M9 Prod hardening (Kubernetes, 30 users) | ⬜ Planned |
+| M10 LLM-driven skill-calling agent (ADR-010) | 📝 Spec'd — not yet implemented |

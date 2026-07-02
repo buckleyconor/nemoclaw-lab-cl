@@ -750,17 +750,18 @@ body.started .curtain-half.right { animation: curtain-right 1.5s cubic-bezier(.6
       </table>
 
       <h3>NemoClaw agent architecture</h3>
-      <p>The sentinel runs as a NemoClaw v0.0.70 agent with four skills and a <code>soul.md</code> identity document. Each skill maps to one phase of the fault lifecycle:</p>
+      <p>The sentinel runs as a NemoClaw v0.0.70 agent with five skills and a <code>soul.md</code> identity document, loaded together into the agent's system prompt. Rather than following a fixed script, the agent dynamically chooses which skill/tool to call next based on what it observes (ADR-010).</p>
       <table class="table">
         <thead><tr><th>Skill</th><th>Phase</th><th>Tools used</th></tr></thead>
         <tbody>
-          <tr><td><code>infra-sentinel-monitor</code></td><td>Detect</td><td><code>monitor_list_events</code></td></tr>
-          <tr><td><code>infra-sentinel-diagnose</code></td><td>Diagnose</td><td><code>logs_get_bundle</code>, Local LLM (chain-of-thought), <code>kb_search</code></td></tr>
-          <tr><td><code>infra-sentinel-notify</code></td><td>Present</td><td>Gateway <code>/api/agent/activity</code>, <code>PATCH /status</code></td></tr>
-          <tr><td><code>infra-sentinel-remediate</code></td><td>Remediate</td><td><code>remediation_execute</code>, approval token poll</td></tr>
+          <tr><td><code>infra-sentinel-guide</code></td><td>Orientation</td><td>— (workflow overview, always loaded)</td></tr>
+          <tr><td><code>infra-sentinel-monitor</code></td><td>Detect</td><td><code>monitor.list_events</code>, <code>monitor.get_asset</code>, <code>monitor.list_assets</code></td></tr>
+          <tr><td><code>infra-sentinel-diagnose</code></td><td>Diagnose</td><td><code>logs.get_bundle</code>, agent's own chain-of-thought reasoning, <code>kb.search</code></td></tr>
+          <tr><td><code>infra-sentinel-notify</code></td><td>Present</td><td><code>notify.post_activity</code></td></tr>
+          <tr><td><code>infra-sentinel-remediate</code></td><td>Remediate</td><td><code>remediation.propose</code> (LLM-callable) → human approval → <code>remediation.execute</code> (harness-only)</td></tr>
         </tbody>
       </table>
-      <p>The <code>soul.md</code> defines the NemoClaw agent's identity, values, constraints, and reasoning style — including the rule that no remediation step may execute without a valid human approval token.</p>
+      <p>The <code>soul.md</code> defines the NemoClaw agent's identity, values, constraints, and reasoning style. The agent can <em>propose</em> a remediation plan via a tool call, but the actual <code>remediation.execute</code> call is never available to it — it runs only in deterministic harness code, after a human operator approves and a single-use token is retrieved server-side. No remediation step ever executes without that valid human approval token.</p>
       <div class="codeblock">
         <div class="codeblock-header"><span>view agent skills</span><button class="copy-btn" data-copy="ls agent/skills/">📋 Copy</button></div>
         <pre><code>ls agent/skills/</code></pre>
@@ -1047,9 +1048,9 @@ document.addEventListener("DOMContentLoaded", applyVertical);
 const AMAP = {
   you:   { role: "the human in the loop", body: "You watch the Operator Dashboard, read the NemoClaw agent's fault diagnosis and analysis, and click Approve Self-Heal or Deny. Nothing is remediated without your explicit decision." },
   appui: { role: "port :8001 · React/Vite · SSE", body: "Cluster health grid, Operator Dashboard, and Agent Activity feed. All panels update live via Server-Sent Events — no page refresh needed." },
-  agent: { role: "NemoClaw v0.0.70 · 4 skills · soul.md", body: "NemoClaw AI agent running the infra-sentinel skill set: monitor → diagnose → notify → remediate. Uses a Local LLM with chain-of-thought reasoning for log analysis and fault assessment. Cannot remediate without a valid human approval token." },
+  agent: { role: "NemoClaw v0.0.70 · 5 skills · soul.md", body: "NemoClaw AI agent that dynamically decides which skill/tool to call next — monitor, diagnose, notify, or propose remediation — based on what it observes, instead of following a fixed script. Uses a Local LLM with chain-of-thought reasoning for log analysis and fault assessment. Can propose a remediation plan, but cannot execute it — execution requires a valid human approval token retrieved outside the LLM's context." },
   gate:  { role: "server-side HITL enforcement", body: "Lives in the Gateway service, not the NemoClaw agent prompt. When you click Approve Self-Heal, a single-use token is minted server-side and bound to that specific fault event. The remediation tool validates it before running anything." },
-  mcp:   { role: "monitor · logs · kb · remediation", body: "Four MCP tools over Streamable HTTP. monitor reads Redfish events. logs fetches the iDRAC log bundle. kb runs fastembed ONNX + FAISS semantic search plus word-match fallback. remediation executes approved steps — refuses without a valid token." },
+  mcp:   { role: "monitor · logs · kb · notify · remediation", body: "MCP tools over Streamable HTTP, surfaced to the LLM as callable functions. monitor reads Redfish events. logs fetches the iDRAC log bundle. kb runs fastembed ONNX + FAISS semantic search plus word-match fallback. notify posts activity narration in the agent's own words. remediation splits in two: propose (LLM-callable, records a recommended plan) and execute (never given to the LLM — runs only in harness code, and refuses without a valid human approval token)." },
   sim:   { role: "fake XE9780L · Redfish surface", body: "Simulated Dell PowerEdge XE9780L GPU cluster. Emits Redfish events and log entries on fault injection. Reports healthy again after successful remediation. Safe to reset at any time." },
   vllm:  { role: "Local LLM · on-cluster inference", body: "The Local LLM the NemoClaw agent uses for chain-of-thought reasoning and log analysis. Runs two passes per fault: signature extraction (with thinking) and a natural-language fault assessment (clean prose). Served via an OpenAI-compatible vLLM endpoint." }
 };

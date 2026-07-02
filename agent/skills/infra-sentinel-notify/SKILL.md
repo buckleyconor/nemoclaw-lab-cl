@@ -1,6 +1,6 @@
 ---
 name: "infra-sentinel-notify"
-description: "Posts structured activity updates and approval requests to the operator dashboard. Manages the awaiting_approval gate by updating fault status and presenting the diagnosis summary to the operator. Use to request human approval after diagnosis, or to post any structured progress update during the fault lifecycle."
+description: "Posts plain-language progress updates to the operator dashboard activity feed. Use any time you've learned something worth telling the operator, not just at fixed checkpoints."
 license: "Apache-2.0"
 ---
 
@@ -8,29 +8,11 @@ license: "Apache-2.0"
 
 ## Purpose
 
-Communicate fault findings and remediation intent to the human operator via the dashboard activity feed and the approval gate. Ensure operators have enough context to make an informed decision before any action is taken.
+Keep the operator informed of what you're doing and why, in your own words. This is the mechanism by which the operator builds situational awareness before they're asked to approve anything.
 
-## Approval Request Flow
+## Using `notify_post_activity`
 
-After `infra-sentinel-diagnose` completes:
-
-1. Post activity: `"Posting fault notification to operator dashboard"` (step: `present`)
-
-2. Compose the approval request message:
-   > **Fault:** `<canonical_signature>` on `<asset_id>`
-   > **Diagnosis:** KB article `<kb_id>` matched with `<score%>` confidence.
-   > **Proposed action:** `<N>` remediation steps — `<step_label_1>`, `<step_label_2>`, ...
-   > **Expected outcome:** Asset returns to healthy state. Estimated duration: ~`<duration>`.
-
-3. Post activity: `"⏸ Awaiting human approval — operator must Approve or Deny in the dashboard"` (step: `present`)
-
-4. `PATCH /api/faults/<fault_id>/status` with `{ "status": "awaiting_approval" }`
-
-5. Pass control to `infra-sentinel-remediate` to poll for the token.
-
-## Activity Post Format
-
-All activity updates are posted to `POST /api/agent/activity`:
+Call with:
 
 ```json
 {
@@ -40,31 +22,25 @@ All activity updates are posted to `POST /api/agent/activity`:
 }
 ```
 
-### Step Values
+`step` categorizes the update for the dashboard's activity feed; `message` is free text you compose — there is no fixed template to fill in. Write what actually happened, not a canned phrase.
+
+### Step values
 
 | Step | When to use |
 |------|-------------|
-| `detect` | Monitoring and log retrieval phase |
-| `diagnose` | LLM analysis and signature extraction |
-| `search_kb` | KB search and article retrieval |
-| `present` | Approval request and operator communication |
-| `remediate` | Step-by-step execution progress |
-| `resolved` | Final healthy confirmation |
-| `denied` | Operator denied remediation |
+| `detect` | Noting a fault event or initial evidence |
+| `diagnose` | Reasoning about the signature or KB match |
+| `search_kb` | KB search results |
+| `present` | Summarizing your findings and proposed action for the operator |
+| `remediate` | Progress once a proposal is made (posted by the runtime once execution begins — you won't usually post this one yourself) |
+| `resolved` / `denied` | Terminal states (posted by the runtime once the outcome is known) |
 
-## Tone Guidelines
+## Style
 
-- Use `⚡` for initial fault detection.
-- Use `✓` for completed steps.
-- Use `▶` for in-progress steps.
-- Use `✅` for positive resolution.
-- Use `⏸` for human-in-the-loop gates.
-- Use `⚠` for errors or partial failures.
-- Keep messages under 120 characters.
-- Do not use exclamation marks except in `✅` confirmations.
+Keep messages concise and factual — under ~120 characters where possible. Calm, not alarmist; urgency comes from content, not punctuation. You may use `⚡` for a newly detected fault, `✓` for a completed finding, `⏸` when you're about to hand off to human approval, and `⚠` for something that went wrong — but these are conventions, not requirements.
 
-## Notes
+## Judgment notes
 
-- Every activity post must include a valid `fault_event_id`. Do not post activity before the fault is registered in the gateway.
-- Do not post approval requests to external channels (Slack, email) without explicit operator configuration — the dashboard is the primary notification surface for this lab environment.
-- The `awaiting_approval` status triggers the approval UI in the dashboard. The operator sees Approve / Deny buttons. Do not set this status until the full diagnosis is complete.
+- Narrate as often as it's genuinely useful — after fetching logs, after identifying a signature, after a KB match or miss. You don't need permission to explain yourself, and you don't need to wait for a fixed checkpoint.
+- Before proposing remediation, post one summary update the operator can read to understand your recommendation without digging through the whole feed: what you found, what you intend to propose, and what they should expect afterward.
+- This tool only posts text to the dashboard. It has no effect on fault status or infrastructure state.

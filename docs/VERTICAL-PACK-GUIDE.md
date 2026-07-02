@@ -276,6 +276,8 @@ The agent is vertical-blind. The only vertical-specific behaviour comes from the
 
 No changes to `agent/loop.py`, `agent/skills/`, or `agent/soul.md` are required for a new vertical using the same fault lifecycle pattern (detect → diagnose → present → remediate).
 
+This remains true after the move to an LLM-driven, dynamic skill/tool-calling loop (ADR-010): the MCP tool catalog, the skill files, and `soul.md` are pack-agnostic, so a new vertical still requires only pack content — no agent code or prompt changes. (The one known exception, tracked separately, is that `soul.md`'s Identity section currently names the flagship GPU-cluster vertical explicitly; see ADR-010's consequences.)
+
 ---
 
 ## Checklist for a new vertical
