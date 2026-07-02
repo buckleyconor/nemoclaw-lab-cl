@@ -17,11 +17,12 @@ Call with:
 ```json
 {
   "fault_event_id": "<fault_id>",
-  "step_ids": ["step-01", "step-02", ...]
+  "step_ids": ["step-01", "step-02", ...],
+  "summary": "<2-3 sentences for the operator: what is wrong, the likely cause, and the operational risk>"
 }
 ```
 
-Use the step ids from your KB match or the scenario's default remediation steps — don't invent step ids that weren't given to you by `kb_search` or the scenario data.
+Use the step ids from your KB match or the scenario's default remediation steps — don't invent step ids that weren't given to you by `kb_search` or the scenario data. Always include the `summary`: it is displayed on the Operator Dashboard as your diagnosis, and the operator decides based on it — write it in plain language.
 
 This call has one effect: it records your proposed plan and moves the fault into the operator's approval queue. **It does not execute anything.** There is no token, no confirmation, no infrastructure change from this call.
 

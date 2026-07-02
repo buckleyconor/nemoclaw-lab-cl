@@ -92,6 +92,19 @@ class GatewayStore:
         self._fault_events[fault_event_id] = updated
         return updated
 
+    async def update_fault_fields(
+        self,
+        fault_event_id: str,
+        **fields,
+    ) -> FaultEvent | None:
+        """Partial update of diagnosis fields (signature, analysis, KB match, …)."""
+        evt = self._fault_events.get(fault_event_id)
+        if evt is None:
+            return None
+        updated = evt.model_copy(update=fields)
+        self._fault_events[fault_event_id] = updated
+        return updated
+
     async def list_faults(self) -> list[FaultEvent]:
         return list(self._fault_events.values())
 

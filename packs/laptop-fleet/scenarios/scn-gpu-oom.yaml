@@ -33,3 +33,8 @@ remediation_steps:
     label: "Verify VRAM freed: nvidia-smi --query-gpu=memory.used --format=csv"
   - id: advise_batch_resize
     label: "Advise user to reduce batch size or enable gradient checkpointing"
+impact:
+  summary: "GPU memory pressure will be relieved by terminating the offending process and clamping application VRAM budgets."
+  workload_impact: "The runaway application is closed — unsaved work in that application may be lost; other applications unaffected."
+  service_risk: "Low — single-device action. Device remains usable throughout."
+  estimated_duration: "~5 minutes"

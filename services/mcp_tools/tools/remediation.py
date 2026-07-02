@@ -30,24 +30,32 @@ async def remediation_propose(
     gateway_client: httpx.AsyncClient,
     fault_event_id: str,
     step_ids: list[str],
+    summary: str = "",
 ) -> dict:
     """Record the agent's recommended remediation plan and request approval.
 
     The LLM-callable half of the propose/execute split (ADR-010). Takes no
     token and returns no token: its only side effects are moving the fault to
-    ``awaiting_approval`` and posting the proposal to the activity feed. The
-    actual execution path (``remediation_execute`` below) is never exposed to
-    the LLM and validates a human-minted token independently of anything that
-    happens here.
+    ``awaiting_approval``, recording the agent's diagnosis summary, and
+    posting the proposal to the activity feed. The actual execution path
+    (``remediation_execute`` below) is never exposed to the LLM and validates
+    a human-minted token independently of anything that happens here.
 
     Args:
         gateway_client:  Configured httpx.AsyncClient pointed at the Gateway.
         fault_event_id:  FaultEvent id being diagnosed.
         step_ids:        Ordered remediation step ids the agent recommends.
+        summary:         Plain-language diagnosis summary for the operator
+                         (shown on the Operator Dashboard before approve/deny).
 
     Returns:
         dict with status "proposal_recorded", or an error dict.
     """
+    if summary:
+        await gateway_client.patch(
+            f"/api/faults/{fault_event_id}/diagnosis",
+            json={"analysis": summary[:1000]},
+        )
     r = await gateway_client.patch(
         f"/api/faults/{fault_event_id}/status",
         json={"status": "awaiting_approval"},

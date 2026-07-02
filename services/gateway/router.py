@@ -27,7 +27,12 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from libs.common.models import ApprovalDecision, AssetState, FaultEventStatus
+from libs.common.models import (
+    ApprovalDecision,
+    AssetState,
+    FaultEventStatus,
+    ScenarioImpact,
+)
 from services.gateway.store import AssetRecord
 
 router = APIRouter()
@@ -119,8 +124,33 @@ class UpdateStatusRequest(BaseModel):
     status: FaultEventStatus
 
 
+class UpdateDiagnosisRequest(BaseModel):
+    """Agent: diagnosis fields discovered during the investigation."""
+
+    error_signature: str | None = None
+    analysis: str | None = None
+    kb_article_id: str | None = None
+    kb_title: str | None = None
+    kb_score: float | None = None
+
+
 class DecisionRequest(BaseModel):
     decision: ApprovalDecision
+
+
+def _impact_for_scenario(request: Request, scenario_id: str, asset_id: str,
+                         step_count: int) -> ScenarioImpact:
+    """Pack-provided impact assessment, or a synthesised generic fallback."""
+    loaded = request.app.state.loaded_pack
+    scenario = loaded.scenarios_by_id.get(scenario_id)
+    if scenario is not None and scenario.impact is not None:
+        return scenario.impact
+    return ScenarioImpact(
+        summary=f"Execute {step_count} approved remediation steps on {asset_id}.",
+        workload_impact=f"Workloads on {asset_id} may be interrupted while remediation runs.",
+        service_risk="Single-asset action — no cluster-wide changes are made.",
+        estimated_duration="~5–10 minutes",
+    )
 
 
 @router.get("/api/faults")
@@ -149,6 +179,9 @@ async def create_fault(body: CreateFaultRequest, request: Request) -> dict:
         kb_article_id=body.kb_article_id,
         log_extract=body.log_extract,
         remediation_step_labels=body.remediation_step_labels,
+        impact=_impact_for_scenario(
+            request, body.scenario_id, body.asset_id, len(body.remediation_step_labels)
+        ),
     )
 
     # Update asset state to faulted
@@ -204,6 +237,24 @@ async def update_fault_status(fault_id: str, body: UpdateStatusRequest, request:
                 "active_fault_event_id": None,
             })
 
+    await store.sse.publish("fault", updated.model_dump(mode="json"))
+    return updated.model_dump(mode="json")
+
+
+@router.patch("/api/faults/{fault_id}/diagnosis")
+async def update_fault_diagnosis(
+    fault_id: str, body: UpdateDiagnosisRequest, request: Request
+) -> dict:
+    """Agent: record diagnosis fields as the investigation progresses [server→server].
+
+    Partial update — only fields present in the body are written. The Operator
+    Dashboard renders these directly (signature, KB match, agent assessment).
+    """
+    store = _store(request)
+    fields = body.model_dump(exclude_none=True)
+    updated = await store.update_fault_fields(fault_id, **fields)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="fault_not_found")
     await store.sse.publish("fault", updated.model_dump(mode="json"))
     return updated.model_dump(mode="json")
 

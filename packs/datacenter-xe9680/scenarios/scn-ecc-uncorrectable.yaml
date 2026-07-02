@@ -30,3 +30,8 @@ remediation_steps:
     label: "Reset GPU ECC counters and clear fault"
   - id: verify_health
     label: "Re-run DCGM ECC diagnostic"
+impact:
+  summary: "Node will be cordoned and drained, GPU ECC counters reset and the fault cleared, then DCGM diagnostics re-run to confirm memory health."
+  workload_impact: "Workloads on this node are drained and migrated; jobs pinned to the affected GPU restart from their last checkpoint."
+  service_risk: "One node out of the pool during remediation. If DBEs recur after reset, the GPU will need retirement — a longer maintenance action."
+  estimated_duration: "~15 minutes"

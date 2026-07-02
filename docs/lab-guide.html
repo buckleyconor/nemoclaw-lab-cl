@@ -359,6 +359,11 @@ body.started .curtain-overlay { pointer-events: none; }
   opacity: .88;
   filter: brightness(1.1);
 }
+/* Dell wordmark is a wide strip (≈7.7:1) — widen it so its visual mass
+   matches the NVIDIA logo beside it. */
+.curtain-logo.dell {
+  width: clamp(190px, 25vw, 320px);
+}
 .curtain-stage {
   position: absolute;
   inset: 0;
@@ -430,7 +435,7 @@ body.started .curtain-half.right { animation: curtain-right 1.5s cubic-bezier(.6
     <button class="start-btn" onclick="startLab()">Start Your Lab</button>
   </div>
   <div class="curtain-half left">
-    <img src="./dell-logo.png" alt="Dell" class="curtain-logo" />
+    <img src="./dell-logo.png" alt="Dell" class="curtain-logo dell" />
   </div>
   <div class="curtain-half right">
     <img src="./nvidia-logo.png" alt="NVIDIA" class="curtain-logo" />

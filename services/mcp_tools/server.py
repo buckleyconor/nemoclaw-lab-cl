@@ -170,7 +170,9 @@ async def _notify_post_activity(fault_event_id: str, step: str, message: str) ->
 
 
 @mcp.tool(name="remediation.propose")
-async def _remediation_propose(fault_event_id: str, step_ids: list[str]) -> str:
+async def _remediation_propose(
+    fault_event_id: str, step_ids: list[str], summary: str = ""
+) -> str:
     """Record your recommended remediation steps and request operator approval.
 
     This is a proposal, not an action: it changes no infrastructure state and
@@ -183,11 +185,15 @@ async def _remediation_propose(fault_event_id: str, step_ids: list[str]) -> str:
         step_ids:       Ordered remediation step ids from the matched KB
                         article or scenario defaults
                         (e.g. ["drain_node", "gpu_reset", "verify_health"]).
+        summary:        2-3 sentence plain-language diagnosis summary for the
+                        operator: what is wrong, the likely cause, and the
+                        operational risk. Shown on the dashboard before the
+                        operator decides — write it for a human.
     """
     gateway_url = _state["gateway_url"]
     async with httpx.AsyncClient(base_url=gateway_url) as client:
         result = await remediation_propose(
-            client, fault_event_id=fault_event_id, step_ids=step_ids
+            client, fault_event_id=fault_event_id, step_ids=step_ids, summary=summary
         )
     return json.dumps(result)
 

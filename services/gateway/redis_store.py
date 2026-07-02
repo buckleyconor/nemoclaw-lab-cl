@@ -65,6 +65,20 @@ class RedisGatewayStore:
         await self._r.hset(self._k("faults"), fault_event_id, updated.model_dump_json())
         return updated
 
+    async def update_fault_fields(
+        self,
+        fault_event_id: str,
+        **fields,
+    ) -> FaultEvent | None:
+        """Partial update of diagnosis fields (signature, analysis, KB match, …)."""
+        raw = await self._r.hget(self._k("faults"), fault_event_id)
+        if raw is None:
+            return None
+        evt = FaultEvent.model_validate_json(raw)
+        updated = evt.model_copy(update=fields)
+        await self._r.hset(self._k("faults"), fault_event_id, updated.model_dump_json())
+        return updated
+
     async def list_faults(self) -> list[FaultEvent]:
         raw = await self._r.hgetall(self._k("faults"))
         return [FaultEvent.model_validate_json(v) for v in raw.values()]

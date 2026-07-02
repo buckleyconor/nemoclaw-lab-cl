@@ -1,37 +1,6 @@
+import { useState } from "react";
 import { gateway } from "../api/gateway";
 import type { ActivityEvent, FaultEvent } from "../types";
-
-// ── helpers to mine parsed data from activity events ──────────────────────────
-
-function getSignature(activity: ActivityEvent[], faultId: string): string | null {
-  for (const e of activity) {
-    if (e.fault_event_id !== faultId) continue;
-    const m = e.message.match(/LLM identified error signature: "(.+?)"/);
-    if (m) return m[1];
-  }
-  return null;
-}
-
-function getKBMatch(activity: ActivityEvent[], faultId: string): { id: string; confidence: string } | null {
-  for (const e of activity) {
-    if (e.fault_event_id !== faultId) continue;
-    const m = e.message.match(/✓ KB article matched: (\S+) \(confidence (\d+%)/);
-    if (m) return { id: m[1], confidence: m[2] };
-  }
-  return null;
-}
-
-function getLLMAnalysis(activity: ActivityEvent[], faultId: string): string | null {
-  const templateStarts = [
-    "Parsing log", "Sending log", "LLM identified", "Canonical signature", "Composing fault",
-  ];
-  for (const e of activity) {
-    if (e.fault_event_id !== faultId || e.step !== "diagnose") continue;
-    if (templateStarts.some((p) => e.message.startsWith(p))) continue;
-    if (e.message.length > 80) return e.message;
-  }
-  return null;
-}
 
 // ── status metadata ───────────────────────────────────────────────────────────
 
@@ -44,26 +13,150 @@ const STATUS_META: Record<string, { label: string; color: string; pulse: boolean
   denied:            { label: "DENIED",               color: "#ef4444", pulse: false },
 };
 
+// ── event report export (audit trail) ─────────────────────────────────────────
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function exportReport(fault: FaultEvent, activity: ActivityEvent[]) {
+  const rows = activity
+    .filter((a) => a.fault_event_id === fault.id)
+    .map(
+      (a) =>
+        `<tr><td>${new Date(a.ts).toLocaleTimeString()}</td>` +
+        `<td>${escapeHtml(a.step)}</td><td>${escapeHtml(a.message)}</td></tr>`
+    )
+    .join("\n");
+  const steps = fault.remediation_step_labels
+    .map((l, i) => `<li>${i + 1}. ${escapeHtml(l)}</li>`)
+    .join("\n");
+  const impact = fault.impact
+    ? `<table class="kv">
+        <tr><th>Action summary</th><td>${escapeHtml(fault.impact.summary)}</td></tr>
+        <tr><th>Workload impact</th><td>${escapeHtml(fault.impact.workload_impact)}</td></tr>
+        <tr><th>Service risk</th><td>${escapeHtml(fault.impact.service_risk)}</td></tr>
+        <tr><th>Estimated duration</th><td>${escapeHtml(fault.impact.estimated_duration)}</td></tr>
+      </table>`
+    : "<p>—</p>";
+  const html = `<!doctype html><html><head><meta charset="utf-8">
+<title>NemoClaw Fault Event Report — ${escapeHtml(fault.id)}</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; color: #111; margin: 32px; }
+  h1 { font-size: 20px; } h2 { font-size: 14px; margin-top: 22px; text-transform: uppercase; letter-spacing: .08em; }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  td, th { border: 1px solid #ccc; padding: 5px 8px; text-align: left; vertical-align: top; }
+  table.kv th { width: 180px; background: #f5f5f5; }
+  ul { list-style: none; padding: 0; font-size: 13px; }
+  .muted { color: #666; font-size: 11px; }
+</style></head><body>
+<h1>NemoClaw Sentinel — Fault Event Report</h1>
+<p class="muted">Generated ${new Date().toLocaleString()} · Fault ID ${escapeHtml(fault.id)}</p>
+<h2>Fault</h2>
+<table class="kv">
+  <tr><th>Asset</th><td>${escapeHtml(fault.asset_id)}</td></tr>
+  <tr><th>Scenario</th><td>${escapeHtml(fault.scenario_id)}</td></tr>
+  <tr><th>Detected at</th><td>${new Date(fault.detected_at).toLocaleString()}</td></tr>
+  <tr><th>Final status</th><td>${escapeHtml(fault.status)}</td></tr>
+  <tr><th>Error signature</th><td>${escapeHtml(fault.error_signature ?? "—")}</td></tr>
+  <tr><th>KB article</th><td>${escapeHtml(
+    fault.kb_article_id
+      ? `${fault.kb_article_id}${fault.kb_title ? " — " + fault.kb_title : ""}` +
+        (fault.kb_score != null ? ` (confidence ${Math.round(fault.kb_score * 100)}%)` : "")
+      : "—"
+  )}</td></tr>
+</table>
+<h2>Agent assessment</h2>
+<p>${escapeHtml(fault.analysis ?? "—")}</p>
+<h2>Impact assessment</h2>
+${impact}
+<h2>Remediation plan</h2>
+<ul>${steps || "<li>—</li>"}</ul>
+<h2>Full activity log</h2>
+<table><tr><th>Time</th><th>Phase</th><th>Message</th></tr>${rows}</table>
+</body></html>`;
+  const w = window.open("", "_blank");
+  if (!w) return;
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  w.print();
+}
+
 // ── component ─────────────────────────────────────────────────────────────────
 
+const cardStyle = {
+  background: "#060a14",
+  border: "1px solid var(--border)",
+  borderRadius: 8,
+  padding: "12px 14px",
+} as const;
+
+const cardLabelStyle = {
+  fontSize: 9, fontWeight: 700, letterSpacing: ".12em",
+  color: "var(--text-dim)", marginBottom: 6, fontFamily: "var(--mono)",
+} as const;
+
 interface Props {
-  fault: FaultEvent;
+  fault: FaultEvent | null;
   activity: ActivityEvent[];
   onDecision: (faultId: string, decision: "approved" | "denied") => void;
 }
 
 export function OperatorDashboard({ fault, activity, onDecision }: Props) {
+  const [deciding, setDeciding] = useState<string | null>(null);
+
+  // Idle shell — the panel stays visible even with nothing to show (cleared
+  // after the post-resolution retention window).
+  if (!fault) {
+    return (
+      <div style={{
+        background: "var(--bg-card)",
+        border: "1px solid var(--border)",
+        borderTop: "3px solid var(--border-strong)",
+        borderRadius: 10,
+        padding: "22px 18px",
+        display: "flex", alignItems: "center", gap: 10,
+        color: "var(--text-dim)", fontSize: 13,
+      }}>
+        <span style={{ color: "var(--healthy)", fontSize: 15 }}>◉</span>
+        No active fault — NemoClaw Sentinel is monitoring. Fault details, impact
+        assessment and approval controls will appear here when an incident is detected.
+      </div>
+    );
+  }
+
   const meta = STATUS_META[fault.status] ?? { label: fault.status.toUpperCase(), color: "#6b7280", pulse: false };
-  const signature = getSignature(activity, fault.id);
-  const kb = getKBMatch(activity, fault.id);
-  const analysis = getLLMAnalysis(activity, fault.id);
-  const canDecide = fault.status === "awaiting_approval";
+  const isDecided = deciding !== null && fault.status === "awaiting_approval";
+  const canDecide = fault.status === "awaiting_approval" && deciding === null;
   const isActive = fault.status !== "resolved" && fault.status !== "denied";
+  const showSteps =
+    fault.remediation_step_labels.length > 0 &&
+    (fault.kb_article_id !== null ||
+      ["awaiting_approval", "remediating", "resolved", "denied"].includes(fault.status));
 
   async function decide(decision: "approved" | "denied") {
-    await gateway.decide(fault.id, decision);
-    onDecision(fault.id, decision);
+    if (!fault) return;
+    setDeciding(decision); // grey out immediately — the click always registers
+    try {
+      await gateway.decide(fault.id, decision);
+      onDecision(fault.id, decision);
+    } catch {
+      setDeciding(null); // request failed — re-enable so the operator can retry
+    }
   }
+
+  const disabledStyle = {
+    background: "rgba(107,114,128,.15)",
+    border: "1px solid rgba(107,114,128,.3)",
+    color: "#6b7280",
+    cursor: "not-allowed",
+    opacity: 0.65,
+  } as const;
 
   return (
     <div style={{
@@ -105,6 +198,20 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
           {meta.label}
         </span>
         <span style={{ flex: 1 }} />
+        <button
+          onClick={() => exportReport(fault, activity)}
+          title="Export a printable event report for the audit trail"
+          style={{
+            padding: "4px 10px",
+            background: "rgba(96,165,250,.1)",
+            border: "1px solid rgba(96,165,250,.35)",
+            borderRadius: 5, color: "#60a5fa",
+            fontWeight: 600, fontSize: 10, cursor: "pointer",
+            fontFamily: "var(--mono)", letterSpacing: ".06em",
+          }}
+        >
+          ⬇ EXPORT REPORT
+        </button>
         <span style={{ fontSize: 11, color: "var(--text-dim)", fontFamily: "var(--mono)" }}>
           {fault.asset_id}
         </span>
@@ -119,24 +226,14 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
         {/* Top row: signature + KB side by side */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           {/* Error signature */}
-          <div style={{
-            background: "#060a14",
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            padding: "12px 14px",
-          }}>
-            <div style={{
-              fontSize: 9, fontWeight: 700, letterSpacing: ".12em",
-              color: "var(--text-dim)", marginBottom: 6, fontFamily: "var(--mono)",
-            }}>
-              ERROR SIGNATURE
-            </div>
-            {signature ? (
+          <div style={cardStyle}>
+            <div style={cardLabelStyle}>ERROR SIGNATURE</div>
+            {fault.error_signature ? (
               <div style={{
                 fontSize: 15, fontWeight: 700, color: "#f59e0b",
                 fontFamily: "var(--mono)", letterSpacing: ".02em",
               }}>
-                {signature}
+                {fault.error_signature}
               </div>
             ) : (
               <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Extracting…</div>
@@ -144,30 +241,26 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
           </div>
 
           {/* KB article */}
-          <div style={{
-            background: "#060a14",
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            padding: "12px 14px",
-          }}>
-            <div style={{
-              fontSize: 9, fontWeight: 700, letterSpacing: ".12em",
-              color: "var(--text-dim)", marginBottom: 6, fontFamily: "var(--mono)",
-            }}>
-              KNOWLEDGE BASE
-            </div>
-            {kb ? (
+          <div style={cardStyle}>
+            <div style={cardLabelStyle}>KNOWLEDGE BASE</div>
+            {fault.kb_article_id ? (
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#60a5fa", fontFamily: "var(--mono)" }}>
-                  {kb.id}
+                  {fault.kb_article_id}
                 </div>
-                <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 3 }}>
-                  Confidence: <span style={{ color: "var(--text)" }}>{kb.confidence}</span>
-                </div>
-              </div>
-            ) : fault.kb_article_id ? (
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#60a5fa", fontFamily: "var(--mono)" }}>
-                {fault.kb_article_id}
+                {fault.kb_title && (
+                  <div style={{ fontSize: 11, color: "var(--text)", marginTop: 3 }}>
+                    {fault.kb_title}
+                  </div>
+                )}
+                {fault.kb_score != null && (
+                  <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 3 }}>
+                    Confidence:{" "}
+                    <span style={{ color: "var(--text)" }}>
+                      {Math.round(fault.kb_score * 100)}%
+                    </span>
+                  </div>
+                )}
               </div>
             ) : (
               <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Searching…</div>
@@ -175,8 +268,8 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
           </div>
         </div>
 
-        {/* LLM analysis */}
-        {analysis && (
+        {/* Agent assessment */}
+        {fault.analysis ? (
           <div style={{
             background: "#0d1117",
             border: "1px solid #8b5cf633",
@@ -188,21 +281,44 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
               fontSize: 9, fontWeight: 700, letterSpacing: ".12em",
               color: "#8b5cf6", marginBottom: 6, fontFamily: "var(--mono)",
             }}>
-              AGENT ANALYSIS
+              AGENT ASSESSMENT
             </div>
             <div style={{ fontSize: 12, color: "var(--text)", lineHeight: 1.6 }}>
-              {analysis}
+              {fault.analysis}
+            </div>
+          </div>
+        ) : isActive ? (
+          <div style={{ fontSize: 11, color: "var(--text-dim)", fontFamily: "var(--mono)" }}>
+            Agent assessment pending…
+          </div>
+        ) : null}
+
+        {/* Impact assessment */}
+        {fault.impact && (
+          <div>
+            <div style={cardLabelStyle}>IMPACT ASSESSMENT</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {[
+                { label: "ACTION", value: fault.impact.summary },
+                { label: "WORKLOAD IMPACT", value: fault.impact.workload_impact },
+                { label: "SERVICE RISK", value: fault.impact.service_risk },
+                { label: "ESTIMATED DURATION", value: fault.impact.estimated_duration },
+              ].map(({ label, value }) => (
+                <div key={label} style={{ ...cardStyle, padding: "9px 12px" }}>
+                  <div style={{ ...cardLabelStyle, marginBottom: 4 }}>{label}</div>
+                  <div style={{ fontSize: 11.5, color: "var(--text)", lineHeight: 1.5 }}>
+                    {value}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
-        {/* Remediation steps — only shown once KB article is confirmed */}
-        {kb && fault.remediation_step_labels.length > 0 && (
+        {/* Remediation steps */}
+        {showSteps && (
           <div>
-            <div style={{
-              fontSize: 9, fontWeight: 700, letterSpacing: ".12em",
-              color: "var(--text-dim)", marginBottom: 8, fontFamily: "var(--mono)",
-            }}>
+            <div style={{ ...cardLabelStyle, marginBottom: 8 }}>
               PROPOSED REMEDIATION STEPS
             </div>
             <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 6 }}>
@@ -228,40 +344,64 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
         )}
 
         {/* Approve / Deny */}
-        {canDecide && (
-          <div style={{ display: "flex", gap: 10, marginTop: 2 }}>
+        {(canDecide || isDecided) && (
+          <div style={{ display: "flex", gap: 10, marginTop: 2, flexWrap: "wrap" as const }}>
             <button
               onClick={() => decide("approved")}
+              disabled={!canDecide}
               style={{
-                flex: 1, padding: "10px 16px",
-                background: "rgba(16,185,129,.12)",
-                border: "1px solid rgba(16,185,129,.4)",
-                borderRadius: 7, color: "#10b981",
-                fontWeight: 700, fontSize: 13, cursor: "pointer",
+                flex: 1, minWidth: 220, padding: "12px 16px",
+                borderRadius: 7,
+                fontWeight: 700, fontSize: 13.5,
                 fontFamily: "var(--sans)", letterSpacing: ".04em",
-                transition: "background .15s",
+                transition: "background .15s, box-shadow .15s",
+                ...(canDecide
+                  ? {
+                      background: "#10b981",
+                      border: "1px solid #34d399",
+                      color: "#03130c",
+                      cursor: "pointer",
+                      boxShadow: "0 0 14px rgba(16,185,129,.35)",
+                    }
+                  : disabledStyle),
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(16,185,129,.22)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(16,185,129,.12)")}
+              onMouseEnter={(e) => { if (canDecide) e.currentTarget.style.background = "#34d399"; }}
+              onMouseLeave={(e) => { if (canDecide) e.currentTarget.style.background = "#10b981"; }}
             >
               ✓ Approve Self-Heal
             </button>
             <button
               onClick={() => decide("denied")}
+              disabled={!canDecide}
               style={{
-                flex: 1, padding: "10px 16px",
-                background: "rgba(239,68,68,.08)",
-                border: "1px solid rgba(239,68,68,.3)",
-                borderRadius: 7, color: "#ef4444",
-                fontWeight: 700, fontSize: 13, cursor: "pointer",
+                flex: 1, minWidth: 220, padding: "12px 16px",
+                borderRadius: 7,
+                fontWeight: 700, fontSize: 13.5,
                 fontFamily: "var(--sans)", letterSpacing: ".04em",
-                transition: "background .15s",
+                transition: "background .15s, box-shadow .15s",
+                ...(canDecide
+                  ? {
+                      background: "#dc2626",
+                      border: "1px solid #f87171",
+                      color: "#fff",
+                      cursor: "pointer",
+                      boxShadow: "0 0 14px rgba(220,38,38,.3)",
+                    }
+                  : disabledStyle),
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(239,68,68,.18)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(239,68,68,.08)")}
+              onMouseEnter={(e) => { if (canDecide) e.currentTarget.style.background = "#ef4444"; }}
+              onMouseLeave={(e) => { if (canDecide) e.currentTarget.style.background = "#dc2626"; }}
             >
-              ✕ Deny
+              ✕ Deny, Manual Remediation
             </button>
+            {isDecided && (
+              <div style={{
+                width: "100%", fontSize: 11, color: "var(--text-dim)",
+                fontFamily: "var(--mono)", letterSpacing: ".04em",
+              }}>
+                ⟳ Decision submitted ({deciding}) — waiting for the system to confirm…
+              </div>
+            )}
           </div>
         )}
 
@@ -273,14 +413,15 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
 
         {fault.status === "resolved" && (
           <div style={{ fontSize: 12, color: "#10b981", fontFamily: "var(--mono)", letterSpacing: ".04em" }}>
-            ✅ {fault.asset_id} returned to healthy state
+            ✅ {fault.asset_id} returned to healthy state — this summary clears in one
+            minute (use Export Report to keep an audit copy)
           </div>
         )}
 
         {fault.status === "denied" && (
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" as const }}>
             <div style={{ fontSize: 12, color: "#ef4444", fontFamily: "var(--mono)", letterSpacing: ".04em" }}>
-              ✕ Self-heal was denied — node remains faulted
+              ✕ Self-heal was denied — manual remediation required, node remains faulted
             </div>
             <button
               onClick={async () => {

@@ -31,3 +31,8 @@ remediation_steps:
     label: "Issue GPU reset via iDRAC"
   - id: verify_health
     label: "Re-run DCGM health check"
+impact:
+  summary: "Node will be cordoned and drained, the failed GPU reset via driver reload, and health re-verified before returning to the scheduler pool."
+  workload_impact: "All training/inference workloads on this node are checkpointed and migrated to spare capacity before the GPU reset — expect job rescheduling delays."
+  service_risk: "Cluster capacity reduced by one 8-GPU node for the duration; no impact to other nodes. Distributed jobs spanning this node will restart from checkpoint."
+  estimated_duration: "~15-20 minutes"

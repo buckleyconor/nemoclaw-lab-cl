@@ -163,6 +163,10 @@ FALLBACK_TOOL_SCHEMAS: list[dict] = [
                 "properties": {
                     "fault_event_id": {"type": "string"},
                     "step_ids": {"type": "array", "items": {"type": "string"}},
+                    "summary": {
+                        "type": "string",
+                        "description": "2-3 sentence plain-language diagnosis summary for the operator: what is wrong, the likely cause, and the operational risk.",
+                    },
                 },
                 "required": ["fault_event_id", "step_ids"],
             },
@@ -273,10 +277,11 @@ class MCPAgentTools:
         self,
         fault_event_id: str,
         step_ids: list[str],
+        summary: str = "",
     ) -> dict:
         raw = await self._call(
             "remediation.propose",
-            {"fault_event_id": fault_event_id, "step_ids": step_ids},
+            {"fault_event_id": fault_event_id, "step_ids": step_ids, "summary": summary},
         )
         return json.loads(raw)
 
@@ -372,9 +377,11 @@ class DirectAgentTools:
         self,
         fault_event_id: str,
         step_ids: list[str],
+        summary: str = "",
     ) -> dict:
         return await remediation_propose(
-            self._gateway(), fault_event_id=fault_event_id, step_ids=step_ids
+            self._gateway(), fault_event_id=fault_event_id, step_ids=step_ids,
+            summary=summary,
         )
 
     async def remediation_execute(
@@ -427,6 +434,7 @@ class DirectAgentTools:
                 result = await self.remediation_propose(
                     arguments["fault_event_id"],
                     list(arguments.get("step_ids") or []),
+                    str(arguments.get("summary") or ""),
                 )
             else:
                 return _unknown_tool_result(name)

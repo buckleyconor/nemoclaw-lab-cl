@@ -190,7 +190,14 @@ class StubLLMClient:
             step_ids = kb.get("remediation_step_ids", []) if isinstance(kb, dict) else []
             return self._call(
                 "remediation_propose",
-                {"fault_event_id": fault_id, "step_ids": step_ids},
+                {
+                    "fault_event_id": fault_id,
+                    "step_ids": step_ids,
+                    "summary": (
+                        f"Fault on {events[0]['asset_id']}: {self._signature}. "
+                        "Remediation recommended per matched KB procedure."
+                    ),
+                },
             )
 
         return {

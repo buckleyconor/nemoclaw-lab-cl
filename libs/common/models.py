@@ -73,6 +73,15 @@ class RemediationStep(BaseModel):
     label: str
 
 
+class ScenarioImpact(BaseModel):
+    """Operator-facing impact assessment for a scenario's remediation plan."""
+
+    summary: str              # what the remediation will do
+    workload_impact: str      # effect on running workloads (drain, migration, …)
+    service_risk: str         # cluster/service-level risk while remediating
+    estimated_duration: str   # e.g. "~15 minutes"
+
+
 class Scenario(BaseModel):
     id: str
     pack_id: str
@@ -83,6 +92,9 @@ class Scenario(BaseModel):
     error_signatures: list[str] = Field(min_length=1)
     kb_article_ref: str
     remediation_steps: list[RemediationStep] = Field(min_length=1)
+    # Optional operator-facing impact assessment; gateway synthesises a
+    # generic fallback when absent.
+    impact: ScenarioImpact | None = None
     # Optional explicit log extract; derived from emit.log_entries[0] when absent.
     log_extract: str | None = None
     # "scaffold" marks packs that aren't yet demo-ready (placeholder content).
@@ -153,6 +165,14 @@ class FaultEvent(BaseModel):
     kb_article_id: str | None = None
     log_extract: str | None = None
     remediation_step_labels: list[str] = Field(default_factory=list)
+    # Diagnosis fields — populated by the agent as the investigation
+    # progresses (PATCH /api/faults/{id}/diagnosis); the Operator Dashboard
+    # renders these directly.
+    error_signature: str | None = None
+    analysis: str | None = None       # agent's plain-language assessment
+    kb_title: str | None = None
+    kb_score: float | None = None
+    impact: ScenarioImpact | None = None  # set at creation from pack content
 
 
 class Notification(BaseModel):

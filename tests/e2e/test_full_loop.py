@@ -233,6 +233,19 @@ async def test_e01_full_happy_path_resolves(
     assert result.status == "resolved", f"got: {result.status}"
     assert result.scenario_id == "scn-gpu-xid-79"
 
+    # Diagnosis fields were persisted for the Operator Dashboard along the way
+    fault_r = gateway_tc.get(f"/api/faults/{result.fault_id}")
+    fault = fault_r.json()
+    assert fault["error_signature"] == "Xid 79"
+    assert fault["kb_article_id"] == "KB000123"
+    assert fault["kb_title"], "KB title missing from fault detail"
+    assert fault["kb_score"] is not None
+    assert fault["analysis"], "agent summary missing from fault detail"
+    # Impact assessment comes from pack content at fault creation
+    assert fault["impact"] is not None
+    for key in ("summary", "workload_impact", "service_risk", "estimated_duration"):
+        assert fault["impact"][key], f"impact.{key} empty"
+
 
 @pytest.mark.asyncio
 async def test_e01_sc1_timeout_without_approval(

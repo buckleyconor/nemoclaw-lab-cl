@@ -137,13 +137,72 @@ async def _register_fault_from_logs(
             f"/api/faults/{ctx.fault_id}/status",
             json={"status": "diagnosing"},
         )
+        # Verbose step-by-step narration so the operator can follow exactly
+        # what the agent is doing (posted here because the fault id only
+        # exists from this moment; timestamps keep the ordering).
+        n_entries = len(bundle.get("log_text", "").splitlines())
         await _post_activity(
             gateway, ctx.fault_id, "detect",
-            f"⚡ Fault evidence retrieved from {ctx.asset_id} — investigation started",
+            f"⚡ Fault detected — critical event received from {ctx.asset_id}",
+        )
+        await _post_activity(
+            gateway, ctx.fault_id, "detect",
+            f"Pulling hardware log files from {ctx.asset_id} (lifecycle log via MCP)…",
+        )
+        await _post_activity(
+            gateway, ctx.fault_id, "detect",
+            f"Log bundle retrieved — {n_entries} entries collected",
+        )
+        await _post_activity(
+            gateway, ctx.fault_id, "diagnose",
+            "Extracting the error from the log bundle — querying the Local LLM "
+            "for signature analysis and fault assessment…",
         )
 
     bundle["fault_event_id"] = ctx.fault_id
     return json.dumps(bundle)
+
+
+async def _record_kb_result(
+    gateway: httpx.AsyncClient,
+    ctx: _FaultContext,
+    arguments: dict,
+    result_text: str,
+) -> None:
+    """Narrate the KB outcome and persist the diagnosis on the FaultEvent
+    (signature + KB match) so the Operator Dashboard can render it."""
+    signature = str(arguments.get("signature", "")).strip()
+    try:
+        kb = json.loads(result_text)
+    except json.JSONDecodeError:
+        kb = None
+
+    if isinstance(kb, dict) and kb.get("kb_id"):
+        title = kb.get("title") or kb["kb_id"]
+        score = float(kb.get("score") or 0.0)
+        await _post_activity(
+            gateway, ctx.fault_id, "search_kb",
+            f"✓ Matched {kb['kb_id']} — {title} (confidence {score:.0%}, via {kb.get('via', '?')})",
+        )
+        diagnosis = {
+            "kb_article_id": kb["kb_id"],
+            "kb_title": title,
+            "kb_score": score,
+        }
+    else:
+        await _post_activity(
+            gateway, ctx.fault_id, "search_kb",
+            "No KB article matched — falling back to scenario default remediation steps",
+        )
+        diagnosis = {}
+
+    if signature:
+        diagnosis["error_signature"] = signature
+    if diagnosis:
+        try:
+            await gateway.patch(f"/api/faults/{ctx.fault_id}/diagnosis", json=diagnosis)
+        except Exception:
+            log.warning("Failed to record diagnosis for fault %s", ctx.fault_id)
 
 
 async def _dispatch(
@@ -195,10 +254,26 @@ async def _dispatch(
                 scenario.kb_article_ref.replace("kb/", "").replace(".md", "")
             )
 
+    # Deterministic step narration — the operator sees exactly what the agent
+    # is doing regardless of how chatty the model feels this run.
+    if name == "kb_search" and ctx.fault_id:
+        await _post_activity(
+            gateway, ctx.fault_id, "search_kb",
+            f'Performing local KB semantic search (FAISS): "{arguments.get("signature", "")}"…',
+        )
+    elif name == "remediation_propose" and ctx.fault_id:
+        await _post_activity(
+            gateway, ctx.fault_id, "present",
+            "Presenting problem details, impact assessment and KB remediation "
+            "steps to the operator…",
+        )
+
     result_text = await tools.call_llm_tool(name, arguments)
 
     if name == "logs_get_bundle":
         result_text = await _register_fault_from_logs(gateway, loaded_pack, ctx, result_text)
+    elif name == "kb_search" and ctx.fault_id:
+        await _record_kb_result(gateway, ctx, arguments, result_text)
     elif name == "remediation_propose":
         try:
             recorded = json.loads(result_text).get("status") == "proposal_recorded"

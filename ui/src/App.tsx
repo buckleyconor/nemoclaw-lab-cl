@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { gateway } from "./api/gateway";
 import { useSSE } from "./hooks/useSSE";
 import { ActivityFeed } from "./components/ActivityFeed";
@@ -15,6 +15,10 @@ import type {
   SSEEvent,
 } from "./types";
 
+// How long a resolved fault stays on the Operator Dashboard before the panel
+// clears back to its idle state.
+const RESOLVED_RETENTION_MS = 60_000;
+
 export default function App() {
   const [pack, setPack] = useState<PackInfo | null>(null);
   const [assets, setAssets] = useState<AssetRecord[]>([]);
@@ -23,6 +27,8 @@ export default function App() {
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [selectedFaultId, setSelectedFaultId] = useState<string | null>(null);
+  const [retainedFault, setRetainedFault] = useState<FaultEvent | null>(null);
+  const retainTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -53,6 +59,16 @@ export default function App() {
           ? prev.map((f) => (f.id === evt.data.id ? evt.data : f))
           : [evt.data, ...prev];
       });
+      if (evt.data.status === "resolved") {
+        // Keep the completed summary on the dashboard for a minute, then clear.
+        setRetainedFault(evt.data);
+        if (retainTimer.current) clearTimeout(retainTimer.current);
+        retainTimer.current = setTimeout(() => setRetainedFault(null), RESOLVED_RETENTION_MS);
+      } else if (evt.data.status === "detected" || evt.data.status === "diagnosing") {
+        // A new investigation supersedes any retained summary.
+        setRetainedFault(null);
+        if (retainTimer.current) clearTimeout(retainTimer.current);
+      }
     } else if (evt.type === "notification") {
       setNotifications((prev) => [evt.data, ...prev]);
       setUnreadCount((c) => c + 1);
@@ -64,6 +80,8 @@ export default function App() {
       setNotifications([]);
       setUnreadCount(0);
       setSelectedFaultId(null);
+      setRetainedFault(null);
+      if (retainTimer.current) clearTimeout(retainTimer.current);
     }
   }, []);
 
@@ -105,10 +123,41 @@ export default function App() {
     (f) => f.status !== "resolved" && f.status !== "denied"
   );
 
+  // Panel shows the live fault, else a recently-resolved one (60 s), else idle.
+  const displayFault = activeFault ?? retainedFault;
+
   function handleAssetSelect(assetId: string) {
     const fault = faults.find((f) => f.asset_id === assetId && f.status !== "resolved");
     setSelectedFaultId(fault?.id ?? null);
   }
+
+  // ── Persistent cluster status bar ──────────────────────────────────────────
+  const statusBar = hasActiveFault
+    ? {
+        border: "1px solid rgba(249,115,22,.45)",
+        icon: "⚠",
+        iconColor: "#f97316",
+        title: "Cluster issue detected",
+        titleColor: "#f97316",
+        body: "— Sentinel Agent investigating, please see Operator Dashboard for issue and remediation",
+      }
+    : hasDeniedFault
+    ? {
+        border: "1px solid rgba(239,68,68,.35)",
+        icon: "⚠",
+        iconColor: "#ef4444",
+        title: "Cluster partially degraded",
+        titleColor: "#ef4444",
+        body: "— self-heal remediation denied. Click a faulted node to review and resolve.",
+      }
+    : {
+        border: "1px solid var(--border)",
+        icon: "✓",
+        iconColor: "var(--healthy)",
+        title: "All systems healthy",
+        titleColor: "var(--text)",
+        body: "— no active faults",
+      };
 
   return (
     <div className="app-shell">
@@ -128,6 +177,18 @@ export default function App() {
       </header>
 
       <div className="app-body">
+        {/* Persistent status bar — always visible */}
+        <div style={{
+          padding: "11px 16px", background: "var(--bg-card)",
+          border: statusBar.border, borderRadius: 8,
+          color: "var(--text-dim)", fontSize: 13,
+          display: "flex", alignItems: "center", gap: 8,
+        }}>
+          <span style={{ color: statusBar.iconColor, fontSize: 16 }}>{statusBar.icon}</span>
+          <span style={{ color: statusBar.titleColor, fontWeight: 600 }}>{statusBar.title}</span>
+          <span>{statusBar.body}</span>
+        </div>
+
         {/* Top row: Fleet Grid + Agent Activity */}
         <div className="top-row">
           <div>
@@ -137,38 +198,15 @@ export default function App() {
           <ActivityFeed events={activity} />
         </div>
 
-        {/* Operator Dashboard — full width, only when a fault is active */}
-        {activeFault ? (
-          <div>
-            <div className="section-heading">Operator Dashboard</div>
-            <OperatorDashboard
-              fault={activeFault}
-              activity={activity}
-              onDecision={handleDecision}
-            />
-          </div>
-        ) : hasDeniedFault && !hasActiveFault ? (
-          <div style={{
-            padding: "14px 16px", background: "var(--bg-card)",
-            border: "1px solid rgba(239,68,68,.35)", borderRadius: 8,
-            color: "var(--text-dim)", fontSize: 13,
-            display: "flex", alignItems: "center", gap: 8,
-          }}>
-            <span style={{ color: "#ef4444", fontSize: 16 }}>⚠</span>
-            <span style={{ color: "#ef4444" }}>Cluster partially degraded</span>
-            <span>— self-heal remediation denied. Click a faulted node to review and resolve.</span>
-          </div>
-        ) : (
-          <div style={{
-            padding: "14px 16px", background: "var(--bg-card)",
-            border: "1px solid var(--border)", borderRadius: 8,
-            color: "var(--text-dim)", fontSize: 13,
-            display: "flex", alignItems: "center", gap: 8,
-          }}>
-            <span style={{ color: "var(--healthy)", fontSize: 16 }}>✓</span>
-            All systems healthy — no active faults
-          </div>
-        )}
+        {/* Operator Dashboard — always visible; idle shell when nothing to show */}
+        <div>
+          <div className="section-heading">Operator Dashboard</div>
+          <OperatorDashboard
+            fault={displayFault}
+            activity={activity}
+            onDecision={handleDecision}
+          />
+        </div>
       </div>
     </div>
   );
