@@ -213,16 +213,32 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
         </span>
         <span style={{ flex: 1 }} />
         <button
-          onClick={() => exportReport(fault, activity)}
-          title="Export a printable event report for the audit trail"
-          style={{
-            padding: "4px 10px",
-            background: "rgba(96,165,250,.1)",
-            border: "1px solid rgba(96,165,250,.35)",
-            borderRadius: 5, color: "#60a5fa",
-            fontWeight: 600, fontSize: 10, cursor: "pointer",
-            fontFamily: "var(--mono)", letterSpacing: ".06em",
-          }}
+          onClick={() => fault.status === "resolved" && exportReport(fault, activity)}
+          disabled={fault.status !== "resolved"}
+          title={
+            fault.status === "resolved"
+              ? "Export a printable event report for the audit trail"
+              : "Available once self-heal has completed and the asset is healthy again"
+          }
+          style={
+            fault.status === "resolved"
+              ? {
+                  padding: "4px 10px",
+                  background: "rgba(96,165,250,.1)",
+                  border: "1px solid rgba(96,165,250,.35)",
+                  borderRadius: 5, color: "#60a5fa",
+                  fontWeight: 600, fontSize: 10, cursor: "pointer",
+                  fontFamily: "var(--mono)", letterSpacing: ".06em",
+                }
+              : {
+                  padding: "4px 10px",
+                  background: "rgba(107,114,128,.08)",
+                  border: "1px solid rgba(107,114,128,.25)",
+                  borderRadius: 5, color: "#6b7280",
+                  fontWeight: 600, fontSize: 10, cursor: "not-allowed",
+                  fontFamily: "var(--mono)", letterSpacing: ".06em",
+                }
+          }
         >
           ⬇ EXPORT REPORT
         </button>

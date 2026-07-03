@@ -201,7 +201,12 @@ export default function App() {
         {/* Operator Dashboard — always visible; idle shell when nothing to show */}
         <div>
           <div className="section-heading">Operator Dashboard</div>
+          {/* key forces a full remount per fault — belt-and-suspenders on top of
+              OperatorDashboard's own fault.id effect, so decision-lock state can
+              never leak from one fault into the next regardless of reconciliation
+              timing. */}
           <OperatorDashboard
+            key={displayFault?.id ?? "idle"}
             fault={displayFault}
             activity={activity}
             onDecision={handleDecision}

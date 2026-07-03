@@ -80,6 +80,24 @@ async function faultIsTerminal(gatewayUrl: string, faultId: string): Promise<boo
 }
 
 /**
+ * Called at the top of monitor_list_events — the tool AGENTS.md says every
+ * wake-up must start with. Clears a lingering investigation the Gateway
+ * already considers resolved/denied *before* the model gets a chance to call
+ * notify_post_activity or kb_search again this turn. Remediation resolves a
+ * fault entirely server-side (services/gateway/executor.py) with no
+ * involvement from this plugin, so nothing else tells the harness "that
+ * investigation is over" — without this, a model that keeps narrating out of
+ * habit on a later wake-up would have its diagnose/search_kb messages pinned
+ * to the stale fault_event_id, showing up in the feed as if still
+ * investigating a fault the hardware already reports healthy.
+ */
+export async function clearStaleInvestigation(gatewayUrl: string): Promise<void> {
+  if (current && (await faultIsTerminal(gatewayUrl, current.faultId))) {
+    current = null;
+  }
+}
+
+/**
  * Called with the parsed logs.get_bundle result. Registers the fault event on
  * first evidence and stamps fault_event_id into the bundle. Returns the
  * (possibly augmented) bundle.

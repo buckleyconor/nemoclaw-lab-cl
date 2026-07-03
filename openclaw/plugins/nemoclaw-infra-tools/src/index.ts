@@ -14,6 +14,7 @@ import { Type } from "typebox";
 import { defineToolPlugin } from "openclaw/plugin-sdk/tool-plugin";
 import {
   alreadyProposedResult,
+  clearStaleInvestigation,
   currentInvestigation,
   markProposed,
   noRegisteredFaultError,
@@ -81,6 +82,10 @@ export default defineToolPlugin({
         ),
       }),
       async execute({ asset_id }, config) {
+        // Every wake-up starts here (AGENTS.md) — clear any investigation the
+        // Gateway already resolved/denied before the model can narrate more
+        // about it or trigger a fresh diagnosis pass.
+        await clearStaleInvestigation(gatewayUrl(config));
         return call(config, "monitor.list_events", { asset_id: asset_id ?? "" });
       },
     }),

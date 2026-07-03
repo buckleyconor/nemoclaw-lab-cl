@@ -9,6 +9,7 @@ import {
   noRegisteredFaultError,
   alreadyProposedResult,
   markProposed,
+  clearStaleInvestigation,
 } from "./harness.js";
 import {
   assertAllowlistExcludesExecute,
@@ -189,5 +190,35 @@ describe("harness side-work", () => {
 
   it("alreadyProposedResult tells the model to stop instead of proposing again", () => {
     expect(alreadyProposedResult()).toMatchObject({ status: "already_proposed" });
+  });
+
+  it("clearStaleInvestigation drops an investigation the Gateway already resolved", async () => {
+    await registerFaultFromLogs(gatewayUrl, {
+      log_text: "x", scenario_id: "scn-1", asset_id: "gpu-01",
+    });
+    expect(currentInvestigation()?.faultId).toBe("fault-123");
+
+    // Override the mock: this fault now reports resolved.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        calls.push({ method: init?.method ?? "GET", url: String(url), body: undefined });
+        if (String(url).endsWith("/api/faults/fault-123") && (!init?.method || init.method === "GET")) {
+          return new Response(JSON.stringify({ status: "resolved" }), { status: 200 });
+        }
+        return new Response(JSON.stringify({ status: "ok" }), { status: 200 });
+      }),
+    );
+
+    await clearStaleInvestigation(gatewayUrl);
+    expect(currentInvestigation()).toBeNull();
+  });
+
+  it("clearStaleInvestigation leaves an active investigation alone", async () => {
+    await registerFaultFromLogs(gatewayUrl, {
+      log_text: "x", scenario_id: "scn-1", asset_id: "gpu-01",
+    });
+    await clearStaleInvestigation(gatewayUrl); // mock still reports {status:"ok"} — not terminal
+    expect(currentInvestigation()?.faultId).toBe("fault-123");
   });
 });
