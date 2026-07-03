@@ -115,11 +115,15 @@ nemoclaw "$SANDBOX_NAME" upload "$REPO_ROOT/openclaw/skills" /sandbox/.openclaw/
 
 # ── 5. Tool lockdown + plugin config + webhook wake-up ───────────────────────
 # Built-in tools (exec/browser/web_search/...) are a new attack surface the
-# bespoke ADR-010 agent never had: profile "minimal" allowlists nothing but
-# session_status; the plugin's seven tools are then explicitly allowed.
-# deny wins over allow, so remediation-execute stays refused even if a
-# future config edit widens the allowlist.
-nemoclaw "$SANDBOX_NAME" exec -- openclaw config set tools.profile '"minimal"' --strict-json
+# bespoke ADR-010 agent never had. tools.profile sets a BASE allowlist that
+# tools.allow can only narrow, never extend (confirmed against OpenClaw
+# v2026.5.27's tool-policy engine) — profile "minimal" caps the base set at
+# session_status alone, which silently drops the plugin's seven tools before
+# tools.allow ever runs. Use "full" (no base restriction) and let
+# tools.allow/tools.deny do all the work instead. deny wins over allow, so
+# remediation-execute stays refused even if a future config edit widens the
+# allowlist.
+nemoclaw "$SANDBOX_NAME" exec -- openclaw config set tools.profile '"full"' --strict-json
 nemoclaw "$SANDBOX_NAME" exec -- openclaw config set tools.allow \
   '["monitor_list_events","monitor_get_asset","monitor_list_assets","logs_get_bundle","kb_search","notify_post_activity","remediation_propose"]' --strict-json
 nemoclaw "$SANDBOX_NAME" exec -- openclaw config set tools.deny \
@@ -127,6 +131,10 @@ nemoclaw "$SANDBOX_NAME" exec -- openclaw config set tools.deny \
 nemoclaw "$SANDBOX_NAME" exec -- openclaw config set \
   plugins.entries.nemoclaw-infra-tools.config \
   '{"mcpUrl":"http://host.openshell.internal:8004/mcp","gatewayUrl":"http://host.openshell.internal:8001"}' --strict-json
+# Without an explicit trust entry the plugin loads as untracked local code and
+# its tools never register as callable ("no registered tools matched").
+nemoclaw "$SANDBOX_NAME" exec -- openclaw config set plugins.allow \
+  '["nemoclaw-infra-tools"]' --strict-json
 
 nemoclaw "$SANDBOX_NAME" exec -- openclaw config set hooks \
   "{\"enabled\":true,\"token\":\"$HOOK_TOKEN\",\"path\":\"/hooks\"}" --strict-json
@@ -140,14 +148,19 @@ nemoclaw "$SANDBOX_NAME" exec -- openclaw cron add \
   --system-event "safety-net poll: run the Infrastructure Fault Response program" \
   --wake now || echo "WARN: cron add failed — webhook remains the only trigger"
 
-nemoclaw "$SANDBOX_NAME" gateway restart --quiet
+# `nemoclaw <name> gateway restart` is not a real subcommand — recover is the
+# host-side action that restarts the sandbox's gateway/dashboard.
+nemoclaw "$SANDBOX_NAME" recover
 
 echo
 echo "── Onboarding complete ─────────────────────────────────────────────"
 echo "Sandbox:        $SANDBOX_NAME"
 echo "Webhook token:  $HOOK_TOKEN"
 echo
-echo "Point the lab Gateway at the agent (then docker compose up -d gateway):"
+echo "Point the lab Gateway at the agent (then docker compose up -d gateway)."
+echo "NOTE: 18789 is only the default — if it was already taken (e.g. another"
+echo "sandbox on this host), onboarding logs 'Port 18789 is taken. Using port"
+echo "N instead.' Confirm the real port with: nemoclaw $SANDBOX_NAME status"
 echo "  export OPENCLAW_HOOK_URL=http://host.docker.internal:18789"
 echo "  export OPENCLAW_HOOK_TOKEN=$HOOK_TOKEN"
 echo
