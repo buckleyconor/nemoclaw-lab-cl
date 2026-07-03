@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { gateway } from "../api/gateway";
 import type { ActivityEvent, FaultEvent } from "../types";
 
@@ -110,6 +110,16 @@ interface Props {
 export function OperatorDashboard({ fault, activity, onDecision }: Props) {
   const [deciding, setDeciding] = useState<string | null>(null);
 
+  // A new fault (different id) invalidates any decision state left over from
+  // the previous one. Without this, a successful decide() on fault #1 leaves
+  // `deciding` permanently non-null (only the catch branch clears it), which
+  // then incorrectly disables the Approve/Deny buttons for every fault after
+  // the first — this component instance is reused across faults, it isn't
+  // remounted per fault_event_id.
+  useEffect(() => {
+    setDeciding(null);
+  }, [fault?.id]);
+
   // Idle shell — the panel stays visible even with nothing to show (cleared
   // after the post-resolution retention window).
   if (!fault) {
@@ -134,10 +144,14 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
   const isDecided = deciding !== null && fault.status === "awaiting_approval";
   const canDecide = fault.status === "awaiting_approval" && deciding === null;
   const isActive = fault.status !== "resolved" && fault.status !== "denied";
+  // Both impact assessment and remediation steps are already available on the
+  // FaultEvent as soon as it's created (from the scenario's static content),
+  // well before the agent has actually run a KB search. Gate their display on
+  // kb_article_id explicitly so the operator sees them appear in the same
+  // causal order the agent produces the rest of the diagnosis in: signature →
+  // KB match → assessment → impact → remediation steps.
   const showSteps =
-    fault.remediation_step_labels.length > 0 &&
-    (fault.kb_article_id !== null ||
-      ["awaiting_approval", "remediating", "resolved", "denied"].includes(fault.status));
+    fault.kb_article_id !== null && fault.remediation_step_labels.length > 0;
 
   async function decide(decision: "approved" | "denied") {
     if (!fault) return;
@@ -293,8 +307,8 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
           </div>
         ) : null}
 
-        {/* Impact assessment */}
-        {fault.impact && (
+        {/* Impact assessment — held back until the KB match is in, same reasoning as showSteps above */}
+        {fault.impact && fault.kb_article_id && (
           <div>
             <div style={cardLabelStyle}>IMPACT ASSESSMENT</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>

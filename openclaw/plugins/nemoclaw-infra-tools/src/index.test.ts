@@ -7,6 +7,8 @@ import {
   resetInvestigation,
   currentInvestigation,
   noRegisteredFaultError,
+  alreadyProposedResult,
+  markProposed,
 } from "./harness.js";
 import {
   assertAllowlistExcludesExecute,
@@ -132,5 +134,60 @@ describe("harness side-work", () => {
 
   it("refuses narration before evidence exists", () => {
     expect(noRegisteredFaultError()).toMatchObject({ error: "no_registered_fault" });
+  });
+
+  it("does not re-register or re-narrate detect phase on a repeat wake-up for the same open investigation", async () => {
+    const bundle = { log_text: "line1\nline2", scenario_id: "scn-1", asset_id: "gpu-01" };
+    const first = await registerFaultFromLogs(gatewayUrl, bundle);
+    expect(first.investigation_stage).toBe("new");
+
+    calls = []; // only inspect what the second call does
+    const second = await registerFaultFromLogs(gatewayUrl, bundle);
+    expect(second.fault_event_id).toBe("fault-123");
+    expect(second.investigation_stage).toBe("new"); // still undiagnosed, still unproposed
+
+    const posts = calls.filter((c) => c.url.endsWith("/api/faults") && c.method === "POST");
+    expect(posts).toHaveLength(0); // no duplicate fault registration
+    const detectActivity = calls.filter((c) => c.url.endsWith("/api/agent/activity"));
+    expect(detectActivity).toHaveLength(0); // no repeat detect/diagnose narration
+  });
+
+  it("does not re-patch diagnosis or re-narrate the KB match on a repeat recordKbResult call", async () => {
+    await registerFaultFromLogs(gatewayUrl, {
+      log_text: "x", scenario_id: "scn-1", asset_id: "gpu-01",
+    });
+    const kb = { kb_id: "KB000123", title: "GPU Xid 79", score: 0.92, via: "faiss" };
+    await recordKbResult(gatewayUrl, "Xid 79", kb);
+    expect(currentInvestigation()?.diagnosed).toBe(true);
+
+    calls = [];
+    await recordKbResult(gatewayUrl, "Xid 79", kb);
+    const diagPatches = calls.filter((c) => c.url.includes("/diagnosis"));
+    const searchNarration = calls.filter((c) => c.url.endsWith("/api/agent/activity"));
+    expect(diagPatches).toHaveLength(0);
+    expect(searchNarration).toHaveLength(0);
+  });
+
+  it("posts a waiting status and reports awaiting_operator_decision on repeat wake-up after proposal", async () => {
+    const bundle = { log_text: "x", scenario_id: "scn-1", asset_id: "gpu-01" };
+    await registerFaultFromLogs(gatewayUrl, bundle);
+    await recordKbResult(gatewayUrl, "Xid 79", { kb_id: "KB000123", title: "t", score: 0.9, via: "faiss" });
+    markProposed();
+    expect(currentInvestigation()?.proposed).toBe(true);
+
+    calls = [];
+    const woken = await registerFaultFromLogs(gatewayUrl, bundle);
+    expect(woken.investigation_stage).toBe("awaiting_operator_decision");
+
+    const waitingPosts = calls.filter(
+      (c) => c.url.endsWith("/api/agent/activity") && c.body?.step === "waiting",
+    );
+    expect(waitingPosts).toHaveLength(1);
+    const posts = calls.filter((c) => c.url.endsWith("/api/faults") && c.method === "POST");
+    expect(posts).toHaveLength(0); // still the same fault, not re-registered
+  });
+
+  it("alreadyProposedResult tells the model to stop instead of proposing again", () => {
+    expect(alreadyProposedResult()).toMatchObject({ status: "already_proposed" });
   });
 });

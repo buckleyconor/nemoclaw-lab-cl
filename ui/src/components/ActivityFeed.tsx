@@ -6,6 +6,7 @@ const STEP_META: Record<string, { icon: string; label: string; color: string }> 
   diagnose:  { icon: "📋", label: "DIAGNOSE",  color: "#a78bfa" },
   search_kb: { icon: "📚", label: "SEARCH KB", color: "#f59e0b" },
   present:   { icon: "🖥️", label: "PRESENT",   color: "#38bdf8" },
+  waiting:   { icon: "⏳", label: "WAITING",   color: "#94a3b8" },
   remediate: { icon: "🔧", label: "REMEDIATE", color: "#fb923c" },
   resolved:  { icon: "✅", label: "RESOLVED",  color: "#4ade80" },
   denied:    { icon: "❌", label: "DENIED",    color: "#f87171" },

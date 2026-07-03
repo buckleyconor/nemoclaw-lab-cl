@@ -13,7 +13,9 @@
 import { Type } from "typebox";
 import { defineToolPlugin } from "openclaw/plugin-sdk/tool-plugin";
 import {
+  alreadyProposedResult,
   currentInvestigation,
+  markProposed,
   noRegisteredFaultError,
   postActivity,
   recordKbResult,
@@ -137,7 +139,10 @@ export default defineToolPlugin({
       async execute({ signature, fallback_kb_id }, config) {
         const gw = gatewayUrl(config);
         const inv = currentInvestigation();
-        if (inv) {
+        // Only narrate the search itself the first time — a repeat wake-up
+        // that re-runs kb_search for an already-diagnosed fault shouldn't
+        // spam the same "performing search" / "matched KBxxx" lines.
+        if (inv && !inv.diagnosed) {
           await postActivity(gw, inv.faultId, "search_kb",
             `Performing local KB semantic search (FAISS): "${signature}"…`);
         }
@@ -208,13 +213,22 @@ export default defineToolPlugin({
       async execute({ step_ids, summary }, config) {
         const inv = currentInvestigation();
         if (inv === null) return noRegisteredFaultError();
+        // A repeat wake-up must not re-propose (and re-PATCH analysis, and
+        // re-post "presenting…") for a fault already awaiting a decision.
+        if (inv.proposed) return alreadyProposedResult();
         await postActivity(gatewayUrl(config), inv.faultId, "present",
           "Presenting problem details, impact assessment and KB remediation steps to the operator…");
-        return call(config, "remediation.propose", {
+        const result = await call(config, "remediation.propose", {
           fault_event_id: inv.faultId,
           step_ids,
           summary: summary ?? "",
         });
+        const ok =
+          result === null ||
+          typeof result !== "object" ||
+          (result as { status?: unknown }).status !== "error";
+        if (ok) markProposed();
+        return result;
       },
     }),
   ],

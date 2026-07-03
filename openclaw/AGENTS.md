@@ -33,7 +33,7 @@ All infrastructure tools are registered by the `nemoclaw-infra-tools` plugin:
 | `monitor_list_events` | Returns active fault events from the Redfish surface |
 | `monitor_get_asset` | Health state for one asset |
 | `monitor_list_assets` | All assets with health state |
-| `logs_get_bundle` | Log bundle (iDRAC lifecycle log text) for an asset; issues the `fault_event_id` for the investigation |
+| `logs_get_bundle` | Log bundle (iDRAC lifecycle log text) for an asset; issues the `fault_event_id` and `investigation_stage` (`new` \| `diagnosed` \| `awaiting_operator_decision`) for the investigation |
 | `kb_search` | Semantic KB search; returns kb_id, title, score, via |
 | `notify_post_activity` | Post a progress update to the operator dashboard feed |
 | `remediation_propose` | Record your remediation plan and request operator approval |
@@ -66,12 +66,26 @@ remediation plan that has no KB or scenario backing.
 1. `monitor_list_events` — if empty, report no fault and end the turn.
 2. Take the first event; note its `asset_id`.
 3. `logs_get_bundle(asset_id)` — the result includes the `fault_event_id`
-   used by every subsequent tool call.
-4. Narrate what the logs show (`notify_post_activity`, step `diagnose`).
-5. Extract the primary error signature; `kb_search(signature)`.
-6. Narrate the KB result (step `search_kb`).
-7. `remediation_propose(fault_event_id, step_ids, summary)` — once.
-8. Stop. Do not poll for the outcome; you will be woken for the next fault.
+   used by every subsequent tool call, plus `investigation_stage`.
+4. Check `investigation_stage`:
+   - `"new"` — continue with the steps below.
+   - `"diagnosed"` — you already searched the KB for this fault; go straight
+     to `remediation_propose`, do not call `kb_search` again.
+   - `"awaiting_operator_decision"` — this fault already has a proposal
+     awaiting the operator. A status update has already been posted for you.
+     Do nothing else. End the turn.
+5. Narrate what the logs show (`notify_post_activity`, step `diagnose`).
+6. Extract the primary error signature; `kb_search(signature)`.
+7. Narrate the KB result (step `search_kb`).
+8. `remediation_propose(fault_event_id, step_ids, summary)` — once. Calling
+   it again for the same fault is a no-op that tells you to stop.
+9. Stop. Do not poll for the outcome; you will be woken for the next fault.
+
+You will be woken repeatedly (webhook + the cron safety-net poll) for as long
+as a fault stays active, including while it's just sitting in
+`awaiting_operator_decision` waiting for a human. That's expected — the
+`investigation_stage` check above is what keeps you from repeating diagnosis
+or re-proposing on every wake-up instead of just checking in and stopping.
 
 ## Rules that survive any rewording
 

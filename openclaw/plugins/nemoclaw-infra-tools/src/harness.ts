@@ -21,6 +21,10 @@ export type Investigation = {
   faultId: string;
   scenarioId: string;
   assetId: string;
+  /** true once recordKbResult has run for this investigation. */
+  diagnosed: boolean;
+  /** true once remediation_propose has succeeded for this investigation. */
+  proposed: boolean;
 };
 
 let current: Investigation | null = null;
@@ -79,6 +83,14 @@ async function faultIsTerminal(gatewayUrl: string, faultId: string): Promise<boo
  * Called with the parsed logs.get_bundle result. Registers the fault event on
  * first evidence and stamps fault_event_id into the bundle. Returns the
  * (possibly augmented) bundle.
+ *
+ * The webhook wake-up plus the cron safety-net poll (AGENTS.md) both start
+ * every turn with monitor_list_events, which keeps reporting an active fault
+ * until it actually clears — so this can be called many times for the same
+ * fault while it sits in awaiting_approval. It must stay idempotent: no new
+ * fault, no repeat detect/diagnose narration, no duplicate work. It instead
+ * posts one lightweight "waiting" line per repeat wake-up and tells the model
+ * via investigation_stage that there's nothing left to do this turn.
  */
 export async function registerFaultFromLogs(
   gatewayUrl: string,
@@ -106,7 +118,7 @@ export async function registerFaultFromLogs(
       throw new Error(`fault registration failed: HTTP ${r.status}`);
     }
     const fault = (await r.json()) as { id: string };
-    current = { faultId: fault.id, scenarioId, assetId };
+    current = { faultId: fault.id, scenarioId, assetId, diagnosed: false, proposed: false };
 
     await gatewayFetch(gatewayUrl, "PATCH", `/api/faults/${fault.id}/status`, {
       status: "diagnosing",
@@ -121,21 +133,37 @@ export async function registerFaultFromLogs(
       `Log bundle retrieved — ${entries} entries collected`);
     await postActivity(gatewayUrl, fault.id, "diagnose",
       "Analysing the log bundle — extracting the primary error signature…");
+  } else if (current.proposed) {
+    // Repeat wake-up for a fault that's already fully diagnosed and proposed
+    // — narrate that we checked and are still waiting, but do no other work.
+    await postActivity(gatewayUrl, current.faultId, "waiting",
+      `⏳ Checked in on ${current.assetId} — still awaiting operator decision, no new action needed.`);
   }
 
-  return { ...bundle, fault_event_id: current.faultId };
+  return {
+    ...bundle,
+    fault_event_id: current.faultId,
+    investigation_stage: current.proposed
+      ? "awaiting_operator_decision"
+      : current.diagnosed
+      ? "diagnosed"
+      : "new",
+  };
 }
 
 /**
  * Called with the kb.search arguments and parsed result. Narrates the KB
  * outcome and persists the diagnosis so the Operator Dashboard renders it.
+ * Idempotent per investigation — a repeat wake-up that calls kb_search again
+ * (the model isn't required to check investigation_stage) must not re-post
+ * the same "matched KBxxx" line or re-PATCH the same diagnosis every time.
  */
 export async function recordKbResult(
   gatewayUrl: string,
   signature: string,
   kb: Record<string, unknown> | null,
 ): Promise<void> {
-  if (current === null) return;
+  if (current === null || current.diagnosed) return;
 
   const diagnosis: Record<string, unknown> = {};
   if (kb && typeof kb.kb_id === "string" && kb.kb_id) {
@@ -160,6 +188,23 @@ export async function recordKbResult(
       // Diagnosis persistence is display-only; do not fail the tool call.
     }
   }
+  current.diagnosed = true;
+}
+
+/** Result returned to the model when it calls remediation_propose a second
+ * time for a fault that's already awaiting an operator decision. */
+export function alreadyProposedResult(): Record<string, unknown> {
+  return {
+    status: "already_proposed",
+    note: "This fault already has a remediation proposal awaiting operator " +
+      "decision. Do not propose again — stop calling tools and wait for the next wake-up.",
+  };
+}
+
+/** Marks the current investigation as proposed once remediation_propose
+ * actually succeeds server-side (call after checking the result, not before). */
+export function markProposed(): void {
+  if (current) current.proposed = true;
 }
 
 /** Error result matching agent/loop.py's no_registered_fault refusal. */
