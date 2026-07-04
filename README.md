@@ -25,11 +25,12 @@ Pack (content)  →  Framework (agent + services)  →  Lab UI
                │                Lab Browser UI                │
                │  Welcome Page · Lab Guide · Dashboard (SPA) │
                └──────────────────┬──────────────────────────┘
-                                  │ HTTP + SSE
+                                  │ HTTP + SSE + WS (terminal)
                ┌──────────────────▼──────────────────────────┐
                │              Gateway  :8001                  │
                │  REST API · SSE multiplex · React SPA host  │
                │  In-memory state · HITL token store          │
+               │  Terminal WS proxy (ADR-012)                 │
                └───┬──────────────────────┬──────────────────┘
                    │                      │
       ┌────────────▼──────┐    ┌──────────▼──────────┐
@@ -64,6 +65,13 @@ The agent is **not** a Compose service: `deploy/scripts/onboard-openclaw.sh`
 onboards the real NVIDIA NemoClaw stack — OpenClaw in an OpenShell sandbox —
 as a peer host process that reaches MCP Tools and the Gateway via their
 published ports. See `docs/adr/ADR-011.md` and `openclaw/README.md`.
+
+A second host process (M12) is the **terminal daemon** (:8005, host-local
+bind only, started with `make terminal`), backing the embedded operator
+terminal in the dashboard for configuring the agent (SOUL.md/SKILL.md,
+`nemoclaw`/`openclaw`/`openshell` CLIs). Like the agent, it is not a Compose
+service — the CLIs and sandbox state live on the host. See
+`docs/adr/ADR-012.md` and `docs/SPEC-EMBEDDED-TERMINAL.md`.
 
 ## Project layout
 
@@ -151,3 +159,4 @@ uv run pytest tests/e2e/      # end-to-end (requires running stack)
 | M9 Prod hardening (Kubernetes, 30 users) | ⬜ Planned |
 | M10 LLM-driven skill-calling agent (ADR-010) | ✅ Complete — validated live against vLLM/Qwen tool-calling |
 | M11 Real NemoClaw/OpenClaw agent runtime (ADR-011) | 🚧 Implemented — spike partially validated (MCP interop, plugin manifest, docs-level unknowns); live sandbox run blocked on Intel-Mac host (OpenShell has no macOS x86_64 assets), needs a supported host |
+| M12 Embedded operator terminal (ADR-012) | 🚧 Implemented — daemon + proxy + panel verified end-to-end host-side; the in-container gateway→daemon hop needs a ufw allow rule on this host (SPEC §6) |

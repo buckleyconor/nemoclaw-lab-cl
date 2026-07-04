@@ -28,6 +28,7 @@ from services.gateway.executor import (
 )
 from services.gateway.router import router
 from services.gateway.store import AssetRecord, GatewayStore
+from services.gateway.terminal import terminal_router
 
 
 def _resolve_pack_dir(pack_dir: Path | None) -> Path:
@@ -118,6 +119,7 @@ def create_app(
     )
 
     app.include_router(router)
+    app.include_router(terminal_router)
 
     @app.get("/healthz", tags=["health"])
     async def healthz() -> dict[str, str]:

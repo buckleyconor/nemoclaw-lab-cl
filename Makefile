@@ -23,7 +23,7 @@ PLATFORM    ?= linux/arm64   # override: linux/amd64 or linux/arm64,linux/amd64
 BACKEND_IMAGE := $(REGISTRY)/nemoclaw-backend:$(TAG)
 GATEWAY_IMAGE := $(REGISTRY)/nemoclaw-gateway:$(TAG)
 
-.PHONY: help build push push-multiarch deploy undeploy up down logs test lint
+.PHONY: help build push push-multiarch deploy undeploy up down logs terminal hook-relay test lint
 
 help:
 	@echo "Targets:"
@@ -35,6 +35,8 @@ help:
 	@echo "  up             docker compose up --build"
 	@echo "  down           docker compose down"
 	@echo "  logs           docker compose logs -f"
+	@echo "  terminal       Run the embedded-terminal daemon on the host (ADR-012)"
+	@echo "  hook-relay     Relay the OpenClaw wake hook onto the docker bridge (ADR-011)"
 	@echo "  test           uv run pytest"
 	@echo "  lint           uv run ruff check . && uv run ruff format --check ."
 
@@ -94,6 +96,14 @@ down:
 
 logs:
 	docker compose logs -f
+
+# ── Host processes (not Compose services — ADR-011/ADR-012) ──────────────────
+
+terminal:
+	./deploy/scripts/run-terminal.sh
+
+hook-relay:
+	./deploy/scripts/hook-relay.py
 
 # ── Dev quality targets ───────────────────────────────────────────────────────
 

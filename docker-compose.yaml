@@ -89,6 +89,14 @@ services:
       # host, so from this container it is host.docker.internal:18789.
       OPENCLAW_HOOK_URL: ${OPENCLAW_HOOK_URL:-}
       OPENCLAW_HOOK_TOKEN: ${OPENCLAW_HOOK_TOKEN:-}
+      # Embedded operator terminal (ADR-012). The terminal daemon runs on the
+      # host (`make terminal`); from this container it is
+      # ws://host.docker.internal:8005/ws. Off unless URL + token are set.
+      TERMINAL_WS_URL: ${TERMINAL_WS_URL:-}
+      TERMINAL_TOKEN: ${TERMINAL_TOKEN:-}
+      TERMINAL_ENABLED: ${TERMINAL_ENABLED:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8001:8001"
     depends_on:

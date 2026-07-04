@@ -5,6 +5,7 @@ import { ActivityFeed } from "./components/ActivityFeed";
 import { FleetGrid } from "./components/FleetGrid";
 import { OperatorDashboard } from "./components/OperatorDashboard";
 import { NotificationInbox } from "./components/NotificationInbox";
+import { TerminalPanel } from "./components/TerminalPanel";
 import "./App.css";
 import type {
   ActivityEvent,
@@ -212,6 +213,10 @@ export default function App() {
             onDecision={handleDecision}
           />
         </div>
+
+        {/* Embedded operator terminal (ADR-012) — renders its own heading;
+            hidden entirely unless the Gateway reports the feature enabled. */}
+        <TerminalPanel />
       </div>
     </div>
   );
