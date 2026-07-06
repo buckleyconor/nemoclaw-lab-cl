@@ -50,9 +50,11 @@ class SSEBroker:
             pass
 
     async def publish(self, event_type: str, data: dict) -> None:
-        payload = json.dumps({"type": event_type, "data": data})
+        self._fanout(json.dumps({"type": event_type, "data": data}))
+
+    def _fanout(self, payload: str) -> None:
         for q in list(self._queues):
-            await q.put(payload)
+            q.put_nowait(payload)
 
     @property
     def subscriber_count(self) -> int:

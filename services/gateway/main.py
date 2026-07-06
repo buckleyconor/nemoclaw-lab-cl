@@ -99,6 +99,9 @@ def create_app(
 
         yield
 
+        store_close = getattr(store, "aclose", None)
+        if store_close is not None:
+            await store_close()
         if orchestrator_client is None:
             await orch.aclose()
         if mcp_tools_client is None:

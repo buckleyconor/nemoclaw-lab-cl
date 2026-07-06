@@ -32,6 +32,10 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "nemoclaw.fullname" . }}-config
+            {{- if and .Values.openclawHook.url .Values.openclawHook.token }}
+            - secretRef:
+                name: {{ include "nemoclaw.fullname" . }}-openclaw-hook
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz

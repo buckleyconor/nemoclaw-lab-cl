@@ -54,13 +54,13 @@ ENV VIRTUAL_ENV=/app/.venv \
 
 # Warm up fastembed model cache at build time so pod startup is instant.
 # Model files land in /root/.cache/fastembed (~125 MB baked into image layer).
+# This MUST fail the build on error: the mcp-tools NetworkPolicy allows no
+# internet egress, so a missing cache cannot be downloaded at runtime and KB
+# search would be dead on arrival in the cluster.
 RUN python - <<'EOF'
-try:
-    from fastembed import TextEmbedding
-    list(TextEmbedding("BAAI/bge-small-en-v1.5").embed(["warmup"]))
-    print("fastembed model cached.")
-except Exception as e:
-    print(f"fastembed warmup skipped: {e}")
+from fastembed import TextEmbedding
+list(TextEmbedding("BAAI/bge-small-en-v1.5").embed(["warmup"]))
+print("fastembed model cached.")
 EOF
 
 # Default: simulator. Override CMD in K8s / docker-compose per service.

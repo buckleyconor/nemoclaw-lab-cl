@@ -9,6 +9,9 @@ Test IDs: REDIS-01 .. REDIS-08
 
 from __future__ import annotations
 
+import asyncio
+import json
+
 import pytest
 import fakeredis.aioredis as fake_aioredis
 
@@ -180,6 +183,45 @@ async def test_redis05_get_missing_token_returns_none(store: RedisGatewayStore) 
 async def test_redis06_sse_broker_exists(store: RedisGatewayStore) -> None:
     assert store.sse is not None
     assert store.sse.subscriber_count == 0
+
+
+async def test_redis06_sse_fanout_across_replicas() -> None:
+    """An event published on one gateway replica reaches a subscriber on another.
+
+    Regression test for the multi-replica deployment (values.prod.yaml runs
+    gateway.replicas: 2): the SSE broker must fan out via Redis pub/sub, not
+    per-process queues.
+    """
+    fake = fake_aioredis.FakeRedis(decode_responses=True)
+    replica_a = RedisGatewayStore("redis://unused", prefix="test", _redis=fake)
+    replica_b = RedisGatewayStore("redis://unused", prefix="test", _redis=fake)
+    try:
+        queue = replica_b.sse.subscribe()
+        await replica_b.sse.wait_ready()
+
+        await replica_a.sse.publish("fault", {"id": "fe-1"})
+
+        payload = await asyncio.wait_for(queue.get(), timeout=2)
+        assert json.loads(payload) == {"type": "fault", "data": {"id": "fe-1"}}
+    finally:
+        await replica_a.sse.aclose()
+        await replica_b.sse.aclose()
+
+
+async def test_redis06_sse_local_subscriber_receives_own_publish() -> None:
+    """A replica's own subscribers still get events it publishes itself."""
+    fake = fake_aioredis.FakeRedis(decode_responses=True)
+    store = RedisGatewayStore("redis://unused", prefix="test", _redis=fake)
+    try:
+        queue = store.sse.subscribe()
+        await store.sse.wait_ready()
+
+        await store.sse.publish("activity", {"step": "diagnose"})
+
+        payload = await asyncio.wait_for(queue.get(), timeout=2)
+        assert json.loads(payload)["type"] == "activity"
+    finally:
+        await store.sse.aclose()
 
 
 # ── REDIS-07: Key isolation by prefix ────────────────────────────────────────

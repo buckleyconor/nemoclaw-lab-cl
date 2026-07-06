@@ -35,6 +35,16 @@ spec:
         matchLabels:
           {{- include "nemoclaw.selectorLabels" . | nindent 10 }}
           app.kubernetes.io/component: redis
+    {{- if and .Values.openclawHook.url .Values.openclawHook.token }}
+    # OpenClaw wake hook — the agent is a host process outside the cluster
+    # (ADR-011), so the webhook needs egress past the pod selectors above.
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.openclawHook.egressCidr }}
+      ports:
+        - port: {{ .Values.openclawHook.egressPort }}
+          protocol: TCP
+    {{- end }}
 ---
 # Orchestrator: ingress from gateway only + egress to simulator
 apiVersion: networking.k8s.io/v1

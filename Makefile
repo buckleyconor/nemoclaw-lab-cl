@@ -8,6 +8,13 @@
 #   make push-multiarch REGISTRY=docker.io/youruser
 #   make deploy REGISTRY=docker.io/youruser TAG=v0.1.0
 #
+# Charmed K8s prod (Intel/amd64 workers — images MUST be amd64):
+#   make push PLATFORM=linux/amd64 REGISTRY=registry.nemoclaw.lab TAG=v0.1.0
+#   make deploy REGISTRY=registry.nemoclaw.lab TAG=v0.1.0 \
+#     VALUES=deploy/helm/nemoclaw/values.prod.yaml
+#   (Building amd64 on the arm64 GB10 runs under QEMU emulation — slow,
+#   especially the fastembed warmup step. Prefer an amd64 builder or CI.)
+#
 # Local dev (docker compose):
 #   make up        # build + start full stack
 #   make down      # stop and remove containers
@@ -19,6 +26,7 @@ NAMESPACE   ?= nemoclaw
 RELEASE     ?= nemoclaw
 CHART       := deploy/helm/nemoclaw
 PLATFORM    ?= linux/arm64   # override: linux/amd64 or linux/arm64,linux/amd64
+VALUES      ?=               # optional extra helm values file, e.g. values.prod.yaml
 
 BACKEND_IMAGE := $(REGISTRY)/nemoclaw-backend:$(TAG)
 GATEWAY_IMAGE := $(REGISTRY)/nemoclaw-gateway:$(TAG)
@@ -79,6 +87,7 @@ deploy:
 	helm upgrade --install $(RELEASE) $(CHART) \
 	  --namespace $(NAMESPACE) \
 	  --create-namespace \
+	  $(if $(VALUES),-f $(VALUES)) \
 	  --set global.registry=$(REGISTRY) \
 	  --set global.tag=$(TAG) \
 	  --wait
