@@ -90,12 +90,14 @@ New FastAPI app, run **on the host** with the repo's uv environment. Not in dock
 
 - **Bind:** `TERMINAL_BIND:TERMINAL_PORT`, default `127.0.0.1:8005`. On a Linux host with a containerized gateway, `host.docker.internal` (`host-gateway`) resolves to the **docker bridge IP**, from which a loopback bind is unreachable — set `TERMINAL_BIND` to the bridge address (typically `172.17.0.1`) there. That address is still host-internal (containers + host only). Never bind a LAN-facing interface.
 - **Auth:** requires env `TERMINAL_TOKEN` (refuses to start without it). Every WS handshake must carry `Authorization: Bearer <token>`; mismatch → close with policy violation before spawning anything.
-- **Endpoint `WS /ws`:** on accept, spawn `/bin/bash -l` in a new PTY:
+- **Mode (ADR-013):** `TERMINAL_MODE` selects what's spawned onto the PTY — `shell` (default) or `restricted`.
+- **Endpoint `WS /ws`, `shell` mode:** on accept, spawn `/bin/bash -l` in a new PTY:
   - user: the invoking user (the lab operator account that owns `~/.local/bin/nemoclaw` etc. — a login shell so `~/.local/bin` lands on `PATH`),
   - cwd: repo root,
   - env: inherit + `TERM=xterm-256color`,
   - then pump bidirectionally between the PTY fd and the WebSocket (stdlib `pty`/`os` + `loop.add_reader`, or an equivalent async pump).
-- **Lifecycle:** WS closed → `SIGHUP`+terminate the child process group; child exits → send `{"type":"exit","code":N}` text frame, then close the WS. No session persistence, no multiplexing — one WS, one PTY, one shell.
+- **Endpoint `WS /ws`, `restricted` mode (ADR-013, M9):** spawns `python -m services.terminal.console` instead of a shell. Requires `SANDBOX_NAME` (the tenant's sandbox — fails fast at `create_app()` time, like `TERMINAL_TOKEN`). The console presents a fixed 6-item menu (`SOUL.md`, `AGENTS.md`, 4 skills); every sandbox path is hardcoded, every subprocess call uses a literal argv list. See `services/terminal/console.py` and ADR-013 for the full design. One daemon process per tenant (`deploy/scripts/run-terminal-tenant.sh`), never shared across tenants.
+- **Lifecycle:** WS closed → `SIGHUP`+terminate the child process group; child exits → send `{"type":"exit","code":N}` text frame, then close the WS. No session persistence, no multiplexing — one WS, one PTY, one shell (or console).
 - **Health:** `GET /healthz` (no auth) → `{"status":"ok"}`, consistent with the other services.
 
 ## 5. Gateway changes (`services/gateway/`)
@@ -138,19 +140,23 @@ New FastAPI app, run **on the host** with the repo's uv environment. Not in dock
 
 ## 7. Security model
 
-**Threat:** this is a full interactive shell on the lab host, as the lab user, reachable from the dashboard origin. Anyone who can open the dashboard can run anything the lab user can.
+**Threat (`shell` mode):** this is a full interactive shell on the lab host, as the lab user, reachable from the dashboard origin. Anyone who can open the dashboard can run anything the lab user can.
 
 **Posture:** that is the *same trust boundary* as the existing Approve/Deny remediation buttons — the lab's current model is "whoever reaches port 8001 is the operator", and access is via a private network / SSH tunnel. Accepted for this single-operator demo lab, with these mandatory mitigations:
 
 1. Daemon binds a host-local address only — loopback by default, or the docker bridge IP where the containerized gateway must reach it (§4); port 8005 is never published, port-forwarded, or firewalled open.
 2. Gateway↔daemon bearer token, injected server-side; the browser never sees it. This prevents anything that can merely *reach* port 8005's host from using the daemon without the token, and keeps the daemon unusable if it is ever accidentally exposed.
 3. Feature is off unless explicitly configured (§5.1), with `TERMINAL_ENABLED=0` as a hard kill switch.
-4. **The M9 shared/multi-user deployment MUST run with the terminal disabled.** Re-enabling it there requires real per-user authentication and audit, which is explicitly out of scope here.
+4. **`shell` mode MUST never run in the M9 shared/multi-tenant deployment** — it has no per-tenant isolation and no per-user auth.
 5. No terminal input/output recording in v1 — flagged as a consequence in ADR-012, revisit if the lab is ever used unattended.
+
+**`restricted` mode (ADR-013, M9):** a different threat model, not a mitigation of the one above. There is no shell process at all — the PTY's occupant is a fixed 6-item menu (`services/terminal/console.py`) plus, transiently, `vim -Z` (restricted vim: no `:!`, `:sh`, suspend, or writing another file). Every sandbox path is a compile-time constant and every subprocess call is a literal argv list, so there is no command-injection surface to defend. Isolation is per-tenant at the process level: one daemon, one token, one target sandbox per tenant (`deploy/scripts/run-terminal-tenant.sh`) — reaching one tenant's daemon never exposes another's. This mode, and only this mode, is permitted in the M9 deployment; see ADR-013 for the full design and its residual risks (vim `-Z`'s guarantees are a well-established convention, not a sandboxed process boundary).
 
 ## 8. Agent-configuration workflows this enables
 
 The stated purpose is configuring the NemoClaw agent. The canonical flows, all inside the panel:
+
+**`shell` mode (dev):**
 
 - **Edit the agent persona/skills (inside the sandbox):**
   `nemoclaw infra-sentinel connect` → `nano /sandbox/.openclaw/workspace/SOUL.md` (or `skills/<skill>/SKILL.md`) → save, `exit` → `nemoclaw infra-sentinel recover` to restart the agent gateway with the new persona.
@@ -158,15 +164,18 @@ The stated purpose is configuring the NemoClaw agent. The canonical flows, all i
   edit under `openclaw/` in the repo checkout, then `nemoclaw infra-sentinel upload openclaw/SOUL.md /sandbox/.openclaw/workspace/SOUL.md`.
 - **Sandbox lifecycle / diagnostics:** `nemoclaw list`, `nemoclaw infra-sentinel status|doctor|logs --follow|recover`, `openshell sandbox list`, `nemoclaw infra-sentinel policy-list` etc.
 
+**`restricted` mode (M9, ADR-013):** connecting *is* the menu — no `connect` step, no free-form commands. Pick 1–6, edit in `vim -Z`, save+exit; the console runs the download/upload (or skill install) automatically and prints the result.
+
 Cross-reference: the parked per-pack persona plan (`docs/PACK-EXPANSION-PLAN.md`, Part A) expects SOUL.md/SKILL.md to be **hand-configured per pack** — this terminal is the intended tool for that workflow.
 
 ## 9. Out of scope (v1)
 
 - Multiple tabs / concurrent sessions per browser.
-- Auto-connecting into the sandbox (the session starts as a host shell; the operator runs `connect` themselves).
 - Session persistence across reloads (tmux wrapper noted as optional enhancement).
 - Recording/auditing terminal input.
-- Per-user authentication (prerequisite for any shared deployment — see §7).
+- Per-user authentication *within* a tenant (each tenant's `restricted`-mode console is still one shared token for that tenant, per ADR-013 — isolation is per-tenant, not per-individual-operator).
+
+Delivered since the original v1 (ADR-013, `restricted` mode only): auto-connecting into the sandbox, and a hard command allowlist.
 
 ## 10. Verification plan (for the implementation phase)
 

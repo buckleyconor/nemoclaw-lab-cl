@@ -156,7 +156,8 @@ uv run pytest tests/e2e/      # end-to-end (requires running stack)
 | M6 NemoClaw agent integration (v0.0.70) | ✅ Complete |
 | M7 Lab guide + welcome page (multi-vertical) | ✅ Complete |
 | M8 Extensibility: second pack (laptop-fleet) | ✅ Complete |
-| M9 Prod hardening (Kubernetes, 30 users) | ⬜ Planned |
+| M9 Prod hardening (Kubernetes, 30 users) | ⬜ Planned — terminal sub-scope resolved by ADR-013 (M13); in-cluster agent/sandbox story still deferred (ADR-011(g)) |
 | M10 LLM-driven skill-calling agent (ADR-010) | ✅ Complete — validated live against vLLM/Qwen tool-calling |
 | M11 Real NemoClaw/OpenClaw agent runtime (ADR-011) | 🚧 Implemented — spike partially validated (MCP interop, plugin manifest, docs-level unknowns); live sandbox run blocked on Intel-Mac host (OpenShell has no macOS x86_64 assets), needs a supported host |
 | M12 Embedded operator terminal (ADR-012) | 🚧 Implemented — daemon + proxy + panel verified end-to-end host-side; the in-container gateway→daemon hop needs a ufw allow rule on this host (SPEC §6) |
+| M13 Restricted per-tenant terminal for M9 (ADR-013) | 🚧 Implemented — `TERMINAL_MODE=restricted` console + per-tenant daemon script + Helm secret/values; live end-to-end verification against a real sandbox still outstanding |

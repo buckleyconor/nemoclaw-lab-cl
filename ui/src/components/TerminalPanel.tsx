@@ -204,16 +204,14 @@ export function TerminalPanel() {
           )}
         </div>
 
-        {/* Terminal well */}
-        <div
-          ref={bodyRef}
-          style={{
-            flex: 1,
-            minHeight: 0,
-            background: "#0f1624",
-            padding: "8px 0 0 10px",
-          }}
-        />
+        {/* Terminal well. The padding lives on this outer wrapper, not on the
+            div xterm attaches to (bodyRef) — FitAddon measures padding on the
+            terminal's own root element, not its parent, so padding set on
+            bodyRef itself is invisible to its row/col math and clips the
+            last row by exactly that many pixels. */}
+        <div style={{ flex: 1, minHeight: 0, background: "#0f1624", padding: "8px 0 0 10px" }}>
+          <div ref={bodyRef} style={{ width: "100%", height: "100%" }} />
+        </div>
       </section>
     </div>
   );

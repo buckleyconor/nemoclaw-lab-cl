@@ -45,6 +45,16 @@ spec:
         - port: {{ .Values.openclawHook.egressPort }}
           protocol: TCP
     {{- end }}
+    {{- if and .Values.terminal.wsUrl .Values.terminal.token }}
+    # Restricted operator terminal (ADR-013) — this tenant's dedicated daemon
+    # process also lives on the external agent host, outside the cluster.
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.terminal.egressCidr }}
+      ports:
+        - port: {{ .Values.terminal.egressPort }}
+          protocol: TCP
+    {{- end }}
 ---
 # Orchestrator: ingress from gateway only + egress to simulator
 apiVersion: networking.k8s.io/v1

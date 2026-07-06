@@ -106,10 +106,15 @@ down:
 logs:
 	docker compose logs -f
 
-# ── Host processes (not Compose services — ADR-011/ADR-012) ──────────────────
+# ── Host processes (not Compose services — ADR-011/ADR-012/ADR-013) ──────────
 
 terminal:
 	./deploy/scripts/run-terminal.sh
+
+# M9 (Kubernetes, 30 tenants): one restricted-console terminal daemon per
+# tenant. Usage: make terminal-tenant TENANT=acme SANDBOX_NAME=acme-sandbox PORT=8006
+terminal-tenant:
+	./deploy/scripts/run-terminal-tenant.sh "$(TENANT)" "$(SANDBOX_NAME)" "$(PORT)"
 
 hook-relay:
 	./deploy/scripts/hook-relay.py

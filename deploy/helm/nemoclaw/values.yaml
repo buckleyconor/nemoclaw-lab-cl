@@ -128,6 +128,18 @@ openclawHook:
   egressCidr: "0.0.0.0/0"
   egressPort: 18790
 
+# ── Restricted operator terminal (ADR-013, M9) ──────────────────────────────
+# Each tenant gets its own dedicated terminal-daemon process on the external
+# agent host (deploy/scripts/run-terminal-tenant.sh), running
+# TERMINAL_MODE=restricted — a locked-down menu (SOUL.md/AGENTS.md/skills
+# edit-and-push only, services/terminal/console.py), never a full shell.
+# Empty url/token = disabled, same fail-safe posture as openclawHook.
+terminal:
+  wsUrl: ""          # e.g. ws://agent-host.lab:8006/ws (this tenant's port)
+  token: ""          # bearer token; rendered into a Secret, never a ConfigMap
+  egressCidr: "0.0.0.0/0"
+  egressPort: 8006
+
 # ── ServiceAccount (minimal RBAC — no K8s API access needed) ────────────────
 serviceAccount:
   create: true

@@ -10,6 +10,13 @@ host-local address only (loopback, or the docker bridge IP so the
 containerized Gateway can reach it — see run-terminal.sh); requires
 TERMINAL_TOKEN. See docs/SPEC-EMBEDDED-TERMINAL.md §4.
 
+TERMINAL_MODE selects what's spawned onto the PTY:
+  "shell" (default)   full login shell (`/bin/bash -l`) — local dev (M12).
+  "restricted"         `services.terminal.console`'s locked-down edit menu —
+                       the M9 30-tenant Kubernetes deployment (ADR-013).
+                       Requires SANDBOX_NAME; one daemon process per tenant
+                       (deploy/scripts/run-terminal-tenant.sh).
+
 Wire protocol (per connection — one WS, one PTY, one shell):
   binary frames        raw terminal bytes, both directions
   text  frames (in)    {"type": "resize", "cols": C, "rows": R}
@@ -27,6 +34,7 @@ import secrets
 import signal
 import struct
 import subprocess
+import sys
 import termios
 from pathlib import Path
 
@@ -53,8 +61,25 @@ def _authorized(ws: WebSocket, token: str) -> bool:
     return scheme.lower() == "bearer" and secrets.compare_digest(presented, token)
 
 
+def _require_sandbox_name() -> None:
+    """Restricted mode (ADR-013) needs a fixed target sandbox — fail fast, like the token."""
+    if not os.environ.get("SANDBOX_NAME", ""):
+        raise RuntimeError(
+            "TERMINAL_MODE=restricted requires SANDBOX_NAME to be set — refusing to "
+            "start. See deploy/scripts/run-terminal-tenant.sh."
+        )
+
+
+def _shell_argv() -> list[str]:
+    """The command spawned onto the PTY: a full login shell, or the restricted
+    operator console (ADR-013) when TERMINAL_MODE=restricted."""
+    if os.environ.get("TERMINAL_MODE", "shell") == "restricted":
+        return [sys.executable, "-m", "services.terminal.console"]
+    return ["/bin/bash", "-l"]
+
+
 def _spawn_shell() -> tuple[subprocess.Popen[bytes], int]:
-    """Spawn `bash -l` in a fresh PTY; return (process, master fd)."""
+    """Spawn the session command (see `_shell_argv`) in a fresh PTY; return (process, master fd)."""
     master_fd, slave_fd = os.openpty()
 
     def _become_session_leader() -> None:
@@ -65,7 +90,7 @@ def _spawn_shell() -> tuple[subprocess.Popen[bytes], int]:
 
     try:
         proc = subprocess.Popen(
-            ["/bin/bash", "-l"],
+            _shell_argv(),
             stdin=slave_fd,
             stdout=slave_fd,
             stderr=slave_fd,
@@ -150,6 +175,8 @@ def _terminate_session(proc: subprocess.Popen[bytes]) -> None:
 
 def create_app(token: str | None = None) -> FastAPI:
     resolved_token = token or _require_token()
+    if os.environ.get("TERMINAL_MODE", "shell") == "restricted":
+        _require_sandbox_name()
 
     app = FastAPI(
         title="NemoClaw Terminal Daemon",
