@@ -1,3 +1,4 @@
+# Scenario: MPI process crash — rank failure aborts a Slurm batch job
 id: scn-mpi-process-crash
 pack_id: hpc-cluster
 target_asset: hpc-node-01
@@ -10,10 +11,13 @@ emit:
     message_id: "HPC.1.0.MPICrash"
   log_entries:
     - severity: Warning
-      message: "MPI process rank 0 terminated abnormally — scaffold placeholder"
+      message: "MPI process crash: rank 0 (hpc-node-01) terminated abnormally on signal 11 (Segmentation fault)"
+    - severity: Warning
+      message: "Slurm job 48213 aborted — all ranks torn down after rank 0 failure"
 
 log_bundle_ref: bundles/scn-mpi-process-crash.log
 
+# Canonical error signatures used for deterministic KB fallback.
 error_signatures:
   - "MPI process crash"
   - "terminated abnormally"
@@ -22,6 +26,13 @@ kb_article_ref: kb/KB500001.md
 
 remediation_steps:
   - id: collect_core_dump
-    label: "Collect core dump from /var/crash"
+    label: "Collect core dump and job logs from /var/crash"
   - id: requeue_job
     label: "Requeue the failed MPI job via Slurm"
+  - id: verify_node_health
+    label: "Run node health check before returning node to the queue"
+impact:
+  summary: "Crash evidence (core dump, MPI/Slurm logs) will be preserved, the job requeued from its last checkpoint, and the node health-checked before it accepts new work."
+  workload_impact: "The failed job restarts from its last checkpoint — compute time since that checkpoint is lost. Other jobs on the node are unaffected unless the health check fails."
+  service_risk: "Low for a single crash — likely an application fault. Repeated crashes of different applications on the same node indicate a node hardware/software fault and drain the node from the queue."
+  estimated_duration: "~10 minutes triage + job requeue; scheduler backfill determines restart time"

@@ -1,3 +1,4 @@
+# Scenario: Fabric link down — leaf uplink to spine loses carrier
 id: scn-fabric-link-down
 pack_id: network-fabric
 target_asset: leaf-01
@@ -10,10 +11,13 @@ emit:
     message_id: "NET.1.0.LinkDown"
   log_entries:
     - severity: Critical
-      message: "Link down detected on Ethernet1/1 — scaffold placeholder"
+      message: "Link down detected on Ethernet1/1 — uplink leaf-01 to spine-01 lost carrier"
+    - severity: Warning
+      message: "BGP session to spine-01 (10.0.0.1) moved to Idle — fabric capacity degraded"
 
 log_bundle_ref: bundles/scn-fabric-link-down.log
 
+# Canonical error signatures used for deterministic KB fallback.
 error_signatures:
   - "link down"
   - "LinkDown"
@@ -22,6 +26,13 @@ kb_article_ref: kb/KB200001.md
 
 remediation_steps:
   - id: check_cable
-    label: "Inspect physical cable on Ethernet1/1"
+    label: "Inspect physical cable and optics on Ethernet1/1"
   - id: bounce_interface
     label: "Bounce the interface to re-negotiate link"
+  - id: verify_convergence
+    label: "Verify link state, LLDP neighbor, and BGP reconvergence"
+impact:
+  summary: "Physical layer on the affected uplink will be inspected, the interface bounced to force renegotiation, and fabric routing convergence re-verified."
+  workload_impact: "None expected — traffic has already rerouted over the remaining ECMP uplinks. A brief sub-second reconvergence blip may occur when the link returns."
+  service_risk: "Fabric is running with reduced spine uplink capacity until the link is restored; a second uplink failure on the same leaf would isolate its rack."
+  estimated_duration: "~10 minutes (longer if optics/cable replacement is required)"

@@ -20,6 +20,7 @@ import {
   noRegisteredFaultError,
   postActivity,
   recordKbResult,
+  recordSignature,
   registerFaultFromLogs,
 } from "./harness.js";
 import { callMcpTool, type ExposedMcpTool } from "./mcp.js";
@@ -144,6 +145,10 @@ export default defineToolPlugin({
       async execute({ signature, fallback_kb_id }, config) {
         const gw = gatewayUrl(config);
         const inv = currentInvestigation();
+        // Persist the extracted signature *before* the search runs — the
+        // Operator Dashboard's ERROR SIGNATURE card populates first, while
+        // KNOWLEDGE BASE still shows "Searching…" (staged population order).
+        await recordSignature(gw, signature);
         // Only narrate the search itself the first time — a repeat wake-up
         // that re-runs kb_search for an already-diagnosed fault shouldn't
         // spam the same "performing search" / "matched KBxxx" lines.

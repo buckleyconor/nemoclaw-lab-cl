@@ -26,6 +26,15 @@
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-font-smoothing:antialiased;}
 
+/* ── DISCLAIMER BANNER ────────────────────────────────────────── */
+.disclaimer-banner{
+  display:flex;align-items:center;justify-content:center;text-align:center;
+  padding:6px 16px;background:#1a1408;color:#f3c74e;
+  border-bottom:1px solid rgba(243,199,78,.35);
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.02em;line-height:1.3;
+  flex-shrink:0;
+}
+
 /* ── PAGE ─────────────────────────────────────────────────────── */
 .page{display:flex;flex-direction:column;min-height:100vh;}
 
@@ -142,6 +151,9 @@ footer{padding:24px;text-align:center;border-top:1px solid var(--border);color:v
 </head>
 <body>
 <div class="page">
+
+  <!-- DISCLAIMER -->
+  <div class="disclaimer-banner">Technical demonstration only. The features shown in this lab are an "art of the possible" exploration and do not represent any current or future planned Dell product or feature.</div>
 
   <!-- HERO -->
   <header class="hero">

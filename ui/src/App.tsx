@@ -132,13 +132,17 @@ export default function App() {
     setSelectedFaultId(fault?.id ?? null);
   }
 
-  // ── Persistent cluster status bar ──────────────────────────────────────────
+  // ── Persistent fleet status bar ─────────────────────────────────────────────
+  // "Cluster" isn't right for every pack (a laptop fleet isn't a cluster) —
+  // derive a noun from fleet_label ("Cluster Health" -> "Cluster", "Fleet
+  // Health" -> "Fleet") rather than hardcoding one pack's wording.
+  const fleetNoun = pack?.fleet_label?.replace(/\s+Health$/i, "") || "Fleet";
   const statusBar = hasActiveFault
     ? {
         border: "1px solid rgba(249,115,22,.45)",
         icon: "⚠",
         iconColor: "#f97316",
-        title: "Cluster issue detected",
+        title: `${fleetNoun} issue detected`,
         titleColor: "#f97316",
         body: "— Sentinel Agent investigating, please see Operator Dashboard for issue and remediation",
       }
@@ -147,7 +151,7 @@ export default function App() {
         border: "1px solid rgba(239,68,68,.35)",
         icon: "⚠",
         iconColor: "#ef4444",
-        title: "Cluster partially degraded",
+        title: `${fleetNoun} partially degraded`,
         titleColor: "#ef4444",
         body: "— self-heal remediation denied. Click a faulted node to review and resolve.",
       }
@@ -167,7 +171,7 @@ export default function App() {
           <div className="app-status-dot" title="System live" />
           <span className="app-logo-bar">DELL × NVIDIA</span>
           <span style={{ color: "var(--border-strong)" }}>|</span>
-          <span className="app-title">AI Infrastructure Sentinel</span>
+          <span className="app-title">{pack?.sentinel_name ?? "Infrastructure Sentinel"}</span>
           {pack && <span className="app-pack-label">{pack.name}</span>}
         </div>
         <NotificationInbox
@@ -194,9 +198,9 @@ export default function App() {
         <div className="top-row">
           <div>
             <div className="section-heading">{pack?.fleet_label ?? "Fleet Health"}</div>
-            <FleetGrid assets={assets} pack={pack} onSelectAsset={handleAssetSelect} />
+            <FleetGrid assets={assets} pack={pack} onSelectAsset={handleAssetSelect} idle={!hasActiveFault} />
           </div>
-          <ActivityFeed events={activity} />
+          <ActivityFeed events={activity} idle={!hasActiveFault} />
         </div>
 
         {/* Operator Dashboard — always visible; idle shell when nothing to show */}

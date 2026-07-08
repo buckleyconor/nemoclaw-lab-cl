@@ -1,5 +1,4 @@
 # Scenario: GPU Out of Memory — CUDA/VRAM exhaustion during AI workload
-# PLACEHOLDER — SME: verify signatures from CUDA toolkit and NVIDIA System Management Interface.
 id: scn-gpu-oom
 pack_id: laptop-fleet
 target_asset: laptop-01

@@ -63,6 +63,15 @@ async def get_pack(request: Request) -> dict:
         "asset_noun": {"singular": pack.asset_noun.singular, "plural": pack.asset_noun.plural},
         "fleet_label": pack.fleet_label,
         "theme": pack.theme,
+        "sentinel_name": pack.sentinel_name,
+        "asset_image_url": pack.asset_image_url,
+        "asset_spec_label": pack.asset_spec_label,
+        "fleet_layout": pack.fleet_layout,
+        # {asset_id: display_name} — only assets with an explicit display_name
+        # are included; the UI falls back to the raw id for the rest.
+        "asset_display_names": {
+            a.id: a.display_name for a in pack.assets if a.display_name
+        },
     }
 
 
@@ -152,6 +161,79 @@ def _impact_for_scenario(request: Request, scenario_id: str, asset_id: str,
     )
 
 
+_MAX_STEP_DETAIL_CHARS = 160
+
+
+def _kb_step_detail(body_md: str, step_id: str) -> str | None:
+    """First prose sentence of the KB article's `### Step N — … (`step_id`)` section.
+
+    The pack KB articles tag each resolution-step heading with its step id in
+    backticks; the line(s) immediately after the heading explain what the step
+    does before the first code block. Returns None when the article doesn't
+    follow that structure — callers fall back to the scenario's plain label.
+    """
+    lines = body_md.splitlines()
+    heading_idx = next(
+        (
+            i
+            for i, ln in enumerate(lines)
+            if ln.lstrip().startswith("###") and f"(`{step_id}`)" in ln
+        ),
+        None,
+    )
+    if heading_idx is None:
+        return None
+    for ln in lines[heading_idx + 1:]:
+        s = ln.strip()
+        if not s:
+            continue
+        if s.startswith(("#", "```", "|", ">")):
+            break  # next section / code / table before any prose — give up
+        # Accept a plain paragraph or the first list item.
+        s = s.lstrip("-*0123456789. ").strip()
+        if not s:
+            continue
+        sentence = s.split(". ")[0].rstrip(".:").strip()
+        # Drop a dangling connective when the sentence led into a code block
+        # ("Confirm with the owner, then:" → "Confirm with the owner").
+        if sentence.endswith(" then"):
+            sentence = sentence[: -len(" then")].rstrip(",;: ")
+        if not sentence:
+            break
+        if len(sentence) > _MAX_STEP_DETAIL_CHARS:
+            sentence = sentence[: _MAX_STEP_DETAIL_CHARS - 1].rstrip(",;: ") + "…"
+        return sentence
+    return None
+
+
+def _step_labels_for_scenario(request: Request, scenario_id: str) -> list[str]:
+    """Proposed-remediation labels for the Operator Dashboard.
+
+    Base labels come from the scenario; each is enriched with the opening
+    sentence of the matching resolution step in the scenario's own KB article
+    ("<label> — <what the step actually does>"), so the dashboard's proposed
+    steps read like the KB runbook rather than terse step names.
+    """
+    loaded = request.app.state.loaded_pack
+    scenario = loaded.scenarios_by_id.get(scenario_id)
+    if scenario is None:
+        return []
+    labels = [s.label for s in scenario.remediation_steps]
+    kb_id = scenario.kb_article_ref.rsplit("/", 1)[-1].removesuffix(".md")
+    article = loaded.kb_articles.get(kb_id)
+    if article is None:
+        return labels
+    out: list[str] = []
+    for step in scenario.remediation_steps:
+        detail = _kb_step_detail(article.body_md, step.id)
+        if detail is None:
+            out.append(step.label)
+        else:
+            period = "" if detail.endswith("…") else "."
+            out.append(f"{step.label} — {detail}{period}")
+    return out
+
+
 @router.get("/api/faults")
 async def list_faults(request: Request) -> dict:
     store = _store(request)
@@ -179,9 +261,7 @@ async def create_fault(body: CreateFaultRequest, request: Request) -> dict:
     store = _store(request)
     step_labels = body.remediation_step_labels
     if not step_labels:
-        scenario = request.app.state.loaded_pack.scenarios_by_id.get(body.scenario_id)
-        if scenario is not None:
-            step_labels = [s.label for s in scenario.remediation_steps]
+        step_labels = _step_labels_for_scenario(request, body.scenario_id)
     evt = await store.create_fault_event(
         scenario_id=body.scenario_id,
         asset_id=body.asset_id,

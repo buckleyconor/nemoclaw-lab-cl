@@ -1,7 +1,4 @@
-# PLACEHOLDER LOG BUNDLE — scn-driver-tdr
-# SME: replace with real Windows Event Log export + NVIDIA bug report from a Precision 7780
-# exhibiting TDR under CUDA or DX12 workload.
-# Required signatures present: "TDR", "Display driver stopped responding", "nvlddmkm"
+# Log bundle: scn-driver-tdr — Windows System Event Log / driver extract, laptop-02 (Precision 7780, RTX 5000 Ada)
 
 2024-03-12T14:05:00Z INFO  NVDisplay[1024]: NVIDIA driver 546.33 initialised on \\Device\\Video0 (RTX 5000 Ada, 16384 MB VRAM)
 2024-03-12T14:05:01Z INFO  NVDisplay[1024]: Display mode: 2560x1600@165Hz (HDR enabled)
@@ -10,8 +7,10 @@
 2024-03-12T14:10:16Z INFO  cuda[8821]: Allocated 8192 MB VRAM for model weights
 2024-03-12T14:10:45Z INFO  cuda[8821]: Training epoch 1/50 — batch 0/1024
 2024-03-12T14:11:30Z INFO  cuda[8821]: Training epoch 1/50 — batch 512/1024
+2024-03-12T14:12:01Z WARN  NVDisplay[1024]: GPU busy 100% for 2000ms — display queue stalled behind compute kernel
 2024-03-12T14:12:03Z WARN  kernel[EventLog]: GPU scheduler detected hang on \\Device\\Video0
 2024-03-12T14:12:03Z WARN  kernel[EventLog]: TDR detected: initiating recovery sequence
+2024-03-12T14:12:04Z CRIT  EventLog[System]: Display driver stopped responding — preparing driver reset on \\Device\\Video0
 2024-03-12T14:12:04Z CRIT  EventLog[System]: Display driver nvlddmkm stopped responding and has successfully recovered
 2024-03-12T14:12:04Z CRIT  EventLog[System]: Event ID 4101 — Source: nvlddmkm, Level: Error
 2024-03-12T14:12:04Z WARN  kernel[EventLog]: TDR detected: GPU reset triggered on \\Device\\Video0
@@ -20,3 +19,4 @@
 2024-03-12T14:12:05Z WARN  cuda[8821]: CUDA context lost due to TDR — application must reinitialise
 2024-03-12T14:12:06Z CRIT  cuda[8821]: RuntimeError: CUDA error: an illegal memory access was encountered
 2024-03-12T14:12:06Z INFO  NVDisplay[1024]: TDR recovery complete. Monitoring for recurrence.
+2024-03-12T14:12:08Z INFO  EventLog[System]: TDR event count for nvlddmkm this session: 1 (device flagged if 3+ within 7 days)

@@ -4,6 +4,7 @@ import plugin from "./index.js";
 import {
   registerFaultFromLogs,
   recordKbResult,
+  recordSignature,
   resetInvestigation,
   currentInvestigation,
   noRegisteredFaultError,
@@ -112,6 +113,33 @@ describe("harness side-work", () => {
     expect(statusPatch?.body).toEqual({ status: "diagnosing" });
   });
 
+  it("uses the Orchestrator's log_highlight as log_extract when present (Operator Dashboard evidence)", async () => {
+    const bundle = {
+      log_text: "# comment\nlots of routine INFO chatter that isn't the fault\nline2",
+      log_highlight: "2026-07-07T09:23:40Z CRIT kernel: Xid 79 fault on gpu-01",
+      scenario_id: "scn-1",
+      asset_id: "gpu-01",
+    };
+    await registerFaultFromLogs(gatewayUrl, bundle);
+
+    const posts = calls.filter((c) => c.url.endsWith("/api/faults") && c.method === "POST");
+    expect(posts[0].body.log_extract).toBe(
+      "2026-07-07T09:23:40Z CRIT kernel: Xid 79 fault on gpu-01",
+    );
+  });
+
+  it("falls back to slicing log_text when log_highlight is absent", async () => {
+    const bundle = {
+      log_text: "line1\nline2\nline3",
+      scenario_id: "scn-1",
+      asset_id: "gpu-01",
+    };
+    await registerFaultFromLogs(gatewayUrl, bundle);
+
+    const posts = calls.filter((c) => c.url.endsWith("/api/faults") && c.method === "POST");
+    expect(posts[0].body.log_extract).toBe("line1\nline2\nline3");
+  });
+
   it("passes error payloads through without registering", async () => {
     const result = await registerFaultFromLogs(gatewayUrl, { status: "error", error: "http_404" });
     expect(result.fault_event_id).toBeUndefined();
@@ -131,6 +159,42 @@ describe("harness side-work", () => {
       kb_article_id: "KB000123",
       kb_score: 0.92,
     });
+  });
+
+  it("persists the signature before the KB match as its own PATCH (staged dashboard order)", async () => {
+    await registerFaultFromLogs(gatewayUrl, {
+      log_text: "x", scenario_id: "scn-1", asset_id: "gpu-01",
+    });
+    await recordSignature(gatewayUrl, "Xid 79");
+    expect(currentInvestigation()?.signatureRecorded).toBe(true);
+
+    let diagPatches = calls.filter((c) => c.url.includes("/diagnosis"));
+    expect(diagPatches).toHaveLength(1);
+    expect(diagPatches[0].body).toEqual({ error_signature: "Xid 79" });
+
+    await recordKbResult(gatewayUrl, "Xid 79", {
+      kb_id: "KB000123", title: "GPU Xid 79", score: 0.92, via: "faiss",
+    });
+    diagPatches = calls.filter((c) => c.url.includes("/diagnosis"));
+    expect(diagPatches).toHaveLength(2);
+    // The KB PATCH must not re-send the signature — it landed in PATCH #1.
+    expect(diagPatches[1].body).toEqual({
+      kb_article_id: "KB000123",
+      kb_title: "GPU Xid 79",
+      kb_score: 0.92,
+    });
+  });
+
+  it("recordSignature is idempotent and a no-op before evidence exists", async () => {
+    await recordSignature(gatewayUrl, "Xid 79"); // no investigation yet
+    expect(calls.filter((c) => c.url.includes("/diagnosis"))).toHaveLength(0);
+
+    await registerFaultFromLogs(gatewayUrl, {
+      log_text: "x", scenario_id: "scn-1", asset_id: "gpu-01",
+    });
+    await recordSignature(gatewayUrl, "Xid 79");
+    await recordSignature(gatewayUrl, "Xid 79"); // repeat wake-up
+    expect(calls.filter((c) => c.url.includes("/diagnosis"))).toHaveLength(1);
   });
 
   it("refuses narration before evidence exists", () => {

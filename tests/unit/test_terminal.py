@@ -122,6 +122,129 @@ def test_daemon_restricted_mode_console_menu_edit_and_push_over_the_wire(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Terminal daemon — POST /reset (non-interactive equivalent of console option 7)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_daemon_reset_route_absent_in_shell_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("TERMINAL_MODE", raising=False)
+    client = TestClient(create_daemon_app(token="secret"))
+    resp = client.post("/reset", headers={"Authorization": "Bearer secret"})
+    assert resp.status_code == 404
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {},
+        {"Authorization": "Bearer wrong"},
+    ],
+)
+def test_daemon_reset_requires_auth_in_restricted_mode(
+    monkeypatch: pytest.MonkeyPatch, headers: dict[str, str]
+) -> None:
+    monkeypatch.setenv("TERMINAL_MODE", "restricted")
+    monkeypatch.setenv("SANDBOX_NAME", "nemoclaw-lab")
+    client = TestClient(create_daemon_app(token="secret"))
+    resp = client.post("/reset", headers=headers)
+    assert resp.status_code == 401
+
+
+def test_daemon_reset_calls_run_reset_with_loaded_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import services.terminal.main as terminal_main
+
+    monkeypatch.setenv("TERMINAL_MODE", "restricted")
+    monkeypatch.setenv("SANDBOX_NAME", "nemoclaw-lab")
+
+    calls: list[object] = []
+
+    def fake_run_reset(config: object) -> bool:
+        calls.append(config)
+        return True
+
+    monkeypatch.setattr(terminal_main.console, "run_reset", fake_run_reset)
+
+    client = TestClient(create_daemon_app(token="secret"))
+    resp = client.post("/reset", headers={"Authorization": "Bearer secret"})
+
+    assert resp.status_code == 200
+    assert resp.json() == {"ok": True}
+    assert len(calls) == 1
+    assert calls[0].sandbox_name == "nemoclaw-lab"  # type: ignore[attr-defined]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Terminal daemon — POST /switch-pack (automated pack switching)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {},
+        {"Authorization": "Bearer wrong"},
+    ],
+)
+def test_daemon_switch_pack_requires_auth(headers: dict[str, str]) -> None:
+    client = TestClient(create_daemon_app(token="secret"))
+    resp = client.post("/switch-pack", json={"pack_id": "laptop-fleet"}, headers=headers)
+    assert resp.status_code == 401
+
+
+@pytest.mark.parametrize(
+    "pack_id",
+    ["", "not a real pack", "../../etc/passwd", "UPPER-CASE", "laptop-fleet; rm -rf /"],
+)
+def test_daemon_switch_pack_rejects_malformed_pack_id(pack_id: str) -> None:
+    client = TestClient(create_daemon_app(token="secret"))
+    resp = client.post(
+        "/switch-pack", json={"pack_id": pack_id}, headers={"Authorization": "Bearer secret"}
+    )
+    assert resp.status_code == 400
+
+
+def test_daemon_switch_pack_rejects_unknown_but_validly_shaped_pack_id() -> None:
+    client = TestClient(create_daemon_app(token="secret"))
+    resp = client.post(
+        "/switch-pack",
+        json={"pack_id": "no-such-pack"},
+        headers={"Authorization": "Bearer secret"},
+    )
+    assert resp.status_code == 404
+
+
+def test_daemon_switch_pack_spawns_detached_and_does_not_block(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import services.terminal.main as terminal_main
+
+    calls: list[tuple[list[str], dict[str, object]]] = []
+
+    class FakePopen:
+        def __init__(self, argv: list[str], **kwargs: object) -> None:
+            calls.append((argv, kwargs))
+
+    monkeypatch.setattr(terminal_main.subprocess, "Popen", FakePopen)
+
+    client = TestClient(create_daemon_app(token="secret"))
+    resp = client.post(
+        "/switch-pack",
+        json={"pack_id": "laptop-fleet"},
+        headers={"Authorization": "Bearer secret"},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json() == {"ok": True, "status": "switch-started", "pack_id": "laptop-fleet"}
+    assert len(calls) == 1
+    argv, kwargs = calls[0]
+    assert argv[-1] == "laptop-fleet"
+    assert argv[0].endswith("switch-pack.sh")
+    assert kwargs.get("start_new_session") is True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Terminal daemon — PTY session over the wire protocol
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -204,3 +327,96 @@ def test_gateway_terminal_ws_closed_when_disabled(
         ):
             pass
         assert exc.value.code == 1008
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Gateway — /api/terminal/reset proxy
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_gateway_terminal_reset_disabled_when_unconfigured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("TERMINAL_WS_URL", raising=False)
+    monkeypatch.delenv("TERMINAL_TOKEN", raising=False)
+    with _gateway_client() as client:
+        resp = client.post("/api/terminal/reset")
+        assert resp.json() == {"ok": False, "error": "terminal disabled"}
+
+
+def test_gateway_terminal_reset_forwards_to_daemon_http_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import httpx
+
+    monkeypatch.setenv("TERMINAL_WS_URL", "ws://host.docker.internal:8005/ws")
+    monkeypatch.setenv("TERMINAL_TOKEN", "secret")
+
+    calls: list[tuple[str, dict[str, str] | None]] = []
+
+    class FakeResponse:
+        def json(self) -> dict:
+            return {"ok": True}
+
+    async def fake_post(
+        self: object, url: str, headers: dict | None = None, **_: object
+    ) -> FakeResponse:
+        calls.append((url, headers))
+        return FakeResponse()
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
+
+    with _gateway_client() as client:
+        resp = client.post("/api/terminal/reset")
+
+    assert resp.json() == {"ok": True}
+    assert calls == [("http://host.docker.internal:8005/reset", {"Authorization": "Bearer secret"})]
+
+
+def test_gateway_terminal_switch_pack_disabled_when_unconfigured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("TERMINAL_WS_URL", raising=False)
+    monkeypatch.delenv("TERMINAL_TOKEN", raising=False)
+    with _gateway_client() as client:
+        resp = client.post("/api/terminal/switch-pack", json={"pack_id": "laptop-fleet"})
+        assert resp.json() == {"ok": False, "error": "terminal disabled"}
+
+
+def test_gateway_terminal_switch_pack_forwards_body_to_daemon_http_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import httpx
+
+    monkeypatch.setenv("TERMINAL_WS_URL", "ws://host.docker.internal:8005/ws")
+    monkeypatch.setenv("TERMINAL_TOKEN", "secret")
+
+    calls: list[tuple[str, dict | None, object]] = []
+
+    class FakeResponse:
+        def json(self) -> dict:
+            return {"ok": True, "status": "switch-started", "pack_id": "laptop-fleet"}
+
+    async def fake_post(
+        self: object,
+        url: str,
+        headers: dict | None = None,
+        json: object = None,
+        **_: object,
+    ) -> FakeResponse:
+        calls.append((url, headers, json))
+        return FakeResponse()
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
+
+    with _gateway_client() as client:
+        resp = client.post("/api/terminal/switch-pack", json={"pack_id": "laptop-fleet"})
+
+    assert resp.json() == {"ok": True, "status": "switch-started", "pack_id": "laptop-fleet"}
+    assert calls == [
+        (
+            "http://host.docker.internal:8005/switch-pack",
+            {"Authorization": "Bearer secret"},
+            {"pack_id": "laptop-fleet"},
+        )
+    ]

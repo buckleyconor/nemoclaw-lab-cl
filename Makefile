@@ -31,7 +31,7 @@ VALUES      ?=               # optional extra helm values file, e.g. values.prod
 BACKEND_IMAGE := $(REGISTRY)/nemoclaw-backend:$(TAG)
 GATEWAY_IMAGE := $(REGISTRY)/nemoclaw-gateway:$(TAG)
 
-.PHONY: help build push push-multiarch deploy undeploy up down logs terminal hook-relay test lint
+.PHONY: help build push push-multiarch deploy undeploy up down logs switch-pack terminal hook-relay test lint
 
 help:
 	@echo "Targets:"
@@ -43,6 +43,7 @@ help:
 	@echo "  up             docker compose up --build"
 	@echo "  down           docker compose down"
 	@echo "  logs           docker compose logs -f"
+	@echo "  switch-pack    Restart the stack bound to PACK_ID=<id> (e.g. make switch-pack PACK_ID=laptop-fleet)"
 	@echo "  terminal       Run the embedded-terminal daemon on the host (ADR-012)"
 	@echo "  hook-relay     Relay the OpenClaw wake hook onto the docker bridge (ADR-011)"
 	@echo "  test           uv run pytest"
@@ -105,6 +106,10 @@ down:
 
 logs:
 	docker compose logs -f
+
+switch-pack:
+	@test -n "$(PACK_ID)" || (echo "Usage: make switch-pack PACK_ID=<pack-id>"; exit 1)
+	deploy/scripts/switch-pack.sh $(PACK_ID)
 
 # ── Host processes (not Compose services — ADR-011/ADR-012/ADR-013) ──────────
 

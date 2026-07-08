@@ -1,6 +1,4 @@
-# PLACEHOLDER LOG BUNDLE — scn-ecc-uncorrectable
-# SME: replace with real iDRAC Lifecycle Log + DCGM log from an XE9680 exhibiting HBM ECC DBE.
-# Required signatures present: "ECC uncorrectable error", "DCGM_FI_DEV_ECC_DBE_VOL_TOTAL"
+# Log bundle: scn-ecc-uncorrectable — correlated DCGM / kernel / iDRAC extract, gpu-server-01 (XE9780L, 8x H100 SXM5)
 
 2024-01-16T14:05:00Z INFO  dcgm[1234]: Health monitoring active. 8 GPUs on gpu-server-01.
 2024-01-16T14:05:01Z INFO  dcgm[1234]: ECC mode: enabled on all GPUs. DBE vol counts: all 0.
@@ -8,11 +6,15 @@
 2024-01-16T14:07:30Z INFO  dcgm[1234]: GPU 1: Temp 65°C, Power 310W — within limits
 2024-01-16T14:08:00Z INFO  nvidia-smi[1235]: GPU 1: ECC SBE vol 3, DBE vol 0 — within tolerance
 2024-01-16T14:09:11Z WARN  dcgm[1234]: GPU 1: DCGM_FI_DEV_ECC_SBE_VOL_TOTAL rising: 14 correctable errors in last 60s
-2024-01-16T14:09:45Z CRIT  dcgm[1234]: GPU 1: DCGM_FI_DEV_ECC_DBE_VOL_TOTAL incremented — uncorrectable ECC error detected on HBM bank 3
-2024-01-16T14:09:45Z CRIT  kernel[  904.223187]: NVRM: GPU at PCI:0000:47:00: GPU-5a3f91c2-...
-2024-01-16T14:09:45Z CRIT  kernel[  904.223191]: NVRM: GPU-60ded90b: ECC DBE (double-bit error) in HBM at row 0x3A4C, bank 3
+2024-01-16T14:09:30Z WARN  dcgm[1234]: GPU 1: SBE rate accelerating — 27 correctable errors in last 60s, all HBM bank 3
+2024-01-16T14:09:45Z CRIT  dcgm[1234]: GPU 1: DCGM_FI_DEV_ECC_DBE_VOL_TOTAL incremented — ECC uncorrectable error detected on HBM bank 3
+2024-01-16T14:09:45Z CRIT  kernel[  904.223187]: NVRM: GPU at PCI:0000:47:00: GPU-5a3f91c2-7b8d-4e2f-9a1c-3d5e7f9b1d3f
+2024-01-16T14:09:45Z CRIT  kernel[  904.223191]: NVRM: GPU-5a3f91c2: ECC DBE (double-bit error) in HBM at row 0x3A4C, bank 3
 2024-01-16T14:09:46Z CRIT  dcgm[1234]: GPU1: Uncorrectable ECC error detected on HBM bank 3
 2024-01-16T14:09:46Z ERROR iDRAC[LifecycleLog]: OEM.1.0.MemUCE — GPU 1 HBM uncorrectable ECC error (DBE). Severity: Critical.
+2024-01-16T14:09:46Z ERROR cuda[8802]: training job TRN-3129 aborted: CUDA_ERROR_ECC_UNCORRECTABLE on device 1
 2024-01-16T14:09:47Z WARN  nvidia-smi[1235]: GPU 1: ECC DBE vol 1 — threshold exceeded, marking GPU for retirement
+2024-01-16T14:09:47Z WARN  nvidia-smi[1235]: GPU 1: Remapped Rows — pending: yes (remap scheduled at next reset)
 2024-01-16T14:09:47Z WARN  scheduler[5678]: GPU 1 on gpu-server-01 flagged for memory fault; draining workload
 2024-01-16T14:09:48Z INFO  kubelet[9012]: gpu-server-01: GPU 1 marked unschedulable — ECC fault
+2024-01-16T14:09:50Z INFO  dcgm[1234]: Memory health watch escalated on GPU 1. Node flagged for remediation.

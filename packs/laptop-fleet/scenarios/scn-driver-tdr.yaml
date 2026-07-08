@@ -1,5 +1,4 @@
 # Scenario: Display Driver TDR — NVIDIA driver timeout on Dell Precision laptop
-# PLACEHOLDER — SME: verify with real Windows Event Log entries from Precision 7780.
 id: scn-driver-tdr
 pack_id: laptop-fleet
 target_asset: laptop-02

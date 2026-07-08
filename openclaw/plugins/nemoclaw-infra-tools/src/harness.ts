@@ -21,6 +21,8 @@ export type Investigation = {
   faultId: string;
   scenarioId: string;
   assetId: string;
+  /** true once recordSignature has PATCHed error_signature for this investigation. */
+  signatureRecorded: boolean;
   /** true once recordKbResult has run for this investigation. */
   diagnosed: boolean;
   /** true once remediation_propose has succeeded for this investigation. */
@@ -126,17 +128,34 @@ export async function registerFaultFromLogs(
     const scenarioId = typeof bundle.scenario_id === "string" ? bundle.scenario_id : "";
     const assetId = typeof bundle.asset_id === "string" ? bundle.asset_id : "";
     const logText = bundle.log_text;
+    // The Orchestrator computes log_highlight server-side as a window of
+    // real lines around wherever the scenario's own error signature actually
+    // appears (dated to today, hostname included) — that's what the
+    // Operator Dashboard quotes as evidence, so the operator can check it
+    // against the error signature before approving. Fall back to a raw
+    // slice only if an older Orchestrator hasn't started sending it yet.
+    const logExtract =
+      typeof bundle.log_highlight === "string" && bundle.log_highlight
+        ? bundle.log_highlight
+        : logText.slice(0, 300);
 
     const r = await gatewayFetch(gatewayUrl, "POST", "/api/faults", {
       scenario_id: scenarioId,
       asset_id: assetId,
-      log_extract: logText.slice(0, 300),
+      log_extract: logExtract,
     });
     if (!r.ok) {
       throw new Error(`fault registration failed: HTTP ${r.status}`);
     }
     const fault = (await r.json()) as { id: string };
-    current = { faultId: fault.id, scenarioId, assetId, diagnosed: false, proposed: false };
+    current = {
+      faultId: fault.id,
+      scenarioId,
+      assetId,
+      signatureRecorded: false,
+      diagnosed: false,
+      proposed: false,
+    };
 
     await gatewayFetch(gatewayUrl, "PATCH", `/api/faults/${fault.id}/status`, {
       status: "diagnosing",
@@ -170,6 +189,32 @@ export async function registerFaultFromLogs(
 }
 
 /**
+ * Called with the signature the model extracted from the log bundle, at the
+ * moment it hands that signature to kb_search — i.e. as the log bundle passes
+ * the diagnose stage, *before* the KB search runs. Persisting the signature
+ * in its own PATCH gives the Operator Dashboard its staged population order:
+ * the ERROR SIGNATURE card fills in first while KNOWLEDGE BASE still shows
+ * "Searching…". Idempotent per investigation.
+ */
+export async function recordSignature(
+  gatewayUrl: string,
+  signature: string,
+): Promise<void> {
+  if (current === null || current.diagnosed || current.signatureRecorded) return;
+  if (!signature) return;
+
+  await postActivity(gatewayUrl, current.faultId, "diagnose",
+    `Primary error signature extracted: "${signature}"`);
+  try {
+    await gatewayFetch(gatewayUrl, "PATCH",
+      `/api/faults/${current.faultId}/diagnosis`, { error_signature: signature });
+    current.signatureRecorded = true;
+  } catch {
+    // Display-only; recordKbResult still carries the signature as a fallback.
+  }
+}
+
+/**
  * Called with the kb.search arguments and parsed result. Narrates the KB
  * outcome and persists the diagnosis so the Operator Dashboard renders it.
  * Idempotent per investigation — a repeat wake-up that calls kb_search again
@@ -197,7 +242,9 @@ export async function recordKbResult(
       "No KB article matched — falling back to scenario default remediation steps");
   }
 
-  if (signature) diagnosis.error_signature = signature;
+  // Fallback only — recordSignature normally persisted this already, in its
+  // own earlier PATCH, so the dashboard populates signature before KB match.
+  if (signature && !current.signatureRecorded) diagnosis.error_signature = signature;
   if (Object.keys(diagnosis).length > 0) {
     try {
       await gatewayFetch(gatewayUrl, "PATCH",

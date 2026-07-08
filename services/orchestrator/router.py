@@ -61,6 +61,12 @@ class LogsResponse(BaseModel):
     asset_id: str
     scenario_id: str
     log_text: str
+    # A short, human-scannable window of real lines from log_text, centered on
+    # the line that actually contains the scenario's error signature — see
+    # _extract_highlight. Lets the Operator Dashboard quote authentic evidence
+    # the operator can check the error signature against, rather than
+    # whatever happened to fall in the first N characters of the bundle.
+    log_highlight: str | None = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -94,6 +100,47 @@ def _stamp_today(log_text: str) -> str:
     """Replace every ISO-8601 date in log_text with today's UTC date."""
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     return _DATE_RE.sub(today, log_text)
+
+
+_HIGHLIGHT_CONTEXT_LINES = 2  # lines of context on each side of the matched cluster
+_HIGHLIGHT_CLUSTER_GAP = 6  # max line-gap between matches still counted as the same fault block
+
+def _extract_highlight(log_text: str, error_signatures: list[str]) -> str | None:
+    """A short window of real log lines spanning the signature match cluster.
+
+    Every bundle opens with a `# ...` file comment and several lines of
+    routine INFO chatter before the fault actually fires — naively taking the
+    first N characters (the previous behaviour) never reaches the line that
+    contains the error signature, so an operator "verifying the signature
+    against the log" would find nothing to verify. A scenario's canonical
+    signatures are usually restated by several tools within the same few
+    lines once a fault fires (e.g. the kernel, DCGM, and iDRAC all log the
+    event within a couple of lines of each other), so this windows around
+    every match that falls in that first tight cluster rather than stopping
+    at whichever single signature phrase happened to appear earliest — the
+    dashboard's error_signature is agent-chosen, not pinned to the first
+    signature string in the scenario's list, so the excerpt should be able to
+    back up any of them.
+    """
+    lines = [ln for ln in log_text.splitlines() if ln.strip() and not ln.lstrip().startswith("#")]
+    if not lines:
+        return None
+
+    match_indices = [i for i, ln in enumerate(lines) if any(sig in ln for sig in error_signatures)]
+    if not match_indices:
+        # Defensive fallback — every shipped scenario's bundle contains its
+        # own signatures, so this only triggers for malformed pack content.
+        return "\n".join(lines[: _HIGHLIGHT_CONTEXT_LINES * 2 + 1])
+
+    first = last = match_indices[0]
+    for idx in match_indices[1:]:
+        if idx - last > _HIGHLIGHT_CLUSTER_GAP:
+            break
+        last = idx
+
+    start = max(0, first - _HIGHLIGHT_CONTEXT_LINES)
+    end = min(len(lines), last + _HIGHLIGHT_CONTEXT_LINES + 1)
+    return "\n".join(lines[start:end])
 
 
 def _run_response(scenario_id: str, pack: LoadedPack) -> RunResponse:
@@ -229,7 +276,13 @@ async def get_logs(asset_id: str, request: Request) -> LogsResponse:
     scenario = pack.scenarios_by_id[scenario_id]
     log_text = pack.log_bundles.get(scenario.log_bundle_ref, "")
     log_text = _stamp_today(log_text)
-    return LogsResponse(asset_id=asset_id, scenario_id=scenario_id, log_text=log_text)
+    log_highlight = _extract_highlight(log_text, scenario.error_signatures)
+    return LogsResponse(
+        asset_id=asset_id,
+        scenario_id=scenario_id,
+        log_text=log_text,
+        log_highlight=log_highlight,
+    )
 
 
 @router.get("/assets/{asset_id}/scenario", response_model=RunResponse)

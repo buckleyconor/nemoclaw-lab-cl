@@ -1,4 +1,17 @@
-# SCAFFOLD LOG BUNDLE — scn-fabric-link-down
-# SME: replace with real switch syslog from a Dell PowerSwitch S5248F-ON or Z9332F-ON
-# exhibiting an Ethernet link-down event on a spine-leaf uplink.
-2024-01-01T00:00:00Z CRIT  switch[syslog]: Link down detected on Ethernet1/1 — scaffold placeholder
+# Log bundle: scn-fabric-link-down — OS10 syslog extract, leaf-01 (S5248F-ON) uplink Ethernet1/1 to spine-01
+
+2024-06-03T08:10:00Z INFO  switch[syslog]: leaf-01 fabric status: 4/4 spine uplinks up. ECMP balanced, ~44% per uplink.
+2024-06-03T08:12:30Z INFO  switch[bgp]: BGP summary: 4 peers Established (spine-01..04). Underlay converged.
+2024-06-03T08:14:02Z INFO  switch[syslog]: leaf-01 Ethernet1/1: FCS error rate 1.1e-8 — within tolerance
+2024-06-03T08:16:45Z WARN  switch[syslog]: leaf-01 Ethernet1/1: FCS errors rising — 214 in last 60s (was 0/min baseline)
+2024-06-03T08:17:20Z WARN  switch[syslog]: leaf-01 Ethernet1/1: Rx power -13.8 dBm — below warning threshold (-12.0 dBm)
+2024-06-03T08:17:52Z CRIT  switch[syslog]: leaf-01 Ethernet1/1: link down — carrier lost
+2024-06-03T08:17:52Z CRIT  switch[syslog]: NET.1.0.LinkDown — Link down detected on Ethernet1/1 (uplink leaf-01 to spine-01)
+2024-06-03T08:17:52Z WARN  switch[bfd]: BFD session 10.0.1.0/31 to spine-01 DOWN — detection time 300ms
+2024-06-03T08:17:52Z WARN  switch[bgp]: BGP peer 10.0.0.1 (spine-01) Established -> Idle — interface down
+2024-06-03T08:17:53Z INFO  switch[route]: ECMP group to spine prefixes reduced: 4 paths -> 3. Traffic rerouted.
+2024-06-03T08:17:53Z WARN  switch[lldp]: LLDP neighbor spine-01 (Ethernet1/32) aged out on Ethernet1/1
+2024-06-03T08:18:10Z INFO  switch[syslog]: Uplink utilisation: Ethernet1/2 58%, Ethernet1/3 61%, Ethernet1/4 57% (was ~44% each)
+2024-06-03T08:18:30Z INFO  switch[syslog]: spine-01 Ethernet1/32 (remote end): no admin-down recorded — fault is physical layer on leaf side or cable plant
+2024-06-03T08:19:00Z WARN  switch[syslog]: leaf-01 redundancy degraded: 3/4 spine uplinks. Second uplink loss would reduce rack capacity to 50%.
+2024-06-03T08:19:05Z INFO  switch[syslog]: Asset flagged for remediation: inspect optics/cable on Ethernet1/1, bounce interface, verify reconvergence.

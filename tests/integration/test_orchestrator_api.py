@@ -219,6 +219,33 @@ def test_get_logs_returns_404_when_idle(client: TestClient) -> None:
     assert r.status_code == 404
 
 
+def test_get_logs_highlight_contains_the_error_signature(client: TestClient) -> None:
+    """Operator Dashboard log evidence (feature): the highlight must actually
+    contain a signature the dashboard also shows, not just the start of the
+    file (which is a comment header + routine INFO chatter for every bundle)."""
+    run_r = client.post("/api/run/scn-gpu-xid-79")
+    target_asset = run_r.json()["target_asset"]
+
+    r = client.get(f"/api/assets/{target_asset}/logs")
+    data = r.json()
+    assert data["log_highlight"] is not None
+    assert "Xid 79" in data["log_highlight"]
+    # The comment header line is never real log evidence — must be excluded.
+    assert "# Log bundle" not in data["log_highlight"]
+
+
+def test_get_logs_highlight_is_stamped_with_todays_date(client: TestClient) -> None:
+    import datetime as dt
+
+    run_r = client.post("/api/run/scn-gpu-xid-79")
+    target_asset = run_r.json()["target_asset"]
+
+    r = client.get(f"/api/assets/{target_asset}/logs")
+    data = r.json()
+    today = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d")
+    assert today in data["log_highlight"]
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /api/assets/{id}/scenario
 # ─────────────────────────────────────────────────────────────────────────────

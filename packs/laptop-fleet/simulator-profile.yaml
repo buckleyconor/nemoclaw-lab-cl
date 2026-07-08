@@ -18,3 +18,9 @@ assets:
       system_status: "OK"
       power_status: "OK"
       gpu_count: 1
+  - id: laptop-04
+    type: laptop
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 1

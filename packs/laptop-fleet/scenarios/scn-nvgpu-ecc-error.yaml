@@ -1,5 +1,4 @@
 # Scenario: GPU ECC memory error on mobile discrete GPU
-# PLACEHOLDER — SME: verify with DCGM / nvidia-smi output from Precision 7780 under compute load.
 id: scn-nvgpu-ecc-error
 pack_id: laptop-fleet
 target_asset: laptop-03

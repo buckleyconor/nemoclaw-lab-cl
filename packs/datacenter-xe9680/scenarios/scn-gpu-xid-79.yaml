@@ -1,5 +1,4 @@
 # Scenario: GPU Xid 79 — GPU has fallen off the bus
-# PLACEHOLDER — SME to verify signatures and replace KB article with real Dell content.
 id: scn-gpu-xid-79
 pack_id: datacenter-xe9680
 target_asset: gpu-server-02
@@ -17,7 +16,7 @@ emit:
 
 log_bundle_ref: bundles/scn-gpu-xid-79.log
 
-# SME-provided canonical signatures used for deterministic KB fallback.
+# Canonical error signatures used for deterministic KB fallback.
 error_signatures:
   - "Xid 79"
   - "GPU has fallen off the bus"

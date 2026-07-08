@@ -6,6 +6,9 @@ asset_noun:
 fleet_label: "Cluster Health"
 monitoring_adapter: redfish
 theme: dell-nvidia
+sentinel_name: "AI Infrastructure Sentinel"
+asset_image_url: "https://i.dell.com/is/image/DellContent/content/dam/ss2/product-images/dell-enterprise-products/enterprise-systems/poweredge/xe9780l/media-gallery/server-dell-xe9780l-16xe1-c-gallery-2.psd?fmt=pjpg&pscan=auto&scl=1&hei=402&wid=1669&qlt=100,1&resMode=sharp2&size=1669,402&chrss=full"
+asset_spec_label: "8× NVIDIA B300"
 assets:
   - id: gpu-server-01
   - id: gpu-server-02

@@ -1,6 +1,6 @@
 """Redfish surface for the datacenter-xe9680 pack.
 
-Exposes a minimal Redfish-style API seeded with real XE9680 response shapes.
+Exposes a minimal Redfish-style API seeded with real XE9780L response shapes.
 The monitor MCP tool's Redfish adapter (M4) reads these endpoints.
 
 Implemented endpoints:

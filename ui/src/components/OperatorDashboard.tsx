@@ -70,6 +70,8 @@ function exportReport(fault: FaultEvent, activity: ActivityEvent[]) {
       : "—"
   )}</td></tr>
 </table>
+<h2>Gathered log evidence</h2>
+<pre style="white-space:pre-wrap;font-size:11px;background:#f5f5f5;padding:10px;border:1px solid #ccc;border-radius:4px;">${escapeHtml(fault.log_extract ?? "—")}</pre>
 <h2>Agent assessment</h2>
 <p>${escapeHtml(fault.analysis ?? "—")}</p>
 <h2>Impact assessment</h2>
@@ -120,6 +122,49 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
     setDeciding(null);
   }, [fault?.id]);
 
+  // Staged population (dashboard reads top-to-bottom in the order the agent
+  // works): 1) error signature, 2) KB match — both arrive as separate
+  // diagnosis PATCHes from the agent harness. 3) agent assessment, then
+  // 4) impact assessment, then 5) proposed remediation steps. The last three
+  // all become available the moment the agent's proposal lands (analysis +
+  // status change in one burst), so the impact and steps are revealed on
+  // short client-side timers after the assessment — the operator sees them
+  // populate in causal order instead of one simultaneous pop.
+  const assessmentReady =
+    fault !== null &&
+    (fault.analysis !== null ||
+      fault.status === "awaiting_approval" ||
+      fault.status === "remediating" ||
+      fault.status === "resolved" ||
+      fault.status === "denied");
+  const settled =
+    fault !== null &&
+    (fault.status === "remediating" ||
+      fault.status === "resolved" ||
+      fault.status === "denied");
+  const [revealImpact, setRevealImpact] = useState(false);
+  const [revealSteps, setRevealSteps] = useState(false);
+  useEffect(() => {
+    if (!assessmentReady) {
+      setRevealImpact(false);
+      setRevealSteps(false);
+      return;
+    }
+    if (settled) {
+      // Post-decision (or page reload mid-remediation): everything is old
+      // news — show it all, no theatre.
+      setRevealImpact(true);
+      setRevealSteps(true);
+      return;
+    }
+    const t1 = setTimeout(() => setRevealImpact(true), 1200);
+    const t2 = setTimeout(() => setRevealSteps(true), 2600);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [fault?.id, assessmentReady, settled]);
+
   // Idle shell — the panel stays visible even with nothing to show (cleared
   // after the post-resolution retention window).
   if (!fault) {
@@ -146,12 +191,15 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
   const isActive = fault.status !== "resolved" && fault.status !== "denied";
   // Both impact assessment and remediation steps are already available on the
   // FaultEvent as soon as it's created (from the scenario's static content),
-  // well before the agent has actually run a KB search. Gate their display on
-  // kb_article_id explicitly so the operator sees them appear in the same
-  // causal order the agent produces the rest of the diagnosis in: signature →
-  // KB match → assessment → impact → remediation steps.
+  // well before the agent has actually diagnosed anything. Gate their display
+  // on the KB match *and* the staged-reveal timers above, so the operator sees
+  // the dashboard fill in the causal order the agent works in: signature →
+  // KB match → assessment → impact → remediation steps (last).
+  const showImpact = fault.impact !== null && fault.kb_article_id !== null && revealImpact;
   const showSteps =
-    fault.kb_article_id !== null && fault.remediation_step_labels.length > 0;
+    fault.kb_article_id !== null &&
+    fault.remediation_step_labels.length > 0 &&
+    revealSteps;
 
   async function decide(decision: "approved" | "denied") {
     if (!fault) return;
@@ -253,6 +301,23 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
       {/* Body */}
       <div style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 14 }}>
 
+        {/* Gathered log evidence — populates first (it's captured the moment
+            the log bundle is retrieved, before the agent has extracted a
+            signature or matched a KB article), so the operator can read the
+            raw lines and check them against ERROR SIGNATURE below once it
+            appears, rather than taking the extracted signature on faith. */}
+        {fault.log_extract && (
+          <div style={cardStyle}>
+            <div style={cardLabelStyle}>GATHERED LOG EVIDENCE — {fault.asset_id}</div>
+            <pre style={{
+              margin: 0, fontSize: 11, lineHeight: 1.6, color: "#9fb3c8",
+              fontFamily: "var(--mono)", whiteSpace: "pre-wrap", wordBreak: "break-word",
+            }}>
+              {fault.log_extract}
+            </pre>
+          </div>
+        )}
+
         {/* Top row: signature + KB side by side */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           {/* Error signature */}
@@ -318,14 +383,27 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
             </div>
           </div>
         ) : isActive ? (
-          <div style={{ fontSize: 11, color: "var(--text-dim)", fontFamily: "var(--mono)" }}>
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8,
+            fontSize: 11, color: "var(--text-dim)", fontFamily: "var(--mono)",
+          }}>
+            <span
+              aria-label="working"
+              style={{
+                display: "block", width: 12, height: 12,
+                borderRadius: "50%", flexShrink: 0,
+                border: "2px solid rgba(139,92,246,.25)",
+                borderTopColor: "#8b5cf6",
+                animation: "spin .9s linear infinite",
+              }}
+            />
             Agent assessment pending…
           </div>
         ) : null}
 
-        {/* Impact assessment — held back until the KB match is in, same reasoning as showSteps above */}
-        {fault.impact && fault.kb_article_id && (
-          <div>
+        {/* Impact assessment — revealed after the agent assessment (staged order) */}
+        {showImpact && fault.impact && (
+          <div style={{ animation: "riseIn .35s ease-out" }}>
             <div style={cardLabelStyle}>IMPACT ASSESSMENT</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               {[
@@ -345,9 +423,9 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
           </div>
         )}
 
-        {/* Remediation steps */}
+        {/* Remediation steps — the last section to populate (staged order) */}
         {showSteps && (
-          <div>
+          <div style={{ animation: "riseIn .35s ease-out" }}>
             <div style={{ ...cardLabelStyle, marginBottom: 8 }}>
               PROPOSED REMEDIATION STEPS
             </div>
@@ -373,9 +451,10 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
           </div>
         )}
 
-        {/* Approve / Deny */}
-        {(canDecide || isDecided) && (
-          <div style={{ display: "flex", gap: 10, marginTop: 2, flexWrap: "wrap" as const }}>
+        {/* Approve / Deny — revealed together with the proposed steps so the
+            decision controls never appear above/before the plan they approve */}
+        {(canDecide || isDecided) && revealSteps && (
+          <div style={{ display: "flex", gap: 10, marginTop: 2, flexWrap: "wrap" as const, animation: "riseIn .35s ease-out" }}>
             <button
               onClick={() => decide("approved")}
               disabled={!canDecide}

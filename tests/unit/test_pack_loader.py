@@ -170,6 +170,16 @@ def test_valid_pack_loads(tmp_path: Path) -> None:
     not FLAGSHIP_PACK_DIR.is_dir(),
     reason="Flagship pack directory not found",
 )
+def test_flagship_pack_defaults_to_grid_fleet_layout() -> None:
+    """The flagship pack's pack.yaml doesn't set fleet_layout — should default to "grid"."""
+    loaded = load_pack(FLAGSHIP_PACK_DIR)
+    assert loaded.pack.fleet_layout == "grid"
+
+
+@pytest.mark.skipif(
+    not FLAGSHIP_PACK_DIR.is_dir(),
+    reason="Flagship pack directory not found",
+)
 def test_u07_signature_index_xid79() -> None:
     """U-07: loading the flagship pack builds a signature index with 'Xid 79' → KB000123."""
     loaded = load_pack(FLAGSHIP_PACK_DIR)

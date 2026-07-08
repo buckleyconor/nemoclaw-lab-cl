@@ -13,13 +13,17 @@ import pytest
 
 from services.terminal.console import (
     MENU_TARGETS,
+    RESET_KEY,
+    RESET_LABEL,
     ConsoleConfig,
+    blank_content,
     download_argv,
     edit_path,
     editor_argv,
     find_target,
     format_menu,
     push_argv,
+    run_reset,
     run_target,
 )
 
@@ -38,12 +42,25 @@ def test_menu_targets_cover_soul_agents_and_four_skills() -> None:
         "infra-sentinel-notify",
         "infra-sentinel-remediate",
     ):
-        assert f"/sandbox/.openclaw/workspace/skills/{skill}" in sandbox_paths
+        # Skills deploy to /sandbox/.openclaw/skills/<name> — this is where
+        # `nemoclaw skill install` actually writes, and is NOT a path under
+        # the workspace mirror (/sandbox/.openclaw/workspace/...). Verified
+        # against a live sandbox: install always lands here regardless of
+        # which workspace directory the source SKILL.md was edited from.
+        assert f"/sandbox/.openclaw/skills/{skill}" in sandbox_paths
+        assert f"/sandbox/.openclaw/workspace/skills/{skill}" not in sandbox_paths
 
 
 def test_find_target_returns_none_for_unknown_selection() -> None:
-    assert find_target("7") is None
+    assert find_target("8") is None
     assert find_target("nemoclaw-lab; rm -rf /") is None
+
+
+def test_reset_key_is_not_an_edit_target() -> None:
+    """Option 7 (reset) is a console action, not a MenuTarget — find_target
+    must not resolve it, so the main loop's dedicated reset branch handles it."""
+    assert RESET_KEY == "7"
+    assert find_target(RESET_KEY) is None
 
 
 @pytest.mark.parametrize("target", MENU_TARGETS, ids=lambda t: t.key)
@@ -92,19 +109,30 @@ def test_editor_argv_is_restricted_vim_by_default() -> None:
     assert argv == ["vim", "-Z", "/tmp/SOUL.md"]
 
 
-def test_format_menu_lists_all_targets_and_quit() -> None:
+def test_format_menu_lists_all_targets_reset_and_quit() -> None:
     menu = format_menu("tenant-a")
     for t in MENU_TARGETS:
         assert t.label in menu
+    assert f"7) {RESET_LABEL}" in menu
     assert "q) Quit" in menu
+    # Reset renders after the edit targets and before Quit.
+    assert menu.index("6)") < menu.index("7)") < menu.index("q) Quit")
+
+
+def test_menu_labels_describe_the_push_destination() -> None:
+    labels = [t.label for t in MENU_TARGETS]
+    assert labels[0] == "Edit SOUL.md and push into the OpenShell sandbox automatically"
+    assert labels[1] == "Edit AGENTS.md and push into the OpenShell sandbox automatically"
+    for label in labels[2:]:
+        assert label.endswith("and install in the NemoClaw agent")
 
 
 def test_format_menu_marks_completed_targets_green() -> None:
     menu = format_menu("tenant-a", completed=frozenset({"1", "3"}))
-    assert "\033[32m✓ Edit SOUL.md\033[0m" in menu
-    assert "\033[32m✓ Edit infra-sentinel-monitor/SKILL.md\033[0m" in menu
+    assert f"\033[32m✓ {MENU_TARGETS[0].label}\033[0m" in menu
+    assert f"\033[32m✓ {MENU_TARGETS[2].label}\033[0m" in menu
     # Untouched targets render plain, with no color codes.
-    assert "  2) Edit AGENTS.md" in menu
+    assert f"  2) {MENU_TARGETS[1].label}" in menu
     assert "\033[32m✓ Edit AGENTS.md" not in menu
 
 
@@ -164,3 +192,89 @@ def test_run_target_creates_scratch_parent_directory(tmp_path: Path) -> None:
     run_target(target, config, run=fake_run)
 
     assert (tmp_path / target.scratch_rel).is_dir()
+
+
+def test_run_reset_blanks_every_target_and_pushes_all_six(tmp_path: Path) -> None:
+    calls: list[list[str]] = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        return _FakeCompleted(returncode=0, stdout="ok")
+
+    config = ConsoleConfig(
+        sandbox_name="tenant-a", workspace_dir=tmp_path, editor_bin="true", editor_args=()
+    )
+
+    ok = run_reset(config, run=fake_run)
+
+    assert ok is True
+    # One push per target, no downloads and no editor invocations.
+    assert len(calls) == len(MENU_TARGETS)
+    for argv in calls:
+        assert argv[2] in ("upload", "skill")
+    # Every scratch file exists and matches blank_content() for its kind:
+    # truly empty for SOUL.md/AGENTS.md, a minimal frontmatter stub for
+    # skills (a fully empty SKILL.md fails `skill install`'s YAML parse).
+    for target in MENU_TARGETS:
+        path = edit_path(target, tmp_path)
+        assert path.exists()
+        assert path.read_text() == blank_content(target)
+        if target.kind == "workspace_file":
+            assert path.read_text() == ""
+        else:
+            assert path.read_text().startswith("---\n")
+            assert "name:" in path.read_text()
+
+
+def test_blank_content_is_empty_for_workspace_files() -> None:
+    for target in MENU_TARGETS:
+        if target.kind == "workspace_file":
+            assert blank_content(target) == ""
+
+
+def test_blank_content_for_skills_has_valid_installable_frontmatter() -> None:
+    """Regression test for the reported bug: a fully empty SKILL.md fails
+    `nemoclaw skill install` with "missing YAML frontmatter" and the reset
+    push fails for every skill. The stub must carry the `name:` key the CLI
+    requires, matching the skill's own directory name, with no other content
+    — the skill's actual instructions (Purpose/Steps/Notes) are what "blanked"
+    means here."""
+    for target in MENU_TARGETS:
+        if target.kind != "skill":
+            continue
+        content = blank_content(target)
+        skill_name = target.scratch_rel.rsplit("/", 1)[-1]
+        assert content == f'---\nname: "{skill_name}"\n---\n'
+        assert "Purpose" not in content
+        assert "Steps" not in content
+
+
+def test_run_reset_returns_false_when_any_push_fails(tmp_path: Path) -> None:
+    def fake_run(argv, **kwargs):
+        if argv[2] == "skill":  # fail the skill installs, let uploads succeed
+            return _FakeCompleted(returncode=1, stderr="boom")
+        return _FakeCompleted(returncode=0, stdout="ok")
+
+    config = ConsoleConfig(
+        sandbox_name="tenant-a", workspace_dir=tmp_path, editor_bin="true", editor_args=()
+    )
+
+    assert run_reset(config, run=fake_run) is False
+
+
+def test_run_reset_argv_is_literal_no_shell_metacharacters(tmp_path: Path) -> None:
+    calls: list[list[str]] = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        return _FakeCompleted(returncode=0, stdout="ok")
+
+    config = ConsoleConfig(
+        sandbox_name="tenant-a", workspace_dir=tmp_path, editor_bin="true", editor_args=()
+    )
+    run_reset(config, run=fake_run)
+
+    for argv in calls:
+        assert argv[0] == "nemoclaw"
+        assert argv[1] == "tenant-a"
+        assert all(isinstance(part, str) for part in argv)

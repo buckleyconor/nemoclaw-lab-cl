@@ -99,3 +99,29 @@
   0%, 100% { opacity: 1; }
   50% { opacity: .35; }
 }
+
+/* Spinner for in-progress dashboard stages (agent assessment pending). */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Staged dashboard sections fade in as the agent's diagnosis lands. */
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Fleet panel border while idle — a slow breathing glow standing in for "the
+   agent is still polling, nothing is wrong" so an empty panel doesn't read
+   as stalled. Kept subtle: opacity/shadow only, no layout shift. */
+@keyframes idle-glow {
+  0%, 100% { box-shadow: 0 0 0 1px var(--border), 0 0 0 0 rgba(16,185,129,0); }
+  50%      { box-shadow: 0 0 0 1px rgba(16,185,129,.4), 0 0 16px 1px rgba(16,185,129,.12); }
+}
+
+/* The small dot next to the idle "scanning fleet" activity line. */
+@keyframes idle-scan-dot {
+  0%, 100% { opacity: .4; transform: scale(.85); }
+  50%      { opacity: 1; transform: scale(1); }
+}

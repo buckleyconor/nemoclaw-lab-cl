@@ -21,6 +21,13 @@ Wire protocol (per connection — one WS, one PTY, one shell):
   binary frames        raw terminal bytes, both directions
   text  frames (in)    {"type": "resize", "cols": C, "rows": R}
   text  frames (out)   {"type": "exit", "code": N}   just before close
+
+Also exposes two bearer-token-gated HTTP actions alongside /ws:
+  POST /switch-pack    {"pack_id": str} -> restarts the docker-compose stack
+                       on a different PACK_ID (deploy/scripts/switch-pack.sh),
+                       detached — see docs/PACK-EXPANSION-PLAN.md.
+  POST /reset          restricted mode only — non-interactive equivalent of
+                       the console's menu option 7 (console.run_reset()).
 """
 
 from __future__ import annotations
@@ -30,6 +37,7 @@ import contextlib
 import fcntl
 import json
 import os
+import re
 import secrets
 import signal
 import struct
@@ -38,7 +46,9 @@ import sys
 import termios
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+
+from services.terminal import console
 
 _REPO_ROOT = Path(__file__).parent.parent.parent
 _READ_CHUNK = 65536
@@ -59,6 +69,15 @@ def _authorized(ws: WebSocket, token: str) -> bool:
     header = ws.headers.get("authorization", "")
     scheme, _, presented = header.partition(" ")
     return scheme.lower() == "bearer" and secrets.compare_digest(presented, token)
+
+
+def _authorized_request(request: Request, token: str) -> bool:
+    header = request.headers.get("authorization", "")
+    scheme, _, presented = header.partition(" ")
+    return scheme.lower() == "bearer" and secrets.compare_digest(presented, token)
+
+
+_PACK_ID_RE = re.compile(r"^[a-z0-9-]+$")
 
 
 def _require_sandbox_name() -> None:
@@ -175,7 +194,8 @@ def _terminate_session(proc: subprocess.Popen[bytes]) -> None:
 
 def create_app(token: str | None = None) -> FastAPI:
     resolved_token = token or _require_token()
-    if os.environ.get("TERMINAL_MODE", "shell") == "restricted":
+    restricted = os.environ.get("TERMINAL_MODE", "shell") == "restricted"
+    if restricted:
         _require_sandbox_name()
 
     app = FastAPI(
@@ -187,6 +207,51 @@ def create_app(token: str | None = None) -> FastAPI:
     @app.get("/healthz", tags=["health"])
     async def healthz() -> dict[str, str]:
         return {"status": "ok"}
+
+    # Automates what was previously a host-side `make switch-pack PACK_ID=<id>`
+    # step (deploy/scripts/switch-pack.sh) so the browser can trigger it with
+    # no terminal access. Registered regardless of TERMINAL_MODE — switching
+    # packs is orthogonal to shell vs. restricted PTY mode.
+    #
+    # switch-pack.sh does `docker compose down && up -d`, which kills the very
+    # Gateway container relaying this request — so this handler must NOT await
+    # it. It spawns the script detached and acks immediately, before the
+    # container teardown happens; the caller polls GET /api/pack afterward to
+    # detect when the new pack is actually up.
+    @app.post("/switch-pack")
+    async def switch_pack(request: Request) -> dict[str, object]:
+        if not _authorized_request(request, resolved_token):
+            raise HTTPException(status_code=401)
+        body = await request.json()
+        pack_id = body.get("pack_id", "")
+        if not isinstance(pack_id, str) or not _PACK_ID_RE.fullmatch(pack_id):
+            raise HTTPException(status_code=400, detail="invalid pack_id")
+        if not (_REPO_ROOT / "packs" / pack_id / "pack.yaml").is_file():
+            raise HTTPException(status_code=404, detail=f"unknown pack: {pack_id}")
+        subprocess.Popen(  # noqa: S603 — literal argv, pack_id validated above
+            [str(_REPO_ROOT / "deploy" / "scripts" / "switch-pack.sh"), pack_id],
+            cwd=_REPO_ROOT,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        return {"ok": True, "status": "switch-started", "pack_id": pack_id}
+
+    if restricted:
+        # Non-interactive equivalent of the restricted console's menu option 7
+        # (services.terminal.console.RESET_KEY) — blanks and re-pushes SOUL.md/
+        # AGENTS.md/all four skills without a live PTY session, so the lab
+        # guide's "Ready for a different scenario?" button can trigger it over
+        # a plain POST. Only registered in restricted mode: reset is a
+        # sandbox-persona concept and has no meaning for a raw login shell.
+        @app.post("/reset")
+        async def reset(request: Request) -> dict[str, bool]:
+            if not _authorized_request(request, resolved_token):
+                raise HTTPException(status_code=401)
+            config = console.load_config()
+            loop = asyncio.get_running_loop()
+            ok = await loop.run_in_executor(None, console.run_reset, config)
+            return {"ok": ok}
 
     @app.websocket("/ws")
     async def terminal_ws(ws: WebSocket) -> None:

@@ -4,6 +4,11 @@ export interface PackInfo {
   asset_noun: { singular: string; plural: string };
   fleet_label: string;
   theme: string;
+  sentinel_name: string;
+  asset_image_url: string | null;
+  asset_spec_label: string | null;
+  fleet_layout: "grid" | "list";
+  asset_display_names: Record<string, string>;
 }
 
 export interface AssetRecord {

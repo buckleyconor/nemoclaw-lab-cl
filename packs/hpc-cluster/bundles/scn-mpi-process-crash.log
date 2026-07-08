@@ -1,3 +1,18 @@
-# SCAFFOLD LOG BUNDLE — scn-mpi-process-crash
-# SME: replace with real Slurm + OpenMPI log from an HPC node exhibiting an MPI rank failure.
-2024-01-01T00:00:00Z WARN  slurm[3001]: MPI process rank 0 terminated abnormally — scaffold placeholder
+# Log bundle: scn-mpi-process-crash — Slurm / OpenMPI / kernel extract, job 48213 (64 ranks, 4 nodes), rank 0 on hpc-node-01
+
+2024-06-14T11:20:03Z INFO  slurmd[hpc-node-01]: Launching job step 48213.0 — 16 ranks local, job total 64 (user rsmith, account chem-dft)
+2024-06-14T11:20:05Z INFO  mpirun[71400]: OpenMPI 4.1.5 — 64 ranks across hpc-node-01..04, UCX transport
+2024-06-14T11:35:12Z INFO  app[71442]: [rank 0] iteration 12000/50000 — residual 8.9e-7, checkpoint written it=12000
+2024-06-14T11:47:26Z INFO  app[71442]: [rank 0] iteration 18400/50000 — residual 3.1e-7, checkpoint written it=18000
+2024-06-14T11:52:41Z CRIT  kernel[hpc-node-01]: app[71442]: segfault at 7f2a4c001018 ip 00000000004a2d17 sp 00007ffd23e1a930 error 4 in app[400000+2ff000]
+2024-06-14T11:52:41Z WARN  slurmd[hpc-node-01]: task 0 of job step 48213.0 exited on signal 11
+2024-06-14T11:52:41Z CRIT  mpirun[71400]: mpirun noticed that process rank 0 with PID 71442 on node hpc-node-01 exited on signal 11 (Segmentation fault)
+2024-06-14T11:52:41Z WARN  mpirun[71400]: MPI process crash: rank 0 (hpc-node-01) terminated abnormally on signal 11 (Segmentation fault)
+2024-06-14T11:52:42Z WARN  mpirun[71400]: tearing down remaining 63 ranks — job cannot continue with a failed rank
+2024-06-14T11:52:42Z INFO  slurmd[hpc-node-02]: job step 48213.0 ranks terminated by job-level teardown (no local fault)
+2024-06-14T11:52:43Z INFO  slurmctld[head]: Job 48213 (user rsmith, account chem-dft) completed, state FAILED, exit 0:11
+2024-06-14T11:52:43Z INFO  slurmd[hpc-node-01]: core dump written: /var/crash/core.app.71442.hpc-node-01.1718021561
+2024-06-14T11:52:44Z INFO  node-health[880]: hpc-node-01: kernel log scan for crash window — no MCE/EDAC memory errors found
+2024-06-14T11:52:45Z INFO  node-health[880]: hpc-node-01: post-job check queued — 1 job failure recorded (0 prior in 7 days)
+2024-06-14T11:52:50Z INFO  node-health[880]: preliminary classification: fault address inside application text segment — application fault likely, node fault not excluded
+2024-06-14T11:52:55Z INFO  slurmctld[head]: Asset flagged for remediation: collect core dump, requeue job 48213 from checkpoint it=18000, health-check node before resume.

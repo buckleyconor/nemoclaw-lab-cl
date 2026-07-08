@@ -41,6 +41,10 @@ class AssetNoun(BaseModel):
 
 class PackAsset(BaseModel):
     id: str
+    # Cosmetic label shown in the UI in place of the raw id (e.g. a
+    # customer-branded "laptop-acme-001" instead of "laptop-01"). Falls back
+    # to id when unset — never used for scenario/simulator lookups.
+    display_name: str | None = None
 
 
 class Pack(BaseModel):
@@ -50,6 +54,20 @@ class Pack(BaseModel):
     fleet_label: str
     monitoring_adapter: MonitoringAdapterType
     theme: str = "default"
+    # Big header title shown in the dashboard's top bar, e.g. "AI
+    # Infrastructure Sentinel" / "Laptop Fleet Sentinel".
+    sentinel_name: str = "Infrastructure Sentinel"
+    # Product photo shown on each fleet tile. Absolute URL or a path under
+    # the SPA's static root (e.g. "/pr-precision-7.png").
+    asset_image_url: str | None = None
+    # Short hardware spec line shown under the asset_noun on each tile, e.g.
+    # "8× NVIDIA B300" or "Dell Pro Precision 7 · NVIDIA RTX PRO 3000 GPU".
+    asset_spec_label: str | None = None
+    # "grid" (default): one photo tile per asset, image-forward — fine for a
+    # handful of assets. "list": a compact two-line-per-asset stacked row
+    # (small thumbnail, name + spec line, status badge) — for packs whose
+    # fleet is dense enough that tiles eat too much vertical space.
+    fleet_layout: Literal["grid", "list"] = "grid"
     assets: list[PackAsset] = Field(min_length=1)
 
 

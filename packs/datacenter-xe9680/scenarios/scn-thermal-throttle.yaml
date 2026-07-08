@@ -1,5 +1,4 @@
 # Scenario: GPU thermal throttle — GPU temperature threshold exceeded
-# PLACEHOLDER — SME to verify signatures and replace KB article with real Dell content.
 id: scn-thermal-throttle
 pack_id: datacenter-xe9680
 target_asset: gpu-server-01

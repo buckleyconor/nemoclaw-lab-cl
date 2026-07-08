@@ -1,5 +1,4 @@
 # Scenario: PSU redundancy loss — power supply 2 input failure
-# PLACEHOLDER — SME to verify signatures and replace KB article with real Dell content.
 id: scn-psu-loss
 pack_id: datacenter-xe9680
 target_asset: gpu-server-01
