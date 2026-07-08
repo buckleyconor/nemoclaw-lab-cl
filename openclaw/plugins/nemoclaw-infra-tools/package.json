@@ -1,0 +1,36 @@
+{
+  "name": "nemoclaw-infra-tools",
+  "version": "0.1.0",
+  "description": "NemoClaw lab infrastructure tools for OpenClaw — MCP client bridge to the mcp-tools service (ADR-011)",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "compat": {
+      "pluginApi": ">=2026.5.22",
+      "minGatewayVersion": "2026.5.22"
+    },
+    "build": {
+      "openclawVersion": "2026.5.27"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "clean": "rm -rf dist/"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "typebox": "^1.1.38"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "openclaw": "2026.5.27",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
+}

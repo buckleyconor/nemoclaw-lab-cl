@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ActivityEvent } from "../types";
 
 const STEP_META: Record<string, { icon: string; label: string; color: string }> = {
@@ -6,16 +6,57 @@ const STEP_META: Record<string, { icon: string; label: string; color: string }> 
   diagnose:  { icon: "📋", label: "DIAGNOSE",  color: "#a78bfa" },
   search_kb: { icon: "📚", label: "SEARCH KB", color: "#f59e0b" },
   present:   { icon: "🖥️", label: "PRESENT",   color: "#38bdf8" },
+  waiting:   { icon: "⏳", label: "WAITING",   color: "#94a3b8" },
   remediate: { icon: "🔧", label: "REMEDIATE", color: "#fb923c" },
   resolved:  { icon: "✅", label: "RESOLVED",  color: "#4ade80" },
   denied:    { icon: "❌", label: "DENIED",    color: "#f87171" },
 };
 
-interface Props {
-  events: ActivityEvent[];
+// Real wake-up cadence from AGENTS.md ("polls the MCP monitor tool every 5
+// seconds") — the ticker below mirrors that cadence so "Nth scan" stays
+// truthful to how often the agent actually checks in, not an arbitrary number.
+const POLL_INTERVAL_S = 5;
+
+// Purely a liveness cue — never written to the activity log or exported in
+// the audit report. While idle (no active fault) there is genuinely nothing
+// to narrate turn over turn, so without this the panel looks the same
+// whether the agent is polling every 5s or has silently died; this makes
+// the difference visible.
+function IdleScanTicker() {
+  const [secondsAgo, setSecondsAgo] = useState(0);
+  useEffect(() => {
+    const id = setInterval(
+      () => setSecondsAgo((s) => (s + 1) % POLL_INTERVAL_S),
+      1000,
+    );
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 8,
+      padding: "10px 14px", fontFamily: "var(--mono)",
+    }}>
+      <span style={{
+        display: "block", width: 6, height: 6, borderRadius: "50%",
+        background: "var(--healthy)", flexShrink: 0,
+        animation: "idle-scan-dot 1.6s ease-in-out infinite",
+      }} />
+      <span style={{ color: "var(--text-dim)", fontSize: 12 }}>
+        NemoClaw agent scanning fleet for events…
+      </span>
+      <span style={{ color: "var(--text-dim)", fontSize: 10, opacity: .6, marginLeft: "auto" }}>
+        next check in {POLL_INTERVAL_S - secondsAgo}s
+      </span>
+    </div>
+  );
 }
 
-export function ActivityFeed({ events }: Props) {
+interface Props {
+  events: ActivityEvent[];
+  idle: boolean;
+}
+
+export function ActivityFeed({ events, idle }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -69,10 +110,19 @@ export function ActivityFeed({ events }: Props) {
         fontFamily: "var(--mono)",
         fontSize: 11,
       }}>
-        {events.length === 0 ? (
-          <div style={{ padding: "16px 14px", color: "var(--text-dim)", fontSize: 12, fontFamily: "inherit" }}>
-            No activity yet
+        {/* Idle liveness strip — shown above whatever history exists, so a
+            fleet with only old/resolved entries still reads as "watched". */}
+        {idle && (
+          <div style={{ borderBottom: events.length > 0 ? "1px solid var(--border)" : undefined }}>
+            <IdleScanTicker />
           </div>
+        )}
+        {events.length === 0 ? (
+          !idle && (
+            <div style={{ padding: "16px 14px", color: "var(--text-dim)", fontSize: 12, fontFamily: "inherit" }}>
+              No activity yet
+            </div>
+          )
         ) : (
           <>
             {groups.map((group, gi) => {

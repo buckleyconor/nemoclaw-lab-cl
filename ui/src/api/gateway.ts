@@ -27,4 +27,5 @@ export const gateway = {
       body: JSON.stringify({ status }),
     }),
   getActivity: () => json("/api/activity"),
+  getTerminalEnabled: () => json("/api/terminal/enabled"),
 };

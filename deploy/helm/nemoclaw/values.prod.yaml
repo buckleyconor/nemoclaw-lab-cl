@@ -1,8 +1,33 @@
-# NemoClaw production values — Charmed K8s on RTX PRO 6000 Workstations (amd64).
+# NemoClaw production values — Charmed K8s, Intel/amd64 workers, RTX PRO 6000 GPUs.
+#
+# The lab stack itself is CPU-only (faiss-cpu + fastembed ONNX); no pod in this
+# chart requests a GPU. The RTX PRO 6000s serve two things that live OUTSIDE
+# this chart: the vLLM endpoint the agent talks to, and the agent host's
+# sandboxes (ADR-011).
+#
+# Build images for amd64 before deploying (the Makefile default is arm64 for
+# the GB10 dev host):
+#   make push PLATFORM=linux/amd64 REGISTRY=registry.nemoclaw.lab TAG=v0.1.0
+#
 # Usage: helm upgrade --install nemoclaw ./deploy/helm/nemoclaw \
 #          -f deploy/helm/nemoclaw/values.prod.yaml \
 #          --set global.tag=<release-tag> \
-#          --set agent.llm.apiKey=<vllm-api-key>
+#          --set openclawHook.url=http://<agent-host>:18790 \
+#          --set openclawHook.token=<hook-token> \
+#          --set terminal.wsUrl=ws://<agent-host>:<tenant-port>/ws \
+#          --set terminal.token=<tenant-terminal-token>
+#
+# NOTE (ADR-011): the autonomous agent is NOT deployed by this chart. It runs
+# on a host outside the cluster (needs Docker + nemoclaw/openclaw CLIs + the
+# vLLM endpoint) and reaches the gateway through the ingress below. Its LLM
+# credentials are configured at onboard time on that host — not via Helm.
+#
+# NOTE (ADR-013): the embedded terminal may be enabled per-tenant here, but
+# ONLY the restricted-console mode — a dedicated per-tenant daemon process on
+# the external agent host, running TERMINAL_MODE=restricted
+# (deploy/scripts/run-terminal-tenant.sh), never the unrestricted dev shell
+# (`make terminal`). Leave terminal.wsUrl/token empty to keep it off, the
+# same fail-safe default as openclawHook.
 
 global:
   registry: "registry.nemoclaw.lab"   # Internal Harbor / registry mirror
@@ -38,7 +63,7 @@ mcpTools:
       memory: "3Gi"   # fastembed ONNX model + FAISS index
 
 gateway:
-  replicas: 2   # Two replicas share state via Redis
+  replicas: 2   # Replicas share state via Redis; SSE fans out via Redis pub/sub
   resources:
     requests:
       cpu: "250m"
@@ -47,24 +72,36 @@ gateway:
       cpu: "1000m"
       memory: "512Mi"
 
-agent:
-  replicas: 1
-  pollIntervalSeconds: "10"
-  approvalTimeoutSeconds: "600"
-  llm:
-    baseUrl: "http://YOUR_VLLM_HOST:8000/v1"
-    apiKey: "vllm"
-    model: "qwen3.6-35b-a3b-dflash"
-  resources:
-    requests:
-      cpu: "250m"
-      memory: "256Mi"
-    limits:
-      cpu: "1000m"
-      memory: "512Mi"
+redis:
+  # Air-gapped clusters: mirror docker.io through the internal registry, e.g.
+  # image: "registry.nemoclaw.lab/library/redis:7-alpine"
+  image: "redis:7-alpine"
+
+# Wake-up webhook to the out-of-cluster agent host (ADR-011). Set both via
+# --set (or a values overlay kept out of git); empty = disabled, agent falls
+# back to its cron poll. Narrow egressCidr to the agent host's /32.
+openclawHook:
+  url: ""
+  token: ""
+  egressCidr: "0.0.0.0/0"
+  egressPort: 18790
+
+# Restricted operator terminal (ADR-013) — this tenant's dedicated daemon on
+# the agent host, started via `make terminal-tenant TENANT=... SANDBOX_NAME=...
+# PORT=...`. Set both via --set (or a values overlay kept out of git); empty =
+# disabled. Narrow egressCidr to the agent host's /32.
+terminal:
+  wsUrl: ""
+  token: ""
+  egressCidr: "0.0.0.0/0"
+  egressPort: 8006
 
 ingress:
   enabled: true
+  # Verify the controller's class on the cluster first: `kubectl get ingressclass`.
+  # Charmed K8s does not ship an ingress controller by default; if none is
+  # installed, deploy one (e.g. ingress-nginx) or set enabled: false and use a
+  # LoadBalancer/NodePort service instead.
   className: "nginx"
   host: "nemoclaw.dell-demo.lab"
   tls:

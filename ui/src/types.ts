@@ -4,6 +4,11 @@ export interface PackInfo {
   asset_noun: { singular: string; plural: string };
   fleet_label: string;
   theme: string;
+  sentinel_name: string;
+  asset_image_url: string | null;
+  asset_spec_label: string | null;
+  fleet_layout: "grid" | "list";
+  asset_display_names: Record<string, string>;
 }
 
 export interface AssetRecord {
@@ -22,6 +27,13 @@ export interface Notification {
   ts: string;
 }
 
+export interface ScenarioImpact {
+  summary: string;
+  workload_impact: string;
+  service_risk: string;
+  estimated_duration: string;
+}
+
 export interface FaultEvent {
   id: string;
   scenario_id: string;
@@ -37,6 +49,12 @@ export interface FaultEvent {
   kb_article_id: string | null;
   log_extract: string | null;
   remediation_step_labels: string[];
+  // Diagnosis fields — written by the agent via PATCH /api/faults/:id/diagnosis
+  error_signature: string | null;
+  analysis: string | null;
+  kb_title: string | null;
+  kb_score: number | null;
+  impact: ScenarioImpact | null;
 }
 
 export interface ActivityEvent {

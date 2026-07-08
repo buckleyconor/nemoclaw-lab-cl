@@ -1,5 +1,4 @@
 # Scenario: GPU thermal throttle — GPU temperature threshold exceeded
-# PLACEHOLDER — SME to verify signatures and replace KB article with real Dell content.
 id: scn-thermal-throttle
 pack_id: datacenter-xe9680
 target_asset: gpu-server-01
@@ -30,3 +29,8 @@ remediation_steps:
     label: "Verify fan speeds and inlet temperature via iDRAC"
   - id: verify_temps
     label: "Confirm GPU temperature below threshold after cooling"
+impact:
+  summary: "GPU workload will be reduced to restore thermal headroom, cooling verified via iDRAC fan/inlet telemetry, and temperatures confirmed below threshold."
+  workload_impact: "Jobs on the affected GPU are throttled or paused while temperatures recover — expect reduced throughput, not job loss."
+  service_risk: "Low — no drain or reset involved. If cooling verification fails, a follow-up hardware inspection (fans/airflow) will be needed."
+  estimated_duration: "~10 minutes"

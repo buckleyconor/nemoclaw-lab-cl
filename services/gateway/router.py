@@ -19,15 +19,19 @@ Endpoints:
 from __future__ import annotations
 
 import asyncio
-import json
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from libs.common.models import ApprovalDecision, AssetState, FaultEventStatus
+from libs.common.models import (
+    ApprovalDecision,
+    AssetState,
+    FaultEventStatus,
+    ScenarioImpact,
+)
 from services.gateway.store import AssetRecord
 
 router = APIRouter()
@@ -59,6 +63,15 @@ async def get_pack(request: Request) -> dict:
         "asset_noun": {"singular": pack.asset_noun.singular, "plural": pack.asset_noun.plural},
         "fleet_label": pack.fleet_label,
         "theme": pack.theme,
+        "sentinel_name": pack.sentinel_name,
+        "asset_image_url": pack.asset_image_url,
+        "asset_spec_label": pack.asset_spec_label,
+        "fleet_layout": pack.fleet_layout,
+        # {asset_id: display_name} — only assets with an explicit display_name
+        # are included; the UI falls back to the raw id for the rest.
+        "asset_display_names": {
+            a.id: a.display_name for a in pack.assets if a.display_name
+        },
     }
 
 
@@ -119,8 +132,106 @@ class UpdateStatusRequest(BaseModel):
     status: FaultEventStatus
 
 
+class UpdateDiagnosisRequest(BaseModel):
+    """Agent: diagnosis fields discovered during the investigation."""
+
+    error_signature: str | None = None
+    analysis: str | None = None
+    kb_article_id: str | None = None
+    kb_title: str | None = None
+    kb_score: float | None = None
+
+
 class DecisionRequest(BaseModel):
     decision: ApprovalDecision
+
+
+def _impact_for_scenario(request: Request, scenario_id: str, asset_id: str,
+                         step_count: int) -> ScenarioImpact:
+    """Pack-provided impact assessment, or a synthesised generic fallback."""
+    loaded = request.app.state.loaded_pack
+    scenario = loaded.scenarios_by_id.get(scenario_id)
+    if scenario is not None and scenario.impact is not None:
+        return scenario.impact
+    return ScenarioImpact(
+        summary=f"Execute {step_count} approved remediation steps on {asset_id}.",
+        workload_impact=f"Workloads on {asset_id} may be interrupted while remediation runs.",
+        service_risk="Single-asset action — no cluster-wide changes are made.",
+        estimated_duration="~5–10 minutes",
+    )
+
+
+_MAX_STEP_DETAIL_CHARS = 160
+
+
+def _kb_step_detail(body_md: str, step_id: str) -> str | None:
+    """First prose sentence of the KB article's `### Step N — … (`step_id`)` section.
+
+    The pack KB articles tag each resolution-step heading with its step id in
+    backticks; the line(s) immediately after the heading explain what the step
+    does before the first code block. Returns None when the article doesn't
+    follow that structure — callers fall back to the scenario's plain label.
+    """
+    lines = body_md.splitlines()
+    heading_idx = next(
+        (
+            i
+            for i, ln in enumerate(lines)
+            if ln.lstrip().startswith("###") and f"(`{step_id}`)" in ln
+        ),
+        None,
+    )
+    if heading_idx is None:
+        return None
+    for ln in lines[heading_idx + 1:]:
+        s = ln.strip()
+        if not s:
+            continue
+        if s.startswith(("#", "```", "|", ">")):
+            break  # next section / code / table before any prose — give up
+        # Accept a plain paragraph or the first list item.
+        s = s.lstrip("-*0123456789. ").strip()
+        if not s:
+            continue
+        sentence = s.split(". ")[0].rstrip(".:").strip()
+        # Drop a dangling connective when the sentence led into a code block
+        # ("Confirm with the owner, then:" → "Confirm with the owner").
+        if sentence.endswith(" then"):
+            sentence = sentence[: -len(" then")].rstrip(",;: ")
+        if not sentence:
+            break
+        if len(sentence) > _MAX_STEP_DETAIL_CHARS:
+            sentence = sentence[: _MAX_STEP_DETAIL_CHARS - 1].rstrip(",;: ") + "…"
+        return sentence
+    return None
+
+
+def _step_labels_for_scenario(request: Request, scenario_id: str) -> list[str]:
+    """Proposed-remediation labels for the Operator Dashboard.
+
+    Base labels come from the scenario; each is enriched with the opening
+    sentence of the matching resolution step in the scenario's own KB article
+    ("<label> — <what the step actually does>"), so the dashboard's proposed
+    steps read like the KB runbook rather than terse step names.
+    """
+    loaded = request.app.state.loaded_pack
+    scenario = loaded.scenarios_by_id.get(scenario_id)
+    if scenario is None:
+        return []
+    labels = [s.label for s in scenario.remediation_steps]
+    kb_id = scenario.kb_article_ref.rsplit("/", 1)[-1].removesuffix(".md")
+    article = loaded.kb_articles.get(kb_id)
+    if article is None:
+        return labels
+    out: list[str] = []
+    for step in scenario.remediation_steps:
+        detail = _kb_step_detail(article.body_md, step.id)
+        if detail is None:
+            out.append(step.label)
+        else:
+            period = "" if detail.endswith("…") else "."
+            out.append(f"{step.label} — {detail}{period}")
+    return out
 
 
 @router.get("/api/faults")
@@ -141,14 +252,25 @@ async def get_fault(fault_id: str, request: Request) -> dict:
 
 @router.post("/api/faults", status_code=201)
 async def create_fault(body: CreateFaultRequest, request: Request) -> dict:
-    """Agent: register a detected fault event. Triggers an SSE notification."""
+    """Agent: register a detected fault event. Triggers an SSE notification.
+
+    When the caller omits remediation_step_labels (the OpenClaw plugin has no
+    pack access), they default to the scenario's step labels from the
+    Gateway's own loaded pack.
+    """
     store = _store(request)
+    step_labels = body.remediation_step_labels
+    if not step_labels:
+        step_labels = _step_labels_for_scenario(request, body.scenario_id)
     evt = await store.create_fault_event(
         scenario_id=body.scenario_id,
         asset_id=body.asset_id,
         kb_article_id=body.kb_article_id,
         log_extract=body.log_extract,
-        remediation_step_labels=body.remediation_step_labels,
+        remediation_step_labels=step_labels,
+        impact=_impact_for_scenario(
+            request, body.scenario_id, body.asset_id, len(step_labels)
+        ),
     )
 
     # Update asset state to faulted
@@ -208,15 +330,35 @@ async def update_fault_status(fault_id: str, body: UpdateStatusRequest, request:
     return updated.model_dump(mode="json")
 
 
+@router.patch("/api/faults/{fault_id}/diagnosis")
+async def update_fault_diagnosis(
+    fault_id: str, body: UpdateDiagnosisRequest, request: Request
+) -> dict:
+    """Agent: record diagnosis fields as the investigation progresses [server→server].
+
+    Partial update — only fields present in the body are written. The Operator
+    Dashboard renders these directly (signature, KB match, agent assessment).
+    """
+    store = _store(request)
+    fields = body.model_dump(exclude_none=True)
+    updated = await store.update_fault_fields(fault_id, **fields)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="fault_not_found")
+    await store.sse.publish("fault", updated.model_dump(mode="json"))
+    return updated.model_dump(mode="json")
+
+
 @router.post("/api/faults/{fault_id}/decision")
 async def post_decision(fault_id: str, body: DecisionRequest, request: Request) -> dict:
     """Human: approve or deny remediation.
 
-    On approval:
+    On approval (ADR-011 — the Gateway is the execution trigger):
       1. Registers fault event + allowed steps in MCP Tools
       2. Mints a single-use approval token in MCP Tools
-      3. Stores token against fault_event_id for agent retrieval
-      4. Pushes SSE event
+      3. Pushes SSE decision event
+      4. Starts remediation execution immediately (background task) — no
+         polling, no LLM; the token goes straight into the trusted
+         server-to-server remediation.execute call
     """
     store = _store(request)
     evt = await store.get_fault(fault_id)
@@ -241,9 +383,14 @@ async def post_decision(fault_id: str, body: DecisionRequest, request: Request) 
         scenario_r.raise_for_status()
         scenario_data = scenario_r.json()
         allowed_step_ids = [s["id"] for s in scenario_data.get("remediation_steps", [])]
+        step_labels = {
+            s["id"]: s.get("label", s["id"])
+            for s in scenario_data.get("remediation_steps", [])
+        }
     except httpx.HTTPError:
         # Fall back to empty allowlist — remediation will fail step validation
         allowed_step_ids = []
+        step_labels = {}
 
     # Register fault event + allowed steps in MCP Tools
     mcp_client = _mcp_tools_client(request)
@@ -271,22 +418,30 @@ async def post_decision(fault_id: str, body: DecisionRequest, request: Request) 
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"mcp_tools_error: {exc}") from exc
 
-    # Store token for agent retrieval
+    # Keep the token retrievable over the trusted path for audit/API compat.
     await store.set_pending_token(fault_id, token_str)
 
-    # Update status
-    updated = await store.update_fault_status(fault_id, FaultEventStatus.awaiting_approval)
-
-    await store.sse.publish("fault", updated.model_dump(mode="json"))
     await store.sse.publish("decision", {
         "fault_event_id": fault_id,
         "decision": "approved",
     })
 
+    # Execute immediately (ADR-011): background task so this POST returns at
+    # once; the executor narrates progress and resolves the fault over SSE.
+    request.app.state.remediation_executor.start(
+        store,
+        fault_id=fault_id,
+        asset_id=evt.asset_id,
+        scenario_id=evt.scenario_id,
+        step_ids=allowed_step_ids,
+        step_labels=step_labels,
+        token=token_str,
+    )
+
     return {
         "decision": "approved",
         "fault_event_id": fault_id,
-        "token_available": True,
+        "execution": "started",
     }
 
 
@@ -358,7 +513,7 @@ async def events_stream(request: Request) -> StreamingResponse:
                 try:
                     payload = await asyncio.wait_for(queue.get(), timeout=25.0)
                     yield f"data: {payload}\n\n"
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     yield ": keepalive\n\n"
         finally:
             store.sse.unsubscribe(queue)
@@ -375,6 +530,38 @@ async def events_stream(request: Request) -> StreamingResponse:
 
 # ── Presenter controls (proxy to orchestrator) ────────────────────────────────
 
+
+async def _fire_agent_webhook(scenario_id: str, asset_id: str) -> None:
+    """Wake the OpenClaw agent the instant a scenario is injected (ADR-011).
+
+    Event-driven replacement for the retired agent's fixed-interval poll; a
+    cron job on the agent side remains as the safety net. Best-effort: an
+    unreachable agent must never fail scenario injection. No-op unless
+    OPENCLAW_HOOK_URL and OPENCLAW_HOOK_TOKEN are configured.
+    """
+    import os
+
+    hook_url = os.environ.get("OPENCLAW_HOOK_URL")
+    hook_token = os.environ.get("OPENCLAW_HOOK_TOKEN")
+    if not hook_url or not hook_token:
+        return
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.post(
+                f"{hook_url.rstrip('/')}/hooks/wake",
+                headers={"Authorization": f"Bearer {hook_token}"},
+                json={
+                    "text": (
+                        f"fault-event: scenario {scenario_id} injected on {asset_id} — "
+                        "run the Infrastructure Fault Response program now"
+                    ),
+                    "mode": "now",
+                },
+            )
+    except httpx.HTTPError:
+        pass
+
+
 @router.post("/api/presenter/inject")
 async def presenter_inject(request: Request, scenario: str | None = None):
     """Inject a fault scenario. Proxies to the orchestrator /api/run endpoint.
@@ -387,7 +574,9 @@ async def presenter_inject(request: Request, scenario: str | None = None):
     else:
         resp = await orch.post("/api/run")
     resp.raise_for_status()
-    return resp.json()
+    data = resp.json()
+    await _fire_agent_webhook(data.get("scenario_id", ""), data.get("target_asset", ""))
+    return data
 
 
 @router.post("/api/presenter/reset")

@@ -1,6 +1,6 @@
 # NemoClaw Sentinel Lab
 
-Autonomous AIOps demo: a NemoClaw v0.0.70 agent monitors simulated hardware infrastructure, detects faults, analyses logs with a chain-of-thought LLM, matches Dell KB articles, and proposes remediation — blocked by a server-side human-in-the-loop approval gate until an operator decides.
+Autonomous AIOps demo: a real NemoClaw/OpenClaw agent (OpenShell-sandboxed, ADR-011) monitors simulated hardware infrastructure, detects faults, analyses logs with a local LLM, matches Dell KB articles, and proposes remediation — blocked by a server-side human-in-the-loop approval gate until an operator decides.
 
 One codebase. Swap the **Domain Pack** to switch verticals — GPU cluster, laptop fleet, edge nodes, oil-field rigs — with no code changes.
 
@@ -25,11 +25,12 @@ Pack (content)  →  Framework (agent + services)  →  Lab UI
                │                Lab Browser UI                │
                │  Welcome Page · Lab Guide · Dashboard (SPA) │
                └──────────────────┬──────────────────────────┘
-                                  │ HTTP + SSE
+                                  │ HTTP + SSE + WS (terminal)
                ┌──────────────────▼──────────────────────────┐
                │              Gateway  :8001                  │
                │  REST API · SSE multiplex · React SPA host  │
                │  In-memory state · HITL token store          │
+               │  Terminal WS proxy (ADR-012)                 │
                └───┬──────────────────────┬──────────────────┘
                    │                      │
       ┌────────────▼──────┐    ┌──────────▼──────────┐
@@ -45,24 +46,38 @@ Pack (content)  →  Framework (agent + services)  →  Lab UI
       │  Emits fault events + iDRAC log bundles        │
       └───────────────────────────────────────────────┘
                           ▲
-               ┌──────────┴──────────┐
-               │  NemoClaw Agent     │
-               │  v0.0.70            │
-               │  soul.md + 4 skills │
-               │  Python loop        │
-               └─────────────────────┘
+               ┌──────────┴──────────────────┐
+               │  NemoClaw / OpenClaw agent  │
+               │  (host process, ADR-011)    │
+               │  OpenShell sandbox          │
+               │  SOUL.md + AGENTS.md +      │
+               │  4 skills + infra plugin    │
+               └──────────┬──────────────────┘
                           │
                ┌──────────▼──────────┐
                │  Local LLM          │
                │  vLLM endpoint      │
-               │  chain-of-thought   │
+               │  (OpenClaw provider)│
                └─────────────────────┘
 ```
+
+The agent is **not** a Compose service: `deploy/scripts/onboard-openclaw.sh`
+onboards the real NVIDIA NemoClaw stack — OpenClaw in an OpenShell sandbox —
+as a peer host process that reaches MCP Tools and the Gateway via their
+published ports. See `docs/adr/ADR-011.md` and `openclaw/README.md`.
+
+A second host process (M12) is the **terminal daemon** (:8005, host-local
+bind only, started with `make terminal`), backing the embedded operator
+terminal in the dashboard for configuring the agent (SOUL.md/SKILL.md,
+`nemoclaw`/`openclaw`/`openshell` CLIs). Like the agent, it is not a Compose
+service — the CLIs and sandbox state live on the host. See
+`docs/adr/ADR-012.md` and `docs/SPEC-EMBEDDED-TERMINAL.md`.
 
 ## Project layout
 
 ```
-agent/          NemoClaw agent: soul.md, skills/, loop.py, llm.py
+openclaw/       OpenClaw agent runtime: SOUL.md, AGENTS.md, skills/ (4),
+                plugins/nemoclaw-infra-tools (tool plugin, MCP client)
 libs/common/    Shared Pydantic models, pack loader
 services/
   gateway/      FastAPI: REST API, SSE, HITL token store, SPA host
@@ -72,7 +87,7 @@ services/
 packs/          Domain Pack content per vertical (YAML + Markdown + logs)
 ui/             React + TypeScript dashboard (Vite, SSE-driven)
 docs/           Lab guide (split-screen HTML), welcome page, ADRs
-  adr/          Architecture Decision Records (9 decisions)
+  adr/          Architecture Decision Records (11 decisions)
 docker/         Dockerfiles (backend + gateway with UI build)
 deploy/helm/    Helm chart for Kubernetes deployment
 tests/          Unit + integration + e2e test suite
@@ -93,16 +108,16 @@ See [`docs/VERTICAL-PACK-GUIDE.md`](docs/VERTICAL-PACK-GUIDE.md) to create or ex
 
 ## Agent
 
-The agent is a NemoClaw v0.0.70 instance with a `soul.md` identity document and four skills:
+The agent is real OpenClaw running in an OpenShell sandbox managed by NemoClaw (ADR-011). Its identity lives in `openclaw/SOUL.md`, its standing order in `openclaw/AGENTS.md` (auto-injected every session), and four skills teach the fault workflow. The agent dynamically decides which skill/tool to invoke and in what order.
 
-| Skill | Phase | MCP tools |
-|-------|-------|-----------|
-| `infra-sentinel-monitor` | Detect | `monitor_list_events` |
-| `infra-sentinel-diagnose` | Diagnose | `logs_get_bundle`, LLM, `kb_search` |
-| `infra-sentinel-notify` | Present | Gateway activity API |
-| `infra-sentinel-remediate` | Remediate | `remediation_execute` + HITL token |
+| Skill | Phase | Tools |
+|-------|-------|-------|
+| `infra-sentinel-monitor` | Detect | `monitor_list_events`, `monitor_get_asset`, `monitor_list_assets` |
+| `infra-sentinel-diagnose` | Diagnose | `logs_get_bundle`, `kb_search` (signature identified via the agent's own reasoning, not a separate LLM call) |
+| `infra-sentinel-notify` | Narrate | `notify_post_activity` |
+| `infra-sentinel-remediate` | Propose | `remediation_propose` (LLM-callable) → human approval → `remediation.execute` (Gateway-only, never exposed to the LLM) |
 
-The Python `agent/loop.py` implements the runtime — the skills are Markdown instruction documents the agent's character and reasoning style; the loop is the execution engine.
+The `nemoclaw-infra-tools` OpenClaw plugin registers exactly those seven tools, bridging to the MCP Tools service as an MCP client. It also carries the deterministic harness side-work the old loop performed (fault registration on first log fetch, diagnosis persistence, narration pinning). OpenClaw's built-in tools (`exec`, `browser`, `web_search`, …) are denied via tool policy at onboard time. On approval, the Gateway's `post_decision()` mints the token and calls `remediation.execute` server-to-server immediately — no polling (see [HITL approval gate](#hitl-approval-gate) below and ADR-004, ADR-010, ADR-011).
 
 ## HITL approval gate
 
@@ -123,10 +138,10 @@ uv run pytest tests/e2e/      # end-to-end (requires running stack)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `VLLM_BASE_URL` | `http://YOUR_VLLM_HOST:8000/v1` | LLM inference endpoint (OpenAI-compatible) |
-| `VLLM_API_KEY` | `token-abc123` | API key for vLLM endpoint |
 | `PACK_ID` | `datacenter-xe9680` | Active domain pack |
-| `POLL_INTERVAL` | `5.0` | Agent poll interval in seconds |
+| `OPENCLAW_HOOK_URL` | unset | OpenClaw gateway URL for webhook wake-up (e.g. `http://host.docker.internal:18789`) |
+| `OPENCLAW_HOOK_TOKEN` | unset | Webhook shared secret (printed by `onboard-openclaw.sh`) |
+| `LLM_BASE_URL` / `LLM_MODEL` / `LLM_API_KEY` | — | Consumed by `onboard-openclaw.sh` only; the Compose stack no longer talks to the LLM |
 
 ## Milestones
 
@@ -141,4 +156,8 @@ uv run pytest tests/e2e/      # end-to-end (requires running stack)
 | M6 NemoClaw agent integration (v0.0.70) | ✅ Complete |
 | M7 Lab guide + welcome page (multi-vertical) | ✅ Complete |
 | M8 Extensibility: second pack (laptop-fleet) | ✅ Complete |
-| M9 Prod hardening (Kubernetes, 30 users) | ⬜ Planned |
+| M9 Prod hardening (Kubernetes, 30 users) | ⬜ Planned — terminal sub-scope resolved by ADR-013 (M13); in-cluster agent/sandbox story still deferred (ADR-011(g)) |
+| M10 LLM-driven skill-calling agent (ADR-010) | ✅ Complete — validated live against vLLM/Qwen tool-calling |
+| M11 Real NemoClaw/OpenClaw agent runtime (ADR-011) | 🚧 Implemented — spike partially validated (MCP interop, plugin manifest, docs-level unknowns); live sandbox run blocked on Intel-Mac host (OpenShell has no macOS x86_64 assets), needs a supported host |
+| M12 Embedded operator terminal (ADR-012) | 🚧 Implemented — daemon + proxy + panel verified end-to-end host-side; the in-container gateway→daemon hop needs a ufw allow rule on this host (SPEC §6) |
+| M13 Restricted per-tenant terminal for M9 (ADR-013) | 🚧 Implemented — `TERMINAL_MODE=restricted` console + per-tenant daemon script + Helm secret/values; live end-to-end verification against a real sandbox still outstanding |

@@ -1,5 +1,4 @@
 # Scenario: GPU ECC memory error on mobile discrete GPU
-# PLACEHOLDER — SME: verify with DCGM / nvidia-smi output from Precision 7780 under compute load.
 id: scn-nvgpu-ecc-error
 pack_id: laptop-fleet
 target_asset: laptop-03
@@ -33,3 +32,8 @@ remediation_steps:
     label: "Reset ECC error counters: nvidia-smi --ecc-config=1 then reboot"
   - id: escalate_if_persistent
     label: "If DBE persists after reboot, raise hardware repair ticket"
+impact:
+  summary: "GPU ECC state will be reset and memory diagnostics run to confirm the error was transient."
+  workload_impact: "GPU-accelerated applications are closed during the reset; the user can keep working on integrated graphics."
+  service_risk: "Low — if ECC errors persist after reset, the device is flagged for warranty replacement."
+  estimated_duration: "~10 minutes"

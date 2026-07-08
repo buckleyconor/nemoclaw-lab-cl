@@ -1,3 +1,4 @@
+# Scenario: Triton model load failure — model fails to load on Jetson edge node
 id: scn-triton-model-load-fail
 pack_id: edge-inference
 target_asset: jetson-01
@@ -10,10 +11,13 @@ emit:
     message_id: "INF.1.0.ModelLoadFail"
   log_entries:
     - severity: Warning
-      message: "Triton model repository: failed to load model 'resnet50' — scaffold placeholder"
+      message: "Triton failed to load model 'resnet50' version 1 — model unavailable for inference"
+    - severity: Warning
+      message: "model load failure: 'resnet50' marked UNAVAILABLE in model repository index"
 
 log_bundle_ref: bundles/scn-triton-model-load-fail.log
 
+# Canonical error signatures used for deterministic KB fallback.
 error_signatures:
   - "model load failure"
   - "Triton failed to load"
@@ -25,3 +29,10 @@ remediation_steps:
     label: "Verify model repository path and file integrity"
   - id: restart_triton
     label: "Restart Triton Inference Server service"
+  - id: verify_model_ready
+    label: "Confirm model reports READY and serves a test inference"
+impact:
+  summary: "The model repository will be validated (paths, config, engine-file integrity), Triton restarted to reload the repository, and the model verified READY with a test inference."
+  workload_impact: "Inference requests for the affected model fail or fall back to other nodes until the reload completes; other models on the node keep serving during diagnosis and briefly blip during the restart."
+  service_risk: "Low — single edge node. If the fleet routes around it, capacity for this model is reduced; if this is the only node serving the model, that inference service is down until remediation completes."
+  estimated_duration: "~10 minutes (+ engine rebuild time if the TensorRT plan must be regenerated)"

@@ -35,6 +35,26 @@ spec:
         matchLabels:
           {{- include "nemoclaw.selectorLabels" . | nindent 10 }}
           app.kubernetes.io/component: redis
+    {{- if and .Values.openclawHook.url .Values.openclawHook.token }}
+    # OpenClaw wake hook — the agent is a host process outside the cluster
+    # (ADR-011), so the webhook needs egress past the pod selectors above.
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.openclawHook.egressCidr }}
+      ports:
+        - port: {{ .Values.openclawHook.egressPort }}
+          protocol: TCP
+    {{- end }}
+    {{- if and .Values.terminal.wsUrl .Values.terminal.token }}
+    # Restricted operator terminal (ADR-013) — this tenant's dedicated daemon
+    # process also lives on the external agent host, outside the cluster.
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.terminal.egressCidr }}
+      ports:
+        - port: {{ .Values.terminal.egressPort }}
+          protocol: TCP
+    {{- end }}
 ---
 # Orchestrator: ingress from gateway only + egress to simulator
 apiVersion: networking.k8s.io/v1
@@ -67,7 +87,10 @@ spec:
           {{- include "nemoclaw.selectorLabels" . | nindent 10 }}
           app.kubernetes.io/component: simulator
 ---
-# MCP Tools: ingress from gateway + agent + egress to simulator
+# MCP Tools: ingress from gateway + egress to simulator and gateway
+# (gateway egress: notify.post_activity / remediation.propose tools, ADR-010;
+# gateway ingress also covers remediation.execute, ADR-011. The autonomous
+# agent is not deployed on K8s under ADR-011 — see the ADR's scope note.)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -89,10 +112,6 @@ spec:
             matchLabels:
               {{- include "nemoclaw.selectorLabels" . | nindent 14 }}
               app.kubernetes.io/component: gateway
-        - podSelector:
-            matchLabels:
-              {{- include "nemoclaw.selectorLabels" . | nindent 14 }}
-              app.kubernetes.io/component: agent
   egress:
     - ports:
         - port: 53
@@ -101,6 +120,10 @@ spec:
         matchLabels:
           {{- include "nemoclaw.selectorLabels" . | nindent 10 }}
           app.kubernetes.io/component: simulator
+    - podSelector:
+        matchLabels:
+          {{- include "nemoclaw.selectorLabels" . | nindent 10 }}
+          app.kubernetes.io/component: gateway
 ---
 # Simulator: ingress from orchestrator + mcp-tools only
 apiVersion: networking.k8s.io/v1
@@ -156,37 +179,3 @@ spec:
               {{- include "nemoclaw.selectorLabels" . | nindent 14 }}
               app.kubernetes.io/component: gateway
   egress: []
----
-# Agent: no ingress (loop process) + egress to mcp-tools, gateway, and external vLLM
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: {{ $fullname }}-agent
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "nemoclaw.labels" . | nindent 4 }}
-spec:
-  podSelector:
-    matchLabels:
-      {{- include "nemoclaw.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: agent
-  policyTypes:
-    - Ingress
-    - Egress
-  ingress: []
-  egress:
-    - ports:
-        - port: 53
-          protocol: UDP
-    - podSelector:
-        matchLabels:
-          {{- include "nemoclaw.selectorLabels" . | nindent 10 }}
-          app.kubernetes.io/component: mcp-tools
-    - podSelector:
-        matchLabels:
-          {{- include "nemoclaw.selectorLabels" . | nindent 10 }}
-          app.kubernetes.io/component: gateway
-    # Allow egress to external vLLM endpoint (host network / external IP)
-    - ports:
-        - port: 8000
-          protocol: TCP

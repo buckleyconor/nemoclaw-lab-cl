@@ -1,3 +1,4 @@
+# Scenario: NVMe media error — drive reports media and data integrity errors
 id: scn-nvme-media-error
 pack_id: storage-nvme
 target_asset: nvme-tray-01
@@ -10,10 +11,13 @@ emit:
     message_id: "STO.1.0.MediaError"
   log_entries:
     - severity: Critical
-      message: "NVMe critical warning: media and data integrity error — scaffold placeholder"
+      message: "NVMe critical warning: media and data integrity error on drive S6EUNA0R500358 (slot 4)"
+    - severity: Warning
+      message: "SMART: Media and Data Integrity Errors count rising on nvme3n1 — drive flagged for replacement"
 
 log_bundle_ref: bundles/scn-nvme-media-error.log
 
+# Canonical error signatures used for deterministic KB fallback.
 error_signatures:
   - "media error"
   - "NVMe critical warning"
@@ -22,6 +26,13 @@ kb_article_ref: kb/KB400001.md
 
 remediation_steps:
   - id: identify_failed_drive
-    label: "Identify failed NVMe drive by serial number"
+    label: "Identify failed NVMe drive by serial number and slot"
   - id: hot_swap_drive
     label: "Hot-swap replacement NVMe drive"
+  - id: verify_rebuild
+    label: "Confirm array rebuild completes and volume returns to optimal"
+impact:
+  summary: "The failing drive will be positively identified by serial/slot, hot-swapped without taking the tray offline, and the array rebuild monitored to completion."
+  workload_impact: "None for reads/writes — the array continues serving from redundancy. Expect elevated latency during the rebuild window while parity/mirror data is reconstructed."
+  service_risk: "Redundancy is degraded until the rebuild completes; a second drive failure in the same span during rebuild risks data loss, so replacement is time-sensitive."
+  estimated_duration: "~15 minutes hands-on + rebuild time (typically 1–4 hours depending on capacity and load)"

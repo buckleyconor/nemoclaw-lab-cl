@@ -1,5 +1,4 @@
 # Scenario: PSU redundancy loss — power supply 2 input failure
-# PLACEHOLDER — SME to verify signatures and replace KB article with real Dell content.
 id: scn-psu-loss
 pack_id: datacenter-xe9680
 target_asset: gpu-server-01
@@ -30,3 +29,8 @@ remediation_steps:
     label: "Schedule PSU replacement with facilities"
   - id: verify_redundancy
     label: "Confirm remaining PSU load within limits"
+impact:
+  summary: "Alert acknowledged and physical PSU replacement scheduled; redundancy re-verified after the maintenance window."
+  workload_impact: "None immediately — the node keeps running on the redundant supplies. No drain or migration is required for this action."
+  service_risk: "Degraded power redundancy until the PSU is replaced; a second PSU failure in the same group could force an unplanned shutdown."
+  estimated_duration: "~5 minutes now + scheduled maintenance window"

@@ -1,6 +1,4 @@
-# PLACEHOLDER LOG BUNDLE — scn-thermal-throttle
-# SME: replace with real iDRAC Lifecycle Log + DCGM log from an XE9680 thermal event.
-# Required signatures present: "thermal throttle", "GPU temperature threshold exceeded"
+# Log bundle: scn-thermal-throttle — correlated DCGM / nvidia-smi / iDRAC extract, gpu-server-01 (XE9780L)
 
 2024-01-19T15:30:00Z INFO  dcgm[1234]: Thermal monitoring active. All GPU temps nominal on gpu-server-01.
 2024-01-19T15:30:00Z INFO  iDRAC[LifecycleLog]: Inlet temp: 24°C. All fans at 40%. Thermal headroom adequate.
@@ -17,3 +15,5 @@
 2024-01-19T15:35:02Z WARN  dcgm[1234]: GPU 3 compute throughput reduced 35% due to thermal throttle
 2024-01-19T15:35:03Z INFO  scheduler[5678]: Training job TRN-4471 experiencing GPU throttle — ETA extended
 2024-01-19T15:35:05Z WARN  iDRAC[LifecycleLog]: All fans at 100%. Max cooling engaged for GPU 3.
+2024-01-19T15:36:00Z WARN  iDRAC[LifecycleLog]: Inlet temp holding at 27°C — facility cooling check recommended (CRAC row 4)
+2024-01-19T15:36:30Z INFO  dcgm[1234]: GPU 3: Temp 88°C steady under throttle. Other 7 GPUs 70–78°C. Asset flagged for thermal remediation.

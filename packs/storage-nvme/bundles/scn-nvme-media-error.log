@@ -1,4 +1,18 @@
-# SCAFFOLD LOG BUNDLE — scn-nvme-media-error
-# SME: replace with real nvme-cli SMART log from a Dell PowerEdge NVMe tray
-# exhibiting a media integrity error.
-2024-01-01T00:00:00Z CRIT  storage[2001]: NVMe critical warning: media and data integrity error — scaffold placeholder
+# Log bundle: scn-nvme-media-error — SMART poller / kernel / RAID manager extract, nvme-tray-01 slot 4 (/dev/nvme3n1, S/N S6EUNA0R500358)
+
+2024-07-09T02:40:11Z INFO  storage[2001]: nvme3n1 SMART poll: critical_warning 0x0, media_errors 0, percentage_used 61%
+2024-07-09T02:40:11Z INFO  storage[2001]: tray nvme-tray-01: 8/8 members healthy, volume md0 state OPTIMAL
+2024-07-09T03:15:40Z WARN  storage[2001]: nvme3n1: read latency p99 14.2ms (baseline 1.1ms) — internal retries suspected
+2024-07-09T03:41:07Z WARN  storage[2001]: nvme3n1 SMART poll: media_errors 37 (was 0) — NAND degradation detected
+2024-07-09T03:41:07Z WARN  storage[2001]: nvme3n1: num_err_log_entries 15 and rising — error log accumulating Unrecovered Read Error entries
+2024-07-09T03:52:19Z CRIT  kernel[41207.881]: blk_update_request: critical medium error, dev nvme3n1, sector 812345672
+2024-07-09T03:52:19Z CRIT  kernel[41207.882]: nvme3n1: Unrecovered Read Error — media error at LBA 0x306ad148
+2024-07-09T03:52:20Z CRIT  storage[2001]: NVMe critical warning: media and data integrity error on drive S6EUNA0R500358 (slot 4)
+2024-07-09T03:52:20Z CRIT  storage[2001]: STO.1.0.MediaError — nvme3n1 critical_warning 0x4, media_errors 118
+2024-07-09T03:52:21Z WARN  storage[2001]: SMART: Media and Data Integrity Errors count rising on nvme3n1 — drive flagged for replacement
+2024-07-09T03:52:21Z INFO  raid[2100]: md0: member nvme3n1 marked degraded — reads served from parity, no data loss
+2024-07-09T03:52:22Z INFO  raid[2100]: md0: proactive rebuild queued onto hot-spare (slot 12)
+2024-07-09T03:52:25Z INFO  storage[2001]: slot 4 drive LED set to fault (amber) — physical identification active
+2024-07-09T03:53:00Z INFO  storage[2001]: Volume md0 state: DEGRADED (7/8 members). Redundancy: single-failure tolerant until rebuild completes.
+2024-07-09T03:55:00Z INFO  raid[2100]: md0: rebuild onto slot 12 spare at 4% — ETA 2h10m at current load
+2024-07-09T03:55:05Z INFO  storage[2001]: Asset flagged for remediation: replace drive S6EUNA0R500358 (slot 4), verify rebuild to OPTIMAL.

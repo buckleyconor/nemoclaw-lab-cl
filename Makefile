@@ -8,6 +8,13 @@
 #   make push-multiarch REGISTRY=docker.io/youruser
 #   make deploy REGISTRY=docker.io/youruser TAG=v0.1.0
 #
+# Charmed K8s prod (Intel/amd64 workers — images MUST be amd64):
+#   make push PLATFORM=linux/amd64 REGISTRY=registry.nemoclaw.lab TAG=v0.1.0
+#   make deploy REGISTRY=registry.nemoclaw.lab TAG=v0.1.0 \
+#     VALUES=deploy/helm/nemoclaw/values.prod.yaml
+#   (Building amd64 on the arm64 GB10 runs under QEMU emulation — slow,
+#   especially the fastembed warmup step. Prefer an amd64 builder or CI.)
+#
 # Local dev (docker compose):
 #   make up        # build + start full stack
 #   make down      # stop and remove containers
@@ -19,11 +26,12 @@ NAMESPACE   ?= nemoclaw
 RELEASE     ?= nemoclaw
 CHART       := deploy/helm/nemoclaw
 PLATFORM    ?= linux/arm64   # override: linux/amd64 or linux/arm64,linux/amd64
+VALUES      ?=               # optional extra helm values file, e.g. values.prod.yaml
 
 BACKEND_IMAGE := $(REGISTRY)/nemoclaw-backend:$(TAG)
 GATEWAY_IMAGE := $(REGISTRY)/nemoclaw-gateway:$(TAG)
 
-.PHONY: help build push push-multiarch deploy undeploy up down logs test lint
+.PHONY: help build push push-multiarch deploy undeploy up down logs switch-pack terminal hook-relay test lint
 
 help:
 	@echo "Targets:"
@@ -35,6 +43,9 @@ help:
 	@echo "  up             docker compose up --build"
 	@echo "  down           docker compose down"
 	@echo "  logs           docker compose logs -f"
+	@echo "  switch-pack    Restart the stack bound to PACK_ID=<id> (e.g. make switch-pack PACK_ID=laptop-fleet)"
+	@echo "  terminal       Run the embedded-terminal daemon on the host (ADR-012)"
+	@echo "  hook-relay     Relay the OpenClaw wake hook onto the docker bridge (ADR-011)"
 	@echo "  test           uv run pytest"
 	@echo "  lint           uv run ruff check . && uv run ruff format --check ."
 
@@ -77,6 +88,7 @@ deploy:
 	helm upgrade --install $(RELEASE) $(CHART) \
 	  --namespace $(NAMESPACE) \
 	  --create-namespace \
+	  $(if $(VALUES),-f $(VALUES)) \
 	  --set global.registry=$(REGISTRY) \
 	  --set global.tag=$(TAG) \
 	  --wait
@@ -94,6 +106,23 @@ down:
 
 logs:
 	docker compose logs -f
+
+switch-pack:
+	@test -n "$(PACK_ID)" || (echo "Usage: make switch-pack PACK_ID=<pack-id>"; exit 1)
+	deploy/scripts/switch-pack.sh $(PACK_ID)
+
+# ── Host processes (not Compose services — ADR-011/ADR-012/ADR-013) ──────────
+
+terminal:
+	./deploy/scripts/run-terminal.sh
+
+# M9 (Kubernetes, 30 tenants): one restricted-console terminal daemon per
+# tenant. Usage: make terminal-tenant TENANT=acme SANDBOX_NAME=acme-sandbox PORT=8006
+terminal-tenant:
+	./deploy/scripts/run-terminal-tenant.sh "$(TENANT)" "$(SANDBOX_NAME)" "$(PORT)"
+
+hook-relay:
+	./deploy/scripts/hook-relay.py
 
 # ── Dev quality targets ───────────────────────────────────────────────────────
 

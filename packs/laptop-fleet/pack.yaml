@@ -1,12 +1,25 @@
 id: laptop-fleet
-name: "Dell Precision Mobile Workstation Fleet"
+name: "Dell Pro Precision 7 Fleet"
 asset_noun:
   singular: laptop
   plural: laptops
 fleet_label: "Fleet Health"
 monitoring_adapter: generic
 theme: dell-precision
+sentinel_name: "Laptop Fleet Sentinel"
+asset_image_url: "/pr-precision-7.png"
+asset_spec_label: "Dell Pro Precision 7 · NVIDIA RTX PRO 3000 GPU"
+fleet_layout: list
 assets:
+  # display_name is a cosmetic label only — swap "acme" for the real demo
+  # customer's name whenever this pack gets reused. The functional id
+  # (laptop-01 etc.) is what scenarios/simulator/tests key off of and must
+  # not change without updating those in lockstep.
   - id: laptop-01
+    display_name: "laptop-acme-001"
   - id: laptop-02
+    display_name: "laptop-acme-002"
   - id: laptop-03
+    display_name: "laptop-acme-003"
+  - id: laptop-04
+    display_name: "laptop-acme-004"

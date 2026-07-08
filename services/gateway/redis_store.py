@@ -13,6 +13,8 @@ Key layout (prefix = REDIS_KEY_PREFIX env var, default "nemoclaw"):
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import json
 
 import redis.asyncio as aioredis
@@ -27,6 +29,55 @@ from libs.common.models import (
 from services.gateway.store import AssetRecord, SSEBroker
 
 
+class RedisSSEBroker(SSEBroker):
+    """SSE broker that fans out across gateway replicas via Redis pub/sub.
+
+    ``publish()`` writes to a Redis channel instead of the local queues; each
+    process runs a listener task that receives every channel message
+    (including its own) and fans it out to the local subscriber queues. A
+    browser holding an SSE connection to one replica therefore sees events
+    triggered by requests that landed on any other replica.
+    """
+
+    def __init__(self, r: aioredis.Redis, channel: str) -> None:
+        super().__init__()
+        self._r = r
+        self._channel = channel
+        self._listener: asyncio.Task[None] | None = None
+        self._ready = asyncio.Event()
+
+    def subscribe(self) -> asyncio.Queue[str]:
+        if self._listener is None or self._listener.done():
+            self._ready.clear()
+            self._listener = asyncio.get_running_loop().create_task(self._listen())
+        return super().subscribe()
+
+    async def wait_ready(self) -> None:
+        """Block until the listener holds the channel subscription."""
+        await self._ready.wait()
+
+    async def publish(self, event_type: str, data: dict) -> None:
+        await self._r.publish(self._channel, json.dumps({"type": event_type, "data": data}))
+
+    async def _listen(self) -> None:
+        pubsub = self._r.pubsub()
+        await pubsub.subscribe(self._channel)
+        self._ready.set()
+        try:
+            async for message in pubsub.listen():
+                if message.get("type") == "message":
+                    self._fanout(message["data"])
+        finally:
+            await pubsub.aclose()
+
+    async def aclose(self) -> None:
+        if self._listener is not None:
+            self._listener.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._listener
+            self._listener = None
+
+
 class RedisGatewayStore:
     """Redis-backed gateway state. Drop-in async replacement for GatewayStore."""
 
@@ -39,7 +90,11 @@ class RedisGatewayStore:
     ) -> None:
         self._r: aioredis.Redis = _redis or aioredis.from_url(redis_url, decode_responses=True)
         self._p = prefix
-        self.sse = SSEBroker()  # SSE is always per-process
+        self.sse = RedisSSEBroker(self._r, channel=f"{prefix}:events")
+
+    async def aclose(self) -> None:
+        await self.sse.aclose()
+        await self._r.aclose()
 
     def _k(self, name: str) -> str:
         return f"{self._p}:{name}"
@@ -62,6 +117,20 @@ class RedisGatewayStore:
             return None
         evt = FaultEvent.model_validate_json(raw)
         updated = evt.model_copy(update={"status": status, **extra})
+        await self._r.hset(self._k("faults"), fault_event_id, updated.model_dump_json())
+        return updated
+
+    async def update_fault_fields(
+        self,
+        fault_event_id: str,
+        **fields,
+    ) -> FaultEvent | None:
+        """Partial update of diagnosis fields (signature, analysis, KB match, …)."""
+        raw = await self._r.hget(self._k("faults"), fault_event_id)
+        if raw is None:
+            return None
+        evt = FaultEvent.model_validate_json(raw)
+        updated = evt.model_copy(update=fields)
         await self._r.hset(self._k("faults"), fault_event_id, updated.model_dump_json())
         return updated
 

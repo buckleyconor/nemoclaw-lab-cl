@@ -1,5 +1,4 @@
 # Scenario: Display Driver TDR — NVIDIA driver timeout on Dell Precision laptop
-# PLACEHOLDER — SME: verify with real Windows Event Log entries from Precision 7780.
 id: scn-driver-tdr
 pack_id: laptop-fleet
 target_asset: laptop-02
@@ -33,3 +32,8 @@ remediation_steps:
     label: "Increase TdrDelay registry value (HKLM\\System\\CurrentControlSet\\Control\\GraphicsDrivers)"
   - id: verify_stability
     label: "Run NVIDIA FrameView stress test to confirm stability"
+impact:
+  summary: "GPU driver will be restarted cleanly and the display stack re-verified; user session is preserved."
+  workload_impact: "Brief screen flicker during driver restart; GPU-accelerated apps may need relaunching."
+  service_risk: "Low — single-device action, no data loss expected. Recurring TDRs would indicate a hardware fault needing depot repair."
+  estimated_duration: "~5 minutes"

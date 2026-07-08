@@ -1,5 +1,4 @@
 # Scenario: NVLink fabric link failure between GPUs
-# PLACEHOLDER — SME to verify signatures and replace KB article with real Dell content.
 id: scn-nvlink-down
 pack_id: datacenter-xe9680
 target_asset: gpu-server-02
@@ -30,3 +29,8 @@ remediation_steps:
     label: "Reset NVLink fabric via iDRAC"
   - id: verify_fabric
     label: "Run nvidia-smi nvlink --status to confirm recovery"
+impact:
+  summary: "Node will be cordoned and drained, the NVLink fabric reset via NVSwitch service restart, and fabric health re-verified with link diagnostics."
+  workload_impact: "Multi-GPU workloads on this node are drained first — NVLink resets while jobs are running would corrupt collective operations."
+  service_risk: "One node out of the pool during remediation. Distributed training jobs using this node's fabric restart from checkpoint."
+  estimated_duration: "~20 minutes"

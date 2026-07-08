@@ -1,10 +1,12 @@
 """MCP Tools service entry point.
 
-Exposes four MCP tools over Streamable HTTP:
+Exposes the NemoClaw MCP tools over Streamable HTTP:
   monitor.list_events / monitor.get_asset / monitor.list_assets
   logs.get_bundle
   kb.search
-  remediation.execute (token-gated, HITL)
+  notify.post_activity (LLM narration → Gateway activity feed)
+  remediation.propose (LLM-callable — records a plan, requests approval)
+  remediation.execute (token-gated, HITL — never exposed to the LLM)
 
 Also exposes three FastAPI endpoints:
   GET  /healthz                           — liveness probe
@@ -65,6 +67,7 @@ def create_app(
     pack_dir: Path | None = None,
     simulator_url: str | None = None,
     orchestrator_url: str | None = None,
+    gateway_url: str | None = None,
     token_store: ApprovalTokenStore | None = None,
     fault_registry: FaultEventRegistry | None = None,
 ) -> FastAPI:
@@ -74,12 +77,14 @@ def create_app(
         pack_dir:        Pack directory.  Defaults to ``packs/$PACK_ID``.
         simulator_url:   Simulator base URL.  Defaults to ``$SIMULATOR_URL``.
         orchestrator_url: Orchestrator base URL.  Defaults to ``$ORCHESTRATOR_URL``.
+        gateway_url:     Gateway base URL (notify/propose tools).  Defaults to ``$GATEWAY_URL``.
         token_store:     Inject a custom token store (tests).
         fault_registry:  Inject a custom fault registry (tests).
     """
     resolved_dir = _resolve_pack_dir(pack_dir)
     sim_url = simulator_url or os.environ.get("SIMULATOR_URL", "http://localhost:8003")
     orch_url = orchestrator_url or os.environ.get("ORCHESTRATOR_URL", "http://localhost:8002")
+    gw_url = gateway_url or os.environ.get("GATEWAY_URL", "http://localhost:8001")
 
     # Create token_store and fault_registry at factory time so internal endpoints
     # can capture them in closures — this avoids depending on app.state which
@@ -107,6 +112,7 @@ def create_app(
             adapter=adapter,
             orchestrator_url=orch_url,
             simulator_url=sim_url,
+            gateway_url=gw_url,
             kb_index=KBIndex(loaded),
             token_store=ts,
             fault_registry=fr,

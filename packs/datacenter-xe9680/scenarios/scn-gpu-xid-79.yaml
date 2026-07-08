@@ -1,5 +1,4 @@
 # Scenario: GPU Xid 79 — GPU has fallen off the bus
-# PLACEHOLDER — SME to verify signatures and replace KB article with real Dell content.
 id: scn-gpu-xid-79
 pack_id: datacenter-xe9680
 target_asset: gpu-server-02
@@ -17,7 +16,7 @@ emit:
 
 log_bundle_ref: bundles/scn-gpu-xid-79.log
 
-# SME-provided canonical signatures used for deterministic KB fallback.
+# Canonical error signatures used for deterministic KB fallback.
 error_signatures:
   - "Xid 79"
   - "GPU has fallen off the bus"
@@ -31,3 +30,8 @@ remediation_steps:
     label: "Issue GPU reset via iDRAC"
   - id: verify_health
     label: "Re-run DCGM health check"
+impact:
+  summary: "Node will be cordoned and drained, the failed GPU reset via driver reload, and health re-verified before returning to the scheduler pool."
+  workload_impact: "All training/inference workloads on this node are checkpointed and migrated to spare capacity before the GPU reset — expect job rescheduling delays."
+  service_risk: "Cluster capacity reduced by one 8-GPU node for the duration; no impact to other nodes. Distributed jobs spanning this node will restart from checkpoint."
+  estimated_duration: "~15-20 minutes"

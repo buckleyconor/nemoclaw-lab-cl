@@ -26,7 +26,7 @@ EXPECTED_SCENARIOS = {
 
 EXPECTED_KB_IDS = {"KB100001", "KB100002", "KB100003"}
 
-EXPECTED_ASSETS = {"laptop-01", "laptop-02", "laptop-03"}
+EXPECTED_ASSETS = {"laptop-01", "laptop-02", "laptop-03", "laptop-04"}
 
 
 @pytest.fixture(scope="module")
@@ -54,6 +54,11 @@ def test_pack05_asset_noun(loaded: LoadedPack) -> None:
 
 def test_pack05_assets(loaded: LoadedPack) -> None:
     assert {a.id for a in loaded.pack.assets} == EXPECTED_ASSETS
+
+
+def test_pack05_fleet_layout_is_list(loaded: LoadedPack) -> None:
+    """4 laptops is dense enough that the compact list layout beats image tiles."""
+    assert loaded.pack.fleet_layout == "list"
 
 
 def test_pack05_three_active_scenarios(loaded: LoadedPack) -> None:

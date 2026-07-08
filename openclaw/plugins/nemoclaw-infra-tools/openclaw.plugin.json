@@ -1,0 +1,33 @@
+{
+  "id": "nemoclaw-infra-tools",
+  "name": "NemoClaw Infra Tools",
+  "description": "Infrastructure sentinel tools for the NemoClaw lab: Redfish monitoring, iDRAC log retrieval, KB search, operator narration, and HITL-gated remediation proposals.",
+  "version": "0.1.0",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "mcpUrl": {
+        "type": "string",
+        "description": "Streamable HTTP URL of the mcp-tools service."
+      },
+      "gatewayUrl": {
+        "type": "string",
+        "description": "Base URL of the lab Gateway API."
+      }
+    }
+  },
+  "activation": {
+    "onStartup": true
+  },
+  "contracts": {
+    "tools": [
+      "monitor_list_events",
+      "monitor_get_asset",
+      "monitor_list_assets",
+      "logs_get_bundle",
+      "kb_search",
+      "notify_post_activity",
+      "remediation_propose"
+    ]
+  }
+}

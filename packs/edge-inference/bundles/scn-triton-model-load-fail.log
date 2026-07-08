@@ -1,4 +1,19 @@
-# SCAFFOLD LOG BUNDLE — scn-triton-model-load-fail
-# SME: replace with real Triton Inference Server log from a Jetson AGX Orin
-# exhibiting a model-load failure on startup.
-2024-01-01T00:00:00Z WARN  triton[1001]: Triton model repository: failed to load model 'resnet50' — scaffold placeholder
+# Log bundle: scn-triton-model-load-fail — Triton Inference Server log extract, jetson-01 (AGX Orin 32 GB, JetPack 6.0)
+
+2024-05-12T07:00:00Z INFO  triton[1001]: Triton Inference Server 24.02 started — model repository /models (poll mode, 4 models)
+2024-05-12T07:00:02Z INFO  triton[1001]: loaded: yolov8:1 (tensorrt), bert-base:1 (onnxruntime), whisper-small:1 (onnxruntime), resnet50:1 (tensorrt)
+2024-05-12T07:00:03Z INFO  triton[1001]: server READY — HTTP :8000, gRPC :8001, metrics :8002
+2024-05-12T07:01:55Z INFO  edge-agent[440]: model sync completed: resnet50 updated from artifact registry (model.plan replaced)
+2024-05-12T07:02:10Z INFO  triton[1001]: Poll model repository /models — change detected for 'resnet50'
+2024-05-12T07:02:10Z INFO  triton[1001]: unloading: resnet50:1 (replacing with updated artifact)
+2024-05-12T07:02:10Z INFO  triton[1001]: loading: resnet50:1
+2024-05-12T07:02:12Z INFO  triton[1001]: TensorRT backend: deserializing engine /models/resnet50/1/model.plan
+2024-05-12T07:02:14Z ERROR triton[1001]: model.plan deserialization failed: The engine plan file is not compatible with this version of TensorRT (built with 8.5.2, running 8.6.2)
+2024-05-12T07:02:14Z ERROR triton[1001]: failed to load 'resnet50' version 1: Internal: unable to create TensorRT engine
+2024-05-12T07:02:14Z WARN  triton[1001]: Triton failed to load model 'resnet50' version 1 — model unavailable for inference
+2024-05-12T07:02:14Z WARN  triton[1001]: model load failure: 'resnet50' marked UNAVAILABLE in model repository index
+2024-05-12T07:02:15Z INFO  triton[1001]: server remains READY — 3 of 4 models serving (yolov8, bert-base, whisper-small)
+2024-05-12T07:02:18Z WARN  triton[1001]: inference request for 'resnet50' rejected: Request for unknown model: 'resnet50' has no available versions
+2024-05-12T07:02:20Z WARN  edge-agent[440]: jetson-01: inference requests for 'resnet50' failing — routing to fallback node jetson-02
+2024-05-12T07:02:25Z INFO  edge-agent[440]: jetson-01: node health OK (tegrastats: RAM 14.2/32 GB, GPU 22%) — fault isolated to model artifact
+2024-05-12T07:02:30Z INFO  edge-agent[440]: Asset flagged for remediation: verify model repository artifact for 'resnet50', restart Triton, confirm READY.
