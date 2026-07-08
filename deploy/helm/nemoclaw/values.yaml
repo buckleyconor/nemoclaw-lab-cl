@@ -101,11 +101,21 @@ gateway:
 # ── Ingress (gateway only) ────────────────────────────────────────────────────
 ingress:
   enabled: true
-  className: "nginx"
+  # MicroK8s: `microk8s enable ingress` registers IngressClass "public" (not
+  # "nginx") — verify with `kubectl get ingressclass` before deploying; an
+  # Ingress with an unmatched class is silently never served.
+  className: "public"
   # Set to the hostname you point at the MicroK8s node IP (or /etc/hosts entry).
   host: "nemoclaw.lab"
   # TLS disabled by default; enable in values.prod.yaml.
   tls: []
+  # SSE (/api/events) + terminal WebSocket (/api/terminal/ws) are long-lived —
+  # nginx's 60s proxy-read-timeout would drop them and buffering would starve
+  # SSE. Ignored by non-nginx controllers.
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
 
 # ── Redis ─────────────────────────────────────────────────────────────────────
 redis:

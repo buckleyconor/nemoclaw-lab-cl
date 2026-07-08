@@ -7,6 +7,14 @@ metadata:
   labels:
     {{- include "nemoclaw.labels" . | nindent 4 }}
     app.kubernetes.io/component: gateway
+  {{- with .Values.ingress.annotations }}
+  # Long-lived connections are load-bearing here: the dashboard runs on SSE
+  # (/api/events) and the embedded terminal on a WebSocket (/api/terminal/ws).
+  # nginx's defaults (60s proxy-read-timeout, response buffering) silently
+  # kill/starve both — the values files carry the required overrides.
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   {{- if .Values.ingress.className }}
   ingressClassName: {{ .Values.ingress.className }}

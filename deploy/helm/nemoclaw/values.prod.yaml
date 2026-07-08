@@ -108,3 +108,10 @@ ingress:
     - secretName: nemoclaw-tls
       hosts:
         - nemoclaw.dell-demo.lab
+  # SSE (/api/events) + terminal WebSocket (/api/terminal/ws) are long-lived —
+  # nginx's 60s proxy-read-timeout would drop them and buffering would starve
+  # SSE. Ignored by non-nginx controllers.
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"

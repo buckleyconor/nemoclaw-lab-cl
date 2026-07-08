@@ -211,31 +211,38 @@ def create_app(token: str | None = None) -> FastAPI:
     # Automates what was previously a host-side `make switch-pack PACK_ID=<id>`
     # step (deploy/scripts/switch-pack.sh) so the browser can trigger it with
     # no terminal access. Registered regardless of TERMINAL_MODE — switching
-    # packs is orthogonal to shell vs. restricted PTY mode.
+    # packs is orthogonal to shell vs. restricted PTY mode — but ONLY when
+    # this daemon's host actually runs the docker-compose stack: in the M9
+    # Kubernetes deployment the stack is Helm-managed and per-tenant daemons
+    # on the agent host must not run `docker compose down` against whatever
+    # checkout happens to live there. run-terminal-tenant.sh sets
+    # SWITCH_PACK_ENABLED=0; the single-host default stays enabled.
     #
     # switch-pack.sh does `docker compose down && up -d`, which kills the very
     # Gateway container relaying this request — so this handler must NOT await
     # it. It spawns the script detached and acks immediately, before the
     # container teardown happens; the caller polls GET /api/pack afterward to
     # detect when the new pack is actually up.
-    @app.post("/switch-pack")
-    async def switch_pack(request: Request) -> dict[str, object]:
-        if not _authorized_request(request, resolved_token):
-            raise HTTPException(status_code=401)
-        body = await request.json()
-        pack_id = body.get("pack_id", "")
-        if not isinstance(pack_id, str) or not _PACK_ID_RE.fullmatch(pack_id):
-            raise HTTPException(status_code=400, detail="invalid pack_id")
-        if not (_REPO_ROOT / "packs" / pack_id / "pack.yaml").is_file():
-            raise HTTPException(status_code=404, detail=f"unknown pack: {pack_id}")
-        subprocess.Popen(  # noqa: S603 — literal argv, pack_id validated above
-            [str(_REPO_ROOT / "deploy" / "scripts" / "switch-pack.sh"), pack_id],
-            cwd=_REPO_ROOT,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,
-        )
-        return {"ok": True, "status": "switch-started", "pack_id": pack_id}
+    if os.environ.get("SWITCH_PACK_ENABLED", "1") != "0":
+
+        @app.post("/switch-pack")
+        async def switch_pack(request: Request) -> dict[str, object]:
+            if not _authorized_request(request, resolved_token):
+                raise HTTPException(status_code=401)
+            body = await request.json()
+            pack_id = body.get("pack_id", "")
+            if not isinstance(pack_id, str) or not _PACK_ID_RE.fullmatch(pack_id):
+                raise HTTPException(status_code=400, detail="invalid pack_id")
+            if not (_REPO_ROOT / "packs" / pack_id / "pack.yaml").is_file():
+                raise HTTPException(status_code=404, detail=f"unknown pack: {pack_id}")
+            subprocess.Popen(  # noqa: S603 — literal argv, pack_id validated above
+                [str(_REPO_ROOT / "deploy" / "scripts" / "switch-pack.sh"), pack_id],
+                cwd=_REPO_ROOT,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            return {"ok": True, "status": "switch-started", "pack_id": pack_id}
 
     if restricted:
         # Non-interactive equivalent of the restricted console's menu option 7

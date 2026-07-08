@@ -54,5 +54,10 @@ export TERMINAL_TOKEN
 export TERMINAL_MODE=restricted
 export SANDBOX_NAME
 export TERMINAL_WORKSPACE_DIR="${HOME}/nemoclaw-tenants/${TENANT}/work"
+# M9 tenants: the stack is Helm-managed in Kubernetes — the browser-triggered
+# pack switch (POST /switch-pack, which runs docker compose down/up in this
+# checkout) is meaningless there and destructive to anything compose-managed
+# on this agent host. Disable it; single-host demos (run-terminal.sh) keep it.
+export SWITCH_PACK_ENABLED=0
 exec uv run uvicorn --factory services.terminal.main:create_app \
   --host "${BIND}" --port "${PORT}"

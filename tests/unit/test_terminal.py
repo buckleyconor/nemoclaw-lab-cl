@@ -205,6 +205,22 @@ def test_daemon_switch_pack_rejects_malformed_pack_id(pack_id: str) -> None:
     assert resp.status_code == 400
 
 
+def test_daemon_switch_pack_route_absent_when_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """M9 per-tenant daemons (run-terminal-tenant.sh) set SWITCH_PACK_ENABLED=0:
+    the stack is Helm-managed there, and docker compose down/up against the
+    agent host's checkout would be destructive, not a pack switch."""
+    monkeypatch.setenv("SWITCH_PACK_ENABLED", "0")
+    client = TestClient(create_daemon_app(token="secret"))
+    resp = client.post(
+        "/switch-pack",
+        json={"pack_id": "laptop-fleet"},
+        headers={"Authorization": "Bearer secret"},
+    )
+    assert resp.status_code == 404
+
+
 def test_daemon_switch_pack_rejects_unknown_but_validly_shaped_pack_id() -> None:
     client = TestClient(create_daemon_app(token="secret"))
     resp = client.post(
