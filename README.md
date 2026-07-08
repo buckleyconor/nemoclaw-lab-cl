@@ -4,15 +4,41 @@ Autonomous AIOps demo: a real NemoClaw/OpenClaw agent (OpenShell-sandboxed, ADR-
 
 One codebase. Swap the **Domain Pack** to switch verticals — GPU cluster, laptop fleet, edge nodes, oil-field rigs — with no code changes.
 
-## Quick start (Docker Compose)
+## Quick start
+
+Day-to-day (everything already onboarded once):
 
 ```bash
-cp .env.example .env          # set VLLM_BASE_URL and VLLM_API_KEY
-docker compose up -d
+make demo-up                  # compose stack + terminal daemon + hook-relay, then preflight
 open http://localhost:8001/lab/
 ```
 
-The welcome page lists all available verticals. Click one to open the split-screen lab guide + live dashboard.
+`make doctor` re-runs just the preflight — a red/green check of every moving
+part (4 services, terminal daemon, hook-relay, sandbox wake-hook, LLM
+endpoint) with the exact fix printed for anything that's down. If faults are
+ever "not being detected", run it first; the cause is almost always a dead
+host process, not the agent. See [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md).
+
+First-time setup (once per host):
+
+```bash
+cp .env.example .env                      # set LLM_BASE_URL / LLM_MODEL / LLM_API_KEY
+docker compose up -d --build
+make terminal                             # prints TERMINAL_WS_URL/TERMINAL_TOKEN → add to .env
+deploy/scripts/onboard-openclaw.sh        # onboards the agent sandbox; prints OPENCLAW_HOOK_* → add to .env
+                                          # (confirm the webhook port with `nemoclaw <sandbox> status` —
+                                          #  default 18789, self-reassigns if taken)
+docker compose up -d gateway              # pick up the new .env values
+make demo-up                              # starts host daemons + verifies everything
+```
+
+Optional: install the systemd user units in `deploy/systemd/` so the terminal
+daemon and hook-relay survive reboots (the compose services already restart
+via `restart: unless-stopped`; openshell's sandbox port-forward is the one
+piece that can't be unit-managed — `make doctor` detects it and prints the
+`nemoclaw <sandbox> recover` fix).
+
+The welcome page lists all available verticals. Click one to open the split-screen lab guide + live dashboard — switching verticals restarts the stack on the right pack automatically.
 
 ## Architecture
 
@@ -90,6 +116,8 @@ docs/           Lab guide (split-screen HTML), welcome page, ADRs
   adr/          Architecture Decision Records (11 decisions)
 docker/         Dockerfiles (backend + gateway with UI build)
 deploy/helm/    Helm chart for Kubernetes deployment
+deploy/scripts/ Host-side ops: demo-up, doctor, switch-pack, terminal, hook-relay, onboarding
+deploy/systemd/ User units so the host daemons survive reboots
 tests/          Unit + integration + e2e test suite
 ```
 
@@ -139,7 +167,7 @@ uv run pytest tests/e2e/      # end-to-end (requires running stack)
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PACK_ID` | `datacenter-xe9680` | Active domain pack |
-| `OPENCLAW_HOOK_URL` | unset | OpenClaw gateway URL for webhook wake-up (e.g. `http://host.docker.internal:18789`) |
+| `OPENCLAW_HOOK_URL` | unset | OpenClaw webhook wake-up URL, `http://host.docker.internal:<port>` — port 18789 by default but openclaw self-reassigns if taken (confirm with `nemoclaw <sandbox> status`); on Linux, `make hook-relay` must bridge it to the container |
 | `OPENCLAW_HOOK_TOKEN` | unset | Webhook shared secret (printed by `onboard-openclaw.sh`) |
 | `LLM_BASE_URL` / `LLM_MODEL` / `LLM_API_KEY` | — | Consumed by `onboard-openclaw.sh` only; the Compose stack no longer talks to the LLM |
 

@@ -189,6 +189,7 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
   const isDecided = deciding !== null && fault.status === "awaiting_approval";
   const canDecide = fault.status === "awaiting_approval" && deciding === null;
   const isActive = fault.status !== "resolved" && fault.status !== "denied";
+  const exportable = !isActive;
   // Both impact assessment and remediation steps are already available on the
   // FaultEvent as soon as it's created (from the scenario's static content),
   // well before the agent has actually diagnosed anything. Gate their display
@@ -260,16 +261,19 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
           {meta.label}
         </span>
         <span style={{ flex: 1 }} />
+        {/* Exportable once the fault reaches a terminal decision — a denied
+            fault's audit trail (who declined what, and why the agent asked)
+            matters as much as a resolved one's. */}
         <button
-          onClick={() => fault.status === "resolved" && exportReport(fault, activity)}
-          disabled={fault.status !== "resolved"}
+          onClick={() => exportable && exportReport(fault, activity)}
+          disabled={!exportable}
           title={
-            fault.status === "resolved"
+            exportable
               ? "Export a printable event report for the audit trail"
-              : "Available once self-heal has completed and the asset is healthy again"
+              : "Available once the operator has decided and any self-heal has completed"
           }
           style={
-            fault.status === "resolved"
+            exportable
               ? {
                   padding: "4px 10px",
                   background: "rgba(96,165,250,.1)",

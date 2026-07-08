@@ -462,7 +462,11 @@ body.started .curtain-half.right { animation: curtain-right 1.5s cubic-bezier(.6
 }
 
 /* ── MOBILE FALLBACK ────────────────────────────────────────────── */
-@media (max-width: 800px) {
+/* 1100px (not 800) so a half-screen laptop window stacks vertically instead
+   of squeezing the dashboard iframe into ~550px of side-by-side split — and
+   it now sits above the SPA's own 900px single-column breakpoint, so the
+   two layouts never disagree in the awkward in-between range. */
+@media (max-width: 1100px) {
   .split-root { grid-template-columns: 1fr; grid-template-rows: 55vh 4px 45vh; height: 200vh; }
   html, body { height: auto; overflow: auto; }
   .left-panel { height: 55vh; }
@@ -574,15 +578,17 @@ body.started .curtain-half.right { animation: curtain-right 1.5s cubic-bezier(.6
         <ul class="takeaway-list">
           <li>Scroll down to the <strong>Agent Configuration Terminal</strong> panel (below the Operator Dashboard) and pick the matching menu number, 1–6</li>
           <li>The terminal opens that file in <code>vim</code>, seeded from whatever is already in the OpenShell sandbox</li>
-          <li>Clear the placeholder text (<code>ggVGd</code>), paste the content you copied below, then save and quit (<code>:wq</code>)</li>
+          <li>Type <code>ggVGd</code> to delete any existing text, then press <code>i</code> to enter insert mode <em>(vim ignores pasted text unless you do — this step matters)</em></li>
+          <li>Paste with <strong>Ctrl+Shift+V</strong> (browser terminals don't use plain Ctrl+V), then press <code>Esc</code> and type <code>:wq</code> to save and quit</li>
+          <li>Made a mess? <code>Esc</code> then <code>:q!</code> quits without saving — pick the same menu number and start over</li>
           <li>The terminal <strong>automatically uploads</strong> the file (or installs it, for skills) into the OpenShell sandbox — there is no separate upload command to run</li>
-          <li>Back at the menu, that item turns <span style="color:var(--healthy)">green with a ✓</span> once the push succeeds</li>
+          <li>Back at the menu, that item turns <span style="color:var(--healthy)">green with a ✓</span> once the push succeeds (skills are checked for valid frontmatter before pushing — a red error means the paste got mangled: re-pick the item and try again)</li>
         </ul>
       </div>
 
       <details class="file-collapse">
         <summary><span class="file-collapse-num">1</span> Identity <code>SOUL.md</code></summary>
-        <p>Terminal menu item <strong>1) Edit SOUL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick option <strong>1</strong>, select all the placeholder text in <code>vim</code> (<code>ggVGd</code>), paste, and save (<code>:wq</code>).</p>
+        <p>Terminal menu item <strong>1) Edit SOUL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick option <strong>1</strong>, clear the file (<code>ggVGd</code>), press <code>i</code>, paste (<strong>Ctrl+Shift+V</strong>), then <code>Esc</code> and <code>:wq</code>.</p>
         <div class="codeblock" data-vertical="ai-infrastructure">
           <div class="codeblock-header"><span>SOUL.md</span><button class="copy-btn" data-copy-target="soul-md-src">📋 Copy</button></div>
           <pre id="soul-md-src"><code># AI Infrastructure Sentinel — Soul
@@ -734,7 +740,7 @@ SOUL.md v2.0 — NemoClaw Device Fleet Sentinel on OpenClaw (ADR-011), 2026
       </details>
       <details class="file-collapse">
         <summary><span class="file-collapse-num">2</span> Operating guide <code>AGENTS.md</code></summary>
-        <p>Terminal menu item <strong>2) Edit AGENTS.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick option <strong>2</strong>, select all the placeholder text in <code>vim</code> (<code>ggVGd</code>), paste, and save (<code>:wq</code>).</p>
+        <p>Terminal menu item <strong>2) Edit AGENTS.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick option <strong>2</strong>, clear the file (<code>ggVGd</code>), press <code>i</code>, paste (<strong>Ctrl+Shift+V</strong>), then <code>Esc</code> and <code>:wq</code>.</p>
         <div class="codeblock" data-vertical="ai-infrastructure">
           <div class="codeblock-header"><span>AGENTS.md</span><button class="copy-btn" data-copy-target="agents-md-src">📋 Copy</button></div>
           <pre id="agents-md-src"><code># AI Infrastructure Sentinel — Operating Guide
@@ -936,7 +942,7 @@ or re-proposing on every wake-up instead of just checking in and stopping.
       </details>
       <details class="file-collapse">
         <summary><span class="file-collapse-num">3</span> Detect <code>infra-sentinel-monitor/SKILL.md</code></summary>
-        <p>Terminal menu item <strong>3) Edit infra-sentinel-monitor/SKILL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick option <strong>3</strong>, select all the placeholder text in <code>vim</code> (<code>ggVGd</code>), paste, and save (<code>:wq</code>).</p>
+        <p>Terminal menu item <strong>3) Edit infra-sentinel-monitor/SKILL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick option <strong>3</strong>, clear the file (<code>ggVGd</code>), press <code>i</code>, paste (<strong>Ctrl+Shift+V</strong>), then <code>Esc</code> and <code>:wq</code>.</p>
         <div class="codeblock" data-vertical="ai-infrastructure">
           <div class="codeblock-header"><span>infra-sentinel-monitor/SKILL.md</span><button class="copy-btn" data-copy-target="skill-monitor-src">📋 Copy</button></div>
           <pre id="skill-monitor-src"><code>---
@@ -1022,7 +1028,7 @@ Or `{ "status": "no_fault" }` when nothing is active.
       </details>
       <details class="file-collapse">
         <summary><span class="file-collapse-num">4</span> Diagnose <code>infra-sentinel-diagnose/SKILL.md</code></summary>
-        <p>Terminal menu item <strong>4) Edit infra-sentinel-diagnose/SKILL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick option <strong>4</strong>, select all the placeholder text in <code>vim</code> (<code>ggVGd</code>), paste, and save (<code>:wq</code>).</p>
+        <p>Terminal menu item <strong>4) Edit infra-sentinel-diagnose/SKILL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick option <strong>4</strong>, clear the file (<code>ggVGd</code>), press <code>i</code>, paste (<strong>Ctrl+Shift+V</strong>), then <code>Esc</code> and <code>:wq</code>.</p>
         <div class="codeblock" data-vertical="ai-infrastructure">
           <div class="codeblock-header"><span>infra-sentinel-diagnose/SKILL.md</span><button class="copy-btn" data-copy-target="skill-diagnose-src">📋 Copy</button></div>
           <pre id="skill-diagnose-src"><code>---
@@ -1212,7 +1218,7 @@ Proceed to `infra-sentinel-remediate` to compose the proposal.
       </details>
       <details class="file-collapse">
         <summary><span class="file-collapse-num">5</span> Narrate <code>infra-sentinel-notify/SKILL.md</code></summary>
-        <p>Terminal menu item <strong>5) Edit infra-sentinel-notify/SKILL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick option <strong>5</strong>, select all the placeholder text in <code>vim</code> (<code>ggVGd</code>), paste, and save (<code>:wq</code>).</p>
+        <p>Terminal menu item <strong>5) Edit infra-sentinel-notify/SKILL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick option <strong>5</strong>, clear the file (<code>ggVGd</code>), press <code>i</code>, paste (<strong>Ctrl+Shift+V</strong>), then <code>Esc</code> and <code>:wq</code>.</p>
         <div class="codeblock" data-vertical="ai-infrastructure">
           <div class="codeblock-header"><span>infra-sentinel-notify/SKILL.md</span><button class="copy-btn" data-copy-target="skill-notify-src">📋 Copy</button></div>
           <pre id="skill-notify-src"><code>---
@@ -1328,7 +1334,7 @@ the platform, not by you — your narration ends at `present`.
       </details>
       <details class="file-collapse">
         <summary><span class="file-collapse-num">6</span> Propose <code>infra-sentinel-remediate/SKILL.md</code></summary>
-        <p>Terminal menu item <strong>6) Edit infra-sentinel-remediate/SKILL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick option <strong>6</strong>, select all the placeholder text in <code>vim</code> (<code>ggVGd</code>), paste, and save (<code>:wq</code>).</p>
+        <p>Terminal menu item <strong>6) Edit infra-sentinel-remediate/SKILL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick option <strong>6</strong>, clear the file (<code>ggVGd</code>), press <code>i</code>, paste (<strong>Ctrl+Shift+V</strong>), then <code>Esc</code> and <code>:wq</code>.</p>
         <div class="codeblock" data-vertical="ai-infrastructure">
           <div class="codeblock-header"><span>infra-sentinel-remediate/SKILL.md</span><button class="copy-btn" data-copy-target="skill-remediate-src">📋 Copy</button></div>
           <pre id="skill-remediate-src"><code>---
@@ -1539,9 +1545,12 @@ buttons in the dashboard:
       <div style="margin:16px 0 20px;padding:16px 18px;background:linear-gradient(135deg,rgba(0,118,206,.08),rgba(118,185,0,.05));border:1px solid rgba(59,130,246,.25);border-radius:10px;">
         <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);letter-spacing:.14em;text-transform:uppercase;margin-bottom:10px;">Fault Injection Control</div>
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-          <button id="startBtn" onclick="triggerFault()" style="background:linear-gradient(135deg,#0558a5,#0672cb);color:#fff;border:0;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;letter-spacing:.04em;cursor:pointer;font-family:var(--sans);transition:filter .15s,transform .15s;" onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''">
+          <button id="injectBtn" onclick="triggerFault()" style="background:linear-gradient(135deg,#0558a5,#0672cb);color:#fff;border:0;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;letter-spacing:.04em;cursor:pointer;font-family:var(--sans);transition:filter .15s,transform .15s;" onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''">
             ▶ Let's get started
           </button>
+          <select id="scenarioSelect" title="Which fault to inject" style="background:var(--bg);color:var(--text);border:1px solid var(--border-strong);border-radius:8px;padding:9px 10px;font-size:12px;font-family:var(--mono);max-width:260px;">
+            <option value="">Surprise me (rotate scenarios)</option>
+          </select>
           <div id="startStatus" style="font-family:var(--mono);font-size:12px;color:var(--text-dim);"></div>
         </div>
       </div>
@@ -1786,6 +1795,7 @@ function loadDash() {
   document.getElementById("dash-frame").src = dashboardUrl;
   document.getElementById("dashError").classList.remove("show");
   checkPackMatch();
+  populateScenarioPicker();
 }
 
 function currentVertical() {
@@ -1851,13 +1861,18 @@ async function startLab() {
     }
   }
 
-  // Always reset the sandbox config before the lab begins — regardless of
-  // whether a pack switch just happened — so every lab run starts from a
-  // blank SOUL.md/AGENTS.md/skills instead of relying on the operator having
-  // clicked "Ready for a different scenario?" on the way out last time.
-  btn.textContent = "Starting…";
-  sub.textContent = "Resetting sandbox config…";
-  await fetch(`${window.location.origin}/api/terminal/reset`, { method: "POST" }).catch(() => {});
+  // Reset the sandbox config before the lab begins, so every lab run starts
+  // from blank SOUL.md/AGENTS.md/skills — but only ONCE per tab+pack: the
+  // sessionStorage guard means an accidental F5 mid-demo doesn't wipe the
+  // config the attendee just spent Part 1 pasting in. Arriving fresh from
+  // the vertical picker always resets (index.html clears the flag on card
+  // click), as does switching to a different pack (the flag is pack-keyed).
+  if (sessionStorage.getItem("nemoclawLabStarted") !== expected) {
+    btn.textContent = "Starting…";
+    sub.textContent = "Resetting sandbox config…";
+    await fetch(`${window.location.origin}/api/terminal/reset`, { method: "POST" }).catch(() => {});
+    try { sessionStorage.setItem("nemoclawLabStarted", expected); } catch { /* private mode */ }
+  }
 
   document.body.classList.add("started");
   setTimeout(() => {
@@ -1875,9 +1890,15 @@ async function startLab() {
 // Best-effort: the /api/terminal/reset route only exists when the terminal
 // daemon is running in restricted mode, so this must never block navigation.
 function returnToMenu() {
+  // Destructive for anyone mid-exercise — make the click deliberate.
+  if (!confirm(
+    "This wipes the agent's SOUL.md, AGENTS.md and all four skills so the " +
+    "next scenario starts unconfigured.\n\nLeave this lab and reset the agent?"
+  )) return;
   const btn = document.getElementById("returnMenuBtn");
   btn.disabled = true;
   btn.textContent = "Resetting sandbox config…";
+  try { sessionStorage.removeItem("nemoclawLabStarted"); } catch { /* private mode */ }
   fetch(`${window.location.origin}/api/terminal/reset`, { method: "POST" })
     .catch(() => {})
     .finally(() => { window.location.href = "./index.html"; });
@@ -2000,9 +2021,30 @@ function resetDashboard() {
 
 // ── Fault trigger countdown ───────────────────────────────────────
 let countdown = null;
+// Populate the injection picker from the active pack's scenario list.
+// Called from loadDash() (not just page load) so a pack switch re-populates
+// it with the new pack's scenarios.
+function populateScenarioPicker() {
+  const sel = document.getElementById("scenarioSelect");
+  fetch(`${window.location.origin}/api/presenter/scenarios`)
+    .then(r => r.json())
+    .then(data => {
+      const scenarios = (data && data.scenarios) || [];
+      sel.length = 1; // keep the "Surprise me" rotate option
+      for (const s of scenarios) {
+        if (s.status !== "active") continue;
+        const opt = document.createElement("option");
+        opt.value = s.id;
+        opt.textContent = `${s.id} → ${s.target_asset}`;
+        sel.appendChild(opt);
+      }
+    })
+    .catch(() => { /* picker stays rotate-only if the list can't load */ });
+}
+
 function triggerFault() {
   if (countdown !== null) return;
-  const btn = document.getElementById("startBtn");
+  const btn = document.getElementById("injectBtn");
   const status = document.getElementById("startStatus");
 
   // Block when opened as file:// — browser prevents cross-origin fetch to http://
@@ -2027,7 +2069,11 @@ function triggerFault() {
       clearInterval(countdown);
       countdown = null;
       status.textContent = "Injecting…";
-      fetch(`${base}/api/presenter/inject`, { method: "POST" })
+      const chosen = document.getElementById("scenarioSelect").value;
+      const injectUrl = chosen
+        ? `${base}/api/presenter/inject?scenario=${encodeURIComponent(chosen)}`
+        : `${base}/api/presenter/inject`;
+      fetch(injectUrl, { method: "POST" })
         .then(r => {
           if (r.ok) {
             status.style.color = "var(--healthy)";

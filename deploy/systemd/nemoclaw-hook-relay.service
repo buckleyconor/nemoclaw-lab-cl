@@ -1,0 +1,27 @@
+# Wake-hook relay (ADR-011) as a user service — survives reboots, unlike a
+# bare `make hook-relay`. Install (adjust WorkingDirectory and the port to
+# match `nemoclaw <sandbox> status`):
+#
+#   mkdir -p ~/.config/systemd/user
+#   cp deploy/systemd/nemoclaw-hook-relay.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now nemoclaw-hook-relay
+#   loginctl enable-linger $USER    # keep user services alive without a login session
+#
+# Note: the relay only bridges to openshell's loopback SSH forward — if the
+# sandbox forward itself died (reboot), also run: nemoclaw <sandbox> recover.
+# `make doctor` checks both hops.
+[Unit]
+Description=NemoClaw wake-hook relay (docker bridge -> openshell loopback forward)
+After=network-online.target
+
+[Service]
+Type=exec
+WorkingDirectory=%h/projects/nemoclaw-lab-cl
+Environment=HOOK_RELAY_PORT=18790
+ExecStart=/usr/bin/env python3 %h/projects/nemoclaw-lab-cl/deploy/scripts/hook-relay.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

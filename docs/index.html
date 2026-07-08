@@ -257,7 +257,14 @@ document.getElementById("cards").addEventListener("click", function(e) {
     return;
   }
   const href = card.dataset.href;
-  if (href) window.location.href = href;
+  if (href) {
+    // Entering a lab from the picker must always start with an unconfigured
+    // agent — clear the guide's reset-once guard so its startLab() re-blanks
+    // the sandbox (the guard otherwise protects mid-demo reloads from wiping
+    // a half-finished persona exercise).
+    try { sessionStorage.removeItem("nemoclawLabStarted"); } catch { /* private mode */ }
+    window.location.href = href;
+  }
 });
 
 function showToast(msg) {

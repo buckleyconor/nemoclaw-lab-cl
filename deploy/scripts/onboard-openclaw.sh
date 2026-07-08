@@ -157,12 +157,17 @@ echo "── Onboarding complete ───────────────�
 echo "Sandbox:        $SANDBOX_NAME"
 echo "Webhook token:  $HOOK_TOKEN"
 echo
-echo "Point the lab Gateway at the agent (then docker compose up -d gateway)."
-echo "NOTE: 18789 is only the default — if it was already taken (e.g. another"
-echo "sandbox on this host), onboarding logs 'Port 18789 is taken. Using port"
-echo "N instead.' Confirm the real port with: nemoclaw $SANDBOX_NAME status"
-echo "  export OPENCLAW_HOOK_URL=http://host.docker.internal:18789"
-echo "  export OPENCLAW_HOOK_TOKEN=$HOOK_TOKEN"
+echo "Point the lab Gateway at the agent (add to .env, then docker compose up -d gateway)."
+echo "NOTE: 18789 is only openclaw's default webhook port — if it was already"
+echo "taken (e.g. another sandbox on this host), onboarding logs 'Port 18789 is"
+echo "taken. Using port N instead.' (the reference GB10 host landed on 18790)."
+echo "ALWAYS confirm the real port first: nemoclaw $SANDBOX_NAME status"
+echo "  OPENCLAW_HOOK_URL=http://host.docker.internal:<PORT>"
+echo "  OPENCLAW_HOOK_TOKEN=$HOOK_TOKEN"
+echo
+echo "On Linux the containerized Gateway can't reach openshell's loopback-bound"
+echo "forward directly — run the bridge relay on the same port:"
+echo "  HOOK_RELAY_PORT=<PORT> make hook-relay"
 echo
 echo "Status:  nemoclaw $SANDBOX_NAME status"
 echo "Logs:    nemoclaw $SANDBOX_NAME logs --follow"

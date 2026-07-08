@@ -31,10 +31,12 @@ VALUES      ?=               # optional extra helm values file, e.g. values.prod
 BACKEND_IMAGE := $(REGISTRY)/nemoclaw-backend:$(TAG)
 GATEWAY_IMAGE := $(REGISTRY)/nemoclaw-gateway:$(TAG)
 
-.PHONY: help build push push-multiarch deploy undeploy up down logs switch-pack terminal hook-relay test lint
+.PHONY: help build push push-multiarch deploy undeploy up down logs switch-pack terminal hook-relay demo-up doctor test lint
 
 help:
 	@echo "Targets:"
+	@echo "  demo-up        Bring up EVERYTHING the demo needs (stack + host daemons), then doctor"
+	@echo "  doctor         Preflight: red/green check of all demo dependencies with fixes"
 	@echo "  build          Build images for PLATFORM=$(PLATFORM)"
 	@echo "  push           Build + push to REGISTRY=$(REGISTRY)"
 	@echo "  push-multiarch Build linux/arm64,linux/amd64 and push"
@@ -123,6 +125,15 @@ terminal-tenant:
 
 hook-relay:
 	./deploy/scripts/hook-relay.py
+
+# One command to a working demo: compose stack + terminal daemon + hook-relay
+# (started in the background if not already running), then the doctor preflight.
+demo-up:
+	./deploy/scripts/demo-up.sh
+
+# Red/green preflight of every demo dependency, with the fix for anything down.
+doctor:
+	./deploy/scripts/doctor.sh
 
 # ── Dev quality targets ───────────────────────────────────────────────────────
 

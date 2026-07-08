@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+# Demo preflight — checks every moving part the lab needs and prints a
+# red/green table with the fix for anything that's down.
+#
+# The failure class this exists for: the terminal daemon, hook-relay, and
+# openshell's SSH port-forward are host processes that die silently (reboot,
+# session end), and the only symptom is "faults are never detected" — which
+# looks exactly like an agent/config bug. Both such incidents during
+# development were host-process failures, not code. Run this first.
+#
+# Usage: make doctor   (or deploy/scripts/doctor.sh)
+# Exit code: 0 if everything passes, 1 otherwise.
+set -uo pipefail
+
+cd "$(dirname "$0")/../.."
+
+GREEN=$'\033[32m'; RED=$'\033[31m'; YELLOW=$'\033[33m'; DIM=$'\033[2m'; RESET=$'\033[0m'
+FAILURES=0
+
+# Pull the vars we probe with from .env (never exported — read-only probe).
+env_get() { grep -E "^$1=" .env 2>/dev/null | head -1 | cut -d= -f2-; }
+HOOK_URL="$(env_get OPENCLAW_HOOK_URL)"
+TERMINAL_WS_URL="$(env_get TERMINAL_WS_URL)"
+TERMINAL_BIND="$(env_get TERMINAL_BIND)"; TERMINAL_BIND="${TERMINAL_BIND:-127.0.0.1}"
+LLM_BASE_URL="$(env_get LLM_BASE_URL)"
+[[ -z "$LLM_BASE_URL" ]] && LLM_BASE_URL="$(env_get VLLM_BASE_URL)"
+SANDBOX_NAME="$(env_get SANDBOX_NAME)"; SANDBOX_NAME="${SANDBOX_NAME:-infra-sentinel}"
+
+pass() { printf "  %s✓%s %-34s %s\n" "$GREEN" "$RESET" "$1" "${2:-}"; }
+fail() {
+  printf "  %s✗%s %-34s %s\n" "$RED" "$RESET" "$1" "${2:-}"
+  printf "      %sfix:%s %s\n" "$YELLOW" "$RESET" "$3"
+  FAILURES=$((FAILURES + 1))
+}
+skip() { printf "  %s-%s %-34s %s%s%s\n" "$DIM" "$RESET" "$1" "$DIM" "$2" "$RESET"; }
+
+http_code() { curl -s -o /dev/null -w "%{http_code}" --max-time 4 "$@" 2>/dev/null; }
+
+echo "NemoClaw demo preflight"
+echo
+
+# ── 1. Compose services (probe published healthz ports directly) ────────────
+for entry in "gateway:8001" "orchestrator:8002" "simulator:8003" "mcp-tools:8004"; do
+  name="${entry%%:*}"; port="${entry##*:}"
+  if [[ "$(http_code "http://localhost:${port}/healthz")" == "200" ]]; then
+    pass "$name (:$port)"
+  else
+    fail "$name (:$port)" "not answering" "docker compose up -d   (make up)"
+  fi
+done
+
+# ── 2. Active pack ───────────────────────────────────────────────────────────
+PACK_JSON=$(curl -s --max-time 4 http://localhost:8001/api/pack 2>/dev/null)
+PACK_ID=$(printf '%s' "$PACK_JSON" | python3 -c "import json,sys; print(json.load(sys.stdin).get('id',''))" 2>/dev/null)
+if [[ -n "$PACK_ID" ]]; then
+  pass "active pack" "$PACK_ID"
+else
+  fail "active pack" "GET /api/pack failed" "gateway isn't serving — see above"
+fi
+
+# ── 3. Terminal daemon (host process, ADR-012/013) ──────────────────────────
+if [[ -n "$TERMINAL_WS_URL" ]]; then
+  TERM_HTTP="${TERMINAL_WS_URL/ws:\/\//http://}"; TERM_HTTP="${TERM_HTTP%/ws}"
+  TERM_HTTP="${TERM_HTTP/host.docker.internal/$TERMINAL_BIND}"
+  if [[ "$(http_code "${TERM_HTTP}/healthz")" == "200" ]]; then
+    pass "terminal daemon" "$TERM_HTTP"
+  else
+    fail "terminal daemon" "not answering at $TERM_HTTP" \
+      "TERMINAL_MODE=restricted SANDBOX_NAME=$SANDBOX_NAME make terminal"
+  fi
+else
+  skip "terminal daemon" "TERMINAL_WS_URL unset — feature off"
+fi
+
+# ── 4/5. Wake-hook path (openshell forward + hook-relay bridge) ──────────────
+if [[ -n "$HOOK_URL" ]]; then
+  HOOK_PORT="${HOOK_URL##*:}"; HOOK_PORT="${HOOK_PORT%%/*}"
+  # (4) openshell's loopback SSH forward → openclaw's hook: bad-token probe
+  # must 401. Connection refused = the forward died (it does not survive
+  # reboots or openshell restarts).
+  CODE=$(http_code -X POST "http://127.0.0.1:${HOOK_PORT}/hooks/wake" -H "Authorization: Bearer doctor-probe")
+  if [[ "$CODE" == "401" ]]; then
+    pass "sandbox wake-hook (:$HOOK_PORT)" "401 on bad token = auth alive"
+  else
+    fail "sandbox wake-hook (:$HOOK_PORT)" "expected 401, got '${CODE:-no response}'" \
+      "nemoclaw $SANDBOX_NAME recover   (restores the loopback forward)"
+  fi
+  # (5) hook-relay bridges that loopback forward onto the docker bridge so
+  # the containerized Gateway can reach it (Linux only).
+  RELAY_CODE=$(http_code -X POST "http://172.17.0.1:${HOOK_PORT}/hooks/wake" -H "Authorization: Bearer doctor-probe")
+  if [[ "$RELAY_CODE" == "401" ]]; then
+    pass "hook-relay bridge (:$HOOK_PORT)" "container->host path alive"
+  else
+    fail "hook-relay bridge (:$HOOK_PORT)" "expected 401, got '${RELAY_CODE:-no response}'" \
+      "HOOK_RELAY_PORT=$HOOK_PORT make hook-relay"
+  fi
+else
+  skip "sandbox wake-hook" "OPENCLAW_HOOK_URL unset — webhook wake-up off (cron-only)"
+fi
+
+# ── 6. LLM endpoint ──────────────────────────────────────────────────────────
+if [[ -n "$LLM_BASE_URL" ]]; then
+  if [[ "$(http_code "${LLM_BASE_URL%/}/models")" == "200" ]]; then
+    pass "LLM endpoint" "$LLM_BASE_URL"
+  else
+    fail "LLM endpoint" "no response from ${LLM_BASE_URL%/}/models" \
+      "check the vLLM host/container is up and LLM_BASE_URL in .env is right"
+  fi
+else
+  skip "LLM endpoint" "LLM_BASE_URL unset in .env"
+fi
+
+echo
+if [[ "$FAILURES" -eq 0 ]]; then
+  echo "${GREEN}All checks passed — demo is ready.${RESET}"
+else
+  echo "${RED}${FAILURES} check(s) failed.${RESET} Fix the items above, then re-run: make doctor"
+  echo "Symptom guide: docs/TROUBLESHOOTING.md"
+  exit 1
+fi

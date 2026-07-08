@@ -31,7 +31,11 @@ export default function App() {
   const [retainedFault, setRetainedFault] = useState<FaultEvent | null>(null);
   const retainTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
+  // Full REST snapshot. Runs on mount, and again whenever the SSE stream
+  // reconnects after a drop — the stream only carries deltas, so anything
+  // that happened while disconnected (most notably a backend restart from
+  // an automated pack switch) is invisible without a refetch.
+  const fetchSnapshot = useCallback(() => {
     Promise.all([
       gateway.getPack(),
       gateway.getAssets(),
@@ -45,8 +49,14 @@ export default function App() {
       setNotifications((n as { notifications: Notification[] }).notifications);
       setUnreadCount((n as { unread_count: number }).unread_count);
       setActivity((act as { activity: ActivityEvent[] }).activity);
+    }).catch(() => {
+      // Backend still down mid-restart — the next reconnect retries.
     });
   }, []);
+
+  useEffect(() => {
+    fetchSnapshot();
+  }, [fetchSnapshot]);
 
   const handleSSE = useCallback((evt: SSEEvent) => {
     if (evt.type === "asset") {
@@ -86,7 +96,7 @@ export default function App() {
     }
   }, []);
 
-  useSSE(handleSSE);
+  const sseConnected = useSSE(handleSSE, fetchSnapshot);
 
   function handleDecision(faultId: string, decision: "approved" | "denied") {
     setFaults((prev) =>
@@ -168,7 +178,10 @@ export default function App() {
     <div className="app-shell">
       <header className="app-header">
         <div className="app-header-left">
-          <div className="app-status-dot" title="System live" />
+          <div
+            className={`app-status-dot${sseConnected ? "" : " disconnected"}`}
+            title={sseConnected ? "System live" : "Reconnecting to event stream…"}
+          />
           <span className="app-logo-bar">DELL × NVIDIA</span>
           <span style={{ color: "var(--border-strong)" }}>|</span>
           <span className="app-title">{pack?.sentinel_name ?? "Infrastructure Sentinel"}</span>

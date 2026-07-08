@@ -562,6 +562,16 @@ async def _fire_agent_webhook(scenario_id: str, asset_id: str) -> None:
         pass
 
 
+@router.get("/api/presenter/scenarios")
+async def presenter_scenarios(request: Request):
+    """List the active pack's scenarios — backs the lab guide's injection
+    picker, so a presenter can demo a specific fault instead of rotating."""
+    orch = _orchestrator_client(request)
+    resp = await orch.get("/api/scenarios")
+    resp.raise_for_status()
+    return resp.json()
+
+
 @router.post("/api/presenter/inject")
 async def presenter_inject(request: Request, scenario: str | None = None):
     """Inject a fault scenario. Proxies to the orchestrator /api/run endpoint.

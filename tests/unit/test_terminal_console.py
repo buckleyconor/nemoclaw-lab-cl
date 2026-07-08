@@ -25,6 +25,7 @@ from services.terminal.console import (
     push_argv,
     run_reset,
     run_target,
+    validate_skill_content,
 )
 
 
@@ -178,6 +179,71 @@ def test_run_target_returns_false_when_push_fails(tmp_path: Path) -> None:
     )
 
     assert run_target(target, config, run=fake_run) is False
+
+
+def test_validate_skill_content_accepts_wellformed_frontmatter() -> None:
+    good = '---\nname: "infra-sentinel-monitor"\ndescription: "x"\n---\n\n# Skill\n'
+    assert validate_skill_content(good) is None
+
+
+@pytest.mark.parametrize(
+    ("text", "fragment"),
+    [
+        ("", "must start with"),
+        ("# Skill without frontmatter\n", "must start with"),
+        ("---\ndescription: no name here\n---\n", "no 'name:'"),
+        ("---\nname: never-closed\n", "never closed"),
+    ],
+)
+def test_validate_skill_content_rejects_mangled_pastes(text: str, fragment: str) -> None:
+    error = validate_skill_content(text)
+    assert error is not None and fragment in error
+
+
+def test_run_target_skill_with_broken_frontmatter_is_not_pushed(tmp_path: Path) -> None:
+    """A mangled paste (e.g. pasted in vim normal mode) must not go green —
+    the push is skipped entirely and the item stays incomplete."""
+    calls: list[list[str]] = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if len(argv) > 2 and argv[2] == "download":
+            return _FakeCompleted(returncode=1, stderr="not found")
+        return _FakeCompleted(returncode=0, stdout="ok")
+
+    target = next(t for t in MENU_TARGETS if t.kind == "skill")
+    config = ConsoleConfig(
+        sandbox_name="tenant-a", workspace_dir=tmp_path, editor_bin="true", editor_args=()
+    )
+    skill_file = edit_path(target, config.workspace_dir)
+    skill_file.parent.mkdir(parents=True, exist_ok=True)
+    skill_file.write_text("garbled paste with no frontmatter at all\n")
+
+    assert run_target(target, config, run=fake_run) is False
+    assert not any(len(c) > 2 and c[2] == "skill" for c in calls)  # no install attempted
+
+
+def test_run_target_skill_with_valid_frontmatter_still_pushes(tmp_path: Path) -> None:
+    def fake_run(argv, **kwargs):
+        if len(argv) > 2 and argv[2] == "download":
+            return _FakeCompleted(returncode=1, stderr="not found")
+        return _FakeCompleted(returncode=0, stdout="ok")
+
+    target = next(t for t in MENU_TARGETS if t.kind == "skill")
+    config = ConsoleConfig(
+        sandbox_name="tenant-a", workspace_dir=tmp_path, editor_bin="true", editor_args=()
+    )
+    skill_file = edit_path(target, config.workspace_dir)
+    skill_file.parent.mkdir(parents=True, exist_ok=True)
+    skill_file.write_text('---\nname: "x"\n---\nBody\n')
+
+    assert run_target(target, config, run=fake_run) is True
+
+
+def test_blank_reset_stub_passes_skill_validation() -> None:
+    """run_reset's blank skill stub must stay installable under the new check."""
+    target = next(t for t in MENU_TARGETS if t.kind == "skill")
+    assert validate_skill_content(blank_content(target)) is None
 
 
 def test_run_target_creates_scratch_parent_directory(tmp_path: Path) -> None:

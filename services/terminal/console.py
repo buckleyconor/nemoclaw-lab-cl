@@ -169,6 +169,29 @@ class ConsoleConfig:
     editor_args: tuple[str, ...] = ("-Z",)
 
 
+def validate_skill_content(text: str) -> str | None:
+    """Check a SKILL.md's frontmatter is installable; return an error or None.
+
+    `nemoclaw skill install` needs YAML frontmatter with a `name:` key to
+    know which sandbox skill slot to deploy to. A mangled paste (the common
+    failure: text pasted in vim normal mode) breaks this in ways the install
+    may not surface clearly — and a "pushed" checkmark on broken content is
+    exactly the silent-blank-skill state that once presented as "the agent
+    never detects faults". Deliberately shallow: frontmatter shape only, no
+    opinion on the skill's actual instructions.
+    """
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return "file must start with a '---' frontmatter line"
+    try:
+        close = next(i for i, line in enumerate(lines[1:], start=1) if line.strip() == "---")
+    except StopIteration:
+        return "frontmatter '---' is never closed"
+    if not any(line.lstrip().startswith("name:") for line in lines[1:close]):
+        return "frontmatter has no 'name:' key"
+    return None
+
+
 def run_target(
     target: MenuTarget,
     config: ConsoleConfig,
@@ -187,6 +210,17 @@ def run_target(
 
     ed_argv = editor_argv(config.editor_bin, list(config.editor_args), path)
     run(ed_argv, check=False)
+
+    if target.kind == "skill":
+        error = validate_skill_content(path.read_text() if path.exists() else "")
+        if error is not None:
+            print(f"[console] NOT pushed — {error}.", file=out)
+            print(
+                "[console] The paste likely got mangled (did you press 'i' before "
+                "pasting?). Pick the same menu item and try again.",
+                file=out,
+            )
+            return False
 
     push = run(
         push_argv(config.nemoclaw_bin, config.sandbox_name, target, config.workspace_dir),

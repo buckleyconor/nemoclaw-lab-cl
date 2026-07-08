@@ -55,6 +55,17 @@
   flex-shrink: 0;
 }
 
+.app-status-dot.disconnected {
+  background: var(--critical);
+  box-shadow: 0 0 6px var(--critical);
+  animation: dot-blink 1.2s ease-in-out infinite;
+}
+
+@keyframes dot-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .35; }
+}
+
 .app-body {
   flex: 1;
   padding: 20px 24px 24px;

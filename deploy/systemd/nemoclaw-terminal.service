@@ -1,0 +1,26 @@
+# Terminal daemon (ADR-012/013) as a user service — survives reboots, unlike
+# a bare `make terminal`. Install (adjust WorkingDirectory to your checkout):
+#
+#   mkdir -p ~/.config/systemd/user
+#   cp deploy/systemd/nemoclaw-terminal.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now nemoclaw-terminal
+#   loginctl enable-linger $USER    # keep user services alive without a login session
+#
+# Requires TERMINAL_TOKEN/TERMINAL_BIND in the repo's .env (run-terminal.sh
+# reads them) and SANDBOX_NAME below matching the onboarded sandbox.
+[Unit]
+Description=NemoClaw embedded-terminal daemon (restricted console)
+After=network-online.target
+
+[Service]
+Type=exec
+WorkingDirectory=%h/projects/nemoclaw-lab-cl
+Environment=TERMINAL_MODE=restricted
+Environment=SANDBOX_NAME=infra-sentinel
+ExecStart=%h/projects/nemoclaw-lab-cl/deploy/scripts/run-terminal.sh
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

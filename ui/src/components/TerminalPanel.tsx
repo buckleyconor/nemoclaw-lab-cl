@@ -51,8 +51,11 @@ const encoder = new TextEncoder();
 // before the green-checkmark line that only appears on the next full menu
 // redraw — watching for it here is what lets the panel collapse right away.
 const REMEDIATE_PUSHED_MARKER = "(target=6)";
-const FULL_HEIGHT = 420;
-const COLLAPSED_HEIGHT = 210;
+// Viewport-relative with a pixel cap: on a short window (half-screen laptop,
+// stacked lab-guide layout) a fixed 420px terminal would eat most of the
+// visible dashboard. FitAddon's ResizeObserver reflows the PTY on any change.
+const FULL_HEIGHT = "min(420px, 45vh)";
+const COLLAPSED_HEIGHT = "min(210px, 25vh)";
 
 type Status = "connecting" | "connected" | "disconnected" | "ended";
 
