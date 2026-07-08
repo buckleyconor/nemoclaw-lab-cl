@@ -39,8 +39,14 @@ def registry() -> FaultEventRegistry:
 _cleared: list[str] = []
 
 
-async def _fake_clear(asset_id: str) -> None:
+async def _fake_clear(asset_id: str) -> bool:
     _cleared.append(asset_id)
+    return True
+
+
+async def _fake_clear_fails(asset_id: str) -> bool:
+    _cleared.append(asset_id)
+    return False
 
 
 @pytest.fixture(autouse=True)
@@ -303,6 +309,58 @@ async def test_successful_execute_consumes_token(
     retrieved = store.get(token.token)
     assert retrieved is not None
     assert retrieved.consumed is True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Simulator clear failure — must not report false success
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_clear_failure_raises_instead_of_reporting_resolved(
+    store: ApprovalTokenStore,
+    registry: FaultEventRegistry,
+) -> None:
+    """A silently-swallowed simulator clear must not surface as "resolved" —
+    that's exactly what let a still-faulted asset get marked healthy, which
+    the next monitor poll then re-detected as a brand new fault."""
+    token = store.mint(_FAULT_ID, ApprovalDecision.approved)
+
+    with pytest.raises(RemediationError) as exc_info:
+        await remediation_execute(
+            fault_event_id=_FAULT_ID,
+            approval_token=token.token,
+            step_ids=_ALLOWED_STEPS,
+            token_store=store,
+            fault_registry=registry,
+            clear_fn=_fake_clear_fails,
+        )
+
+    assert exc_info.value.error == "simulator_clear_failed"
+
+
+@pytest.mark.asyncio
+async def test_clear_failure_does_not_consume_token(
+    store: ApprovalTokenStore,
+    registry: FaultEventRegistry,
+) -> None:
+    """Don't burn the operator's single-use approval on an infra hiccup that
+    wasn't their decision to make."""
+    token = store.mint(_FAULT_ID, ApprovalDecision.approved)
+
+    with pytest.raises(RemediationError):
+        await remediation_execute(
+            fault_event_id=_FAULT_ID,
+            approval_token=token.token,
+            step_ids=_ALLOWED_STEPS,
+            token_store=store,
+            fault_registry=registry,
+            clear_fn=_fake_clear_fails,
+        )
+
+    retrieved = store.get(token.token)
+    assert retrieved is not None
+    assert retrieved.consumed is False
 
 
 # ─────────────────────────────────────────────────────────────────────────────

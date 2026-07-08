@@ -96,8 +96,9 @@ def gateway_tc(orchestrator_tc, token_store, fault_registry, fake_sim) -> TestCl
     )
 
     async def execute_fn(fault_event_id: str, approval_token: str, step_ids: list[str]) -> dict:
-        async def _clear(asset_id: str) -> None:
+        async def _clear(asset_id: str) -> bool:
             await fake_sim.clear(asset_id)
+            return True
 
         try:
             return await remediation_execute(
@@ -189,8 +190,9 @@ async def test_sec06_execute_requires_valid_token_regardless_of_caller(
         allowed_step_ids=["drain_node"],
     )
 
-    async def _clear(asset_id: str) -> None:
+    async def _clear(asset_id: str) -> bool:
         await fake_sim.clear(asset_id)
+        return True
 
     # SEC-01: no token
     with pytest.raises(RemediationError) as exc1:

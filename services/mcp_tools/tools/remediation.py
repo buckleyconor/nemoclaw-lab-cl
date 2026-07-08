@@ -23,7 +23,7 @@ from libs.common.models import ApprovalDecision
 
 
 class _ClearFn(Protocol):
-    async def __call__(self, asset_id: str) -> None: ...
+    async def __call__(self, asset_id: str) -> bool: ...
 
 
 async def remediation_propose(
@@ -111,13 +111,18 @@ async def remediation_execute(
         token_store:     ApprovalTokenStore shared with the Gateway.
         fault_registry:  FaultEventRegistry mapping event → allowed steps.
         clear_fn:        Coroutine that calls ``POST /control/clear`` on the
-                         Simulator for the given asset_id.
+                         Simulator for the given asset_id and returns whether
+                         it actually succeeded.
 
     Returns:
         dict with keys: status ("resolved"), executed (list), asset_state.
 
     Raises:
-        RemediationError: On any security check failure.
+        RemediationError: On any security check failure, or if the
+            Simulator's clear doesn't confirm success (``simulator_clear_failed``)
+            — reporting "resolved" without that confirmation is what let a
+            still-faulted asset get marked healthy, which the next monitor
+            poll would then re-detect as a brand new fault.
     """
     # ── SEC-01: no token provided ──────────────────────────────────────────
     if not approval_token:
@@ -150,12 +155,16 @@ async def remediation_execute(
     if invalid:
         raise RemediationError("step_not_allowed", invalid_steps=invalid)
 
-    # ── Consume token (single-use) ─────────────────────────────────────────
-    token_store.consume(approval_token)
-
-    # ── Execute: narrate steps, then clear fault ───────────────────────────
+    # ── Execute: clear the fault, only then consume the token ──────────────
+    # Clear before consuming so an infra hiccup here doesn't burn the human's
+    # single-use approval for nothing — token_store.consume() only runs once
+    # the Simulator has actually confirmed the asset is healthy again.
     executed = [{"step_id": sid, "status": "executed"} for sid in step_ids]
-    await clear_fn(record.asset_id)
+    cleared = await clear_fn(record.asset_id)
+    if not cleared:
+        raise RemediationError("simulator_clear_failed", fault_event_id=fault_event_id)
+
+    token_store.consume(approval_token)
 
     return {
         "status": "resolved",

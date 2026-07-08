@@ -105,8 +105,9 @@ def gateway_tc(orchestrator_tc, token_store, fault_registry, fake_sim) -> TestCl
     # logic — the same shape make_mcp_remediation_execute produces over the
     # MCP wire in production.
     async def execute_fn(fault_event_id: str, approval_token: str, step_ids: list[str]) -> dict:
-        async def _clear(asset_id: str) -> None:
+        async def _clear(asset_id: str) -> bool:
             await fake_sim.clear(asset_id)
+            return True
 
         try:
             return await remediation_execute(

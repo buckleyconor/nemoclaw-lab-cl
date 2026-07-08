@@ -224,12 +224,17 @@ async def _remediation_execute(
     except (json.JSONDecodeError, TypeError):
         return json.dumps({"status": "error", "error": "invalid_step_ids_json"})
 
-    async def _clear(asset_id: str) -> None:
+    async def _clear(asset_id: str) -> bool:
         async with httpx.AsyncClient() as client:
-            await client.post(
-                f"{simulator_url}/control/clear",
-                json={"asset_id": asset_id},
-            )
+            try:
+                resp = await client.post(
+                    f"{simulator_url}/control/clear",
+                    json={"asset_id": asset_id},
+                )
+                resp.raise_for_status()
+            except httpx.HTTPError:
+                return False
+        return True
 
     try:
         result = await remediation_execute(

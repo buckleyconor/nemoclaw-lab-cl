@@ -80,8 +80,9 @@ def gateway_client(
     # In-process remediation.execute for the Gateway's post-approval executor
     # (ADR-011) — same business logic the MCP wire reaches in production.
     async def execute_fn(fault_event_id: str, approval_token: str, step_ids: list[str]) -> dict:
-        async def _clear(asset_id: str) -> None:
+        async def _clear(asset_id: str) -> bool:
             await fake_sim.clear(asset_id)
+            return True
 
         try:
             return await remediation_execute(
@@ -363,8 +364,8 @@ async def test_i04_token_single_use_after_remediation(
 
     _wait_for_status(gateway_client, fault_id, "resolved")
 
-    async def _noop_clear(asset_id: str) -> None:
-        pass
+    async def _noop_clear(asset_id: str) -> bool:
+        return True
 
     # Replay after the Gateway already executed — token consumed
     with pytest.raises(RemediationError) as exc_info:
