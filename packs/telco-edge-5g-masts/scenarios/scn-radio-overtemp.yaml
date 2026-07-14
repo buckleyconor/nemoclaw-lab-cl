@@ -1,0 +1,39 @@
+# Scenario: AAS radio unit overtemperature — fan degradation, Tx power derating, cell capacity degraded
+id: scn-radio-overtemp
+pack_id: telco-edge-5g-masts
+target_asset: gnb-site-01
+fault_type: radio_overtemperature
+
+emit:
+  event:
+    severity: Warning
+    message_id: "RADIO.1.0.OVERTEMP"
+  log_entries:
+    - severity: Warning
+      message: "Radio unit fan speed below expected for current ambient — cooling airflow degraded"
+    - severity: Critical
+      message: "Radio unit overtemperature — temperature exceptionally high, TX power derating applied"
+
+log_bundle_ref: bundles/scn-radio-overtemp.log
+
+error_signatures:
+  - "Radio unit overtemperature"
+  - "temperature exceptionally high"
+  - "TX power derating"
+
+kb_article_ref: kb/KB900002.md
+
+remediation_steps:
+  - id: apply_tx_derating_profile
+    label: "Confirm automatic TX derating profile is holding radio within safe thermal limits"
+  - id: verify_fan_alarms
+    label: "Verify fan unit alarm status and airflow sensor readings"
+  - id: schedule_site_visit
+    label: "Schedule field technician site visit for fan/cooling element inspection"
+  - id: monitor_temp_trend
+    label: "Monitor radio temperature trend until confirmed stable within nominal range"
+impact:
+  summary: "The radio's automatic TX power derating is confirmed as holding temperature within safe limits, trading some cell capacity/coverage for continued safe operation while a technician is scheduled to inspect the cooling system; the radio is not shut down."
+  workload_impact: "Reduced TX power means reduced cell edge coverage and capacity at this site while derating is active — most users see no effect, but users at cell edge or during high-load periods may experience degraded throughput or handover to neighboring sites."
+  service_risk: "Medium — sustained overtemperature operation, even with derating active, accelerates component aging; if derating cannot hold temperature within limits, the radio unit shuts down entirely rather than risk hardware damage, which is a full capacity loss at this site."
+  estimated_duration: "~10 minutes to confirm derating status and fan alarms; field technician cooling-system service is typically scheduled within 1-3 business days depending on severity."

@@ -1,0 +1,16 @@
+# Log bundle: scn-mud-pump-washout — Rig SCADA / mud pump PLC extract, mud-pump-01 (NOV 14-P-220 Triplex)
+
+2026-02-08T03:41:02Z INFO  scada[mud-pump-01]: Pump running — 95 SPM, discharge pressure 2140 psi, liner size 6.0in
+2026-02-08T03:41:02Z INFO  scada[mud-pump-01]: Suction pressure 55 psi, stroke rate steady, no cavitation flags
+2026-02-08T04:12:47Z INFO  scada[mud-pump-01]: Pump running — 95 SPM, discharge pressure 2135 psi
+2026-02-08T04:55:19Z WARN  scada[mud-pump-01]: Discharge pressure trending down at constant SPM — 2135 psi to 1980 psi over 10 min
+2026-02-08T05:02:33Z WARN  scada[mud-pump-01]: Pressure deviation at constant SPM — 1980 psi to 1650 psi, SPM unchanged at 95
+2026-02-08T05:04:11Z WARN  scada[mud-pump-01]: Fluid end washout suspected — pressure deviation at constant SPM, valve seat leak signature
+2026-02-08T05:04:11Z WARN  scada[mud-pump-01]: Audible knock reported by driller at pump skid — logged per driller radio call
+2026-02-08T05:06:45Z CRIT  scada[mud-pump-01]: Pump discharge pressure loss detected on Mud Pump 1 — 2140 psi to 1180 psi at constant 95 SPM
+2026-02-08T05:06:45Z CRIT  scada[mud-pump-01]: Discharge pressure below minimum circulating threshold (1200 psi) for current bit/BHA configuration
+2026-02-08T05:06:46Z WARN  scada[mud-pump-01]: Pump vibration RMS elevated — 0.42 in/s (baseline 0.11 in/s)
+2026-02-08T05:06:50Z INFO  scada[mud-pump-01]: Alarm raised to driller console — Mud Pump 1 pressure/vibration deviation
+2026-02-08T05:08:02Z INFO  scada[mud-pump-02]: Standby pump — idle, pre-lubed, ready for start
+2026-02-08T05:08:02Z INFO  scada[rig-floor]: Driller acknowledges alarm — preparing to switch to Mud Pump 2
+2026-02-08T05:09:15Z WARN  scada[mud-pump-01]: Continued operation not recommended — washout progression risk to fluid end body

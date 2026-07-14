@@ -1,0 +1,32 @@
+pack_id: healthcare-devices
+assets:
+  - id: infusion-pump-01
+    type: infusion_pump
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 0
+  - id: infusion-pump-02
+    type: infusion_pump
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 0
+  - id: monitor-01
+    type: patient_monitor
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 0
+  - id: monitor-02
+    type: patient_monitor
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 0
+  - id: mri-01
+    type: mri_scanner
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 0

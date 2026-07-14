@@ -1,0 +1,22 @@
+id: healthcare-devices
+name: "Hospital Biomedical Device Fleet"
+asset_noun:
+  singular: device
+  plural: devices
+fleet_label: "Device Fleet Health"
+monitoring_adapter: generic
+theme: dell-default
+sentinel_name: "Biomedical Device Sentinel"
+asset_spec_label: "BD Alaris / Philips IntelliVue / Siemens MAGNETOM clinical fleet"
+fleet_layout: list
+assets:
+  - id: infusion-pump-01
+    display_name: "Infusion Pump 01 (BD Alaris 8100, Med-Surg 3W)"
+  - id: infusion-pump-02
+    display_name: "Infusion Pump 02 (BD Alaris 8100, ICU)"
+  - id: monitor-01
+    display_name: "Patient Monitor 01 (Philips IntelliVue MX800, ICU Bed 4)"
+  - id: monitor-02
+    display_name: "Patient Monitor 02 (Philips IntelliVue MX450, Telemetry Bed 12)"
+  - id: mri-01
+    display_name: "MRI Scanner (Siemens MAGNETOM Aera 1.5T)"

@@ -1,0 +1,15 @@
+# Log bundle: scn-top-drive-vfd-overtemp — Top drive VFD controller extract, top-drive-01 (NOV TDS-11SA)
+
+2026-03-22T09:14:00Z INFO  vfd[top-drive-01]: Drive motor 1 running — 145 RPM, 62% torque, IGBT temp 58C
+2026-03-22T09:14:00Z INFO  vfd[top-drive-01]: Cooling blower 1 running — 3600 RPM, 4HP TEFC motor nominal
+2026-03-22T09:41:12Z INFO  vfd[top-drive-01]: Drive motor 1 running — 148 RPM, 68% torque, IGBT temp 61C
+2026-03-22T10:03:47Z WARN  vfd[top-drive-01]: IGBT heatsink temp trending up — 61C to 78C over 22 min at steady torque
+2026-03-22T10:03:47Z WARN  vfd[top-drive-01]: Cooling blower 1 airflow sensor reading below rated — 62% of nominal
+2026-03-22T10:05:19Z WARN  vfd[top-drive-01]: Ambient intake duct differential pressure elevated — possible filter/duct restriction
+2026-03-22T10:07:02Z WARN  vfd[top-drive-01]: IGBT heatsink temp 85C — approaching overtemperature threshold (90C)
+2026-03-22T10:07:02Z WARN  vfd[top-drive-01]: Drive overtemperature fault — cooling blower airflow below rated, top drive derate imminent
+2026-03-22T10:08:41Z CRIT  vfd[top-drive-01]: VFD IGBT overtemperature fault 42F1 — top drive AC drilling motor 1, estimated junction temp 94C
+2026-03-22T10:08:41Z CRIT  vfd[top-drive-01]: Fault code 42F1 latched — automatic torque derate to 40% applied
+2026-03-22T10:08:42Z INFO  vfd[top-drive-01]: Drive motor 2 unaffected — IGBT temp 63C, no fault
+2026-03-22T10:08:45Z INFO  driller-console[rig-floor]: Top drive torque limit alarm — reduced-rate drilling in effect
+2026-03-22T10:09:10Z WARN  vfd[top-drive-01]: Estimated drive IGBT temperature excessive — check ambient conditions and cooling blower operation

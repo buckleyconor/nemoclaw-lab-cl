@@ -1,0 +1,24 @@
+id: finance-atm-fleet
+name: "Retail Bank ATM Fleet"
+asset_noun:
+  singular: ATM
+  plural: ATMs
+fleet_label: "ATM Fleet Health"
+monitoring_adapter: generic
+theme: dell-default
+sentinel_name: "ATM Fleet Sentinel"
+asset_spec_label: "NCR SelfServ 84 / Diebold Nixdorf DN Series 200 branch and off-premise fleet"
+fleet_layout: list
+assets:
+  - id: atm-01
+    display_name: "ATM-01 (NCR SelfServ 84, Main Branch Lobby)"
+  - id: atm-02
+    display_name: "ATM-02 (NCR SelfServ 84, Main Branch Drive-Up)"
+  - id: atm-03
+    display_name: "ATM-03 (Diebold Nixdorf DN Series 200, Westside Branch)"
+  - id: atm-04
+    display_name: "ATM-04 (Diebold Nixdorf DN Series 200, Westside Branch)"
+  - id: atm-05
+    display_name: "ATM-05 (NCR SelfServ 84, Riverside Branch)"
+  - id: atm-06
+    display_name: "ATM-06 (Diebold Nixdorf DN Series 200, Off-Premise — Grocery Plaza)"

@@ -1,0 +1,32 @@
+pack_id: telco-edge-5g-masts
+assets:
+  - id: gnb-site-01
+    type: gnb_site
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 0
+  - id: gnb-site-02
+    type: gnb_site
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 0
+  - id: gnb-site-03
+    type: gnb_site
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 0
+  - id: gnb-site-04
+    type: gnb_site
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 0
+  - id: gnb-site-05
+    type: gnb_site
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 0

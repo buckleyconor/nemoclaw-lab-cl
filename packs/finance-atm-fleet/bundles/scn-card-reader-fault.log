@@ -1,0 +1,15 @@
+# Log bundle: scn-card-reader-fault — Diebold Nixdorf DN Series 200 ActivEdge reader extract, atm-04 (Westside Branch)
+
+2026-05-03T16:04:22Z INFO  reader[atm-04]: Card transaction complete — chip read OK, card ejected
+2026-05-03T16:11:58Z INFO  reader[atm-04]: Card transaction complete — chip read OK, card ejected
+2026-05-03T16:19:07Z INFO  reader[atm-04]: Card inserted — motorized transport engaged
+2026-05-03T16:19:09Z WARN  reader[atm-04]: Card reader motor stall detected during eject cycle — retry initiated
+2026-05-03T16:19:11Z WARN  reader[atm-04]: Eject retry 1/3 — motor current draw abnormal
+2026-05-03T16:19:14Z WARN  reader[atm-04]: Eject retry 2/3 — card position sensor reports card still in transport
+2026-05-03T16:19:18Z CRIT  reader[atm-04]: Card reader transport fault — card reader offline, card capture error, card transactions suspended
+2026-05-03T16:19:18Z CRIT  reader[atm-04]: Card retained in transport — routed to capture bin per fault-safe procedure
+2026-05-03T16:19:19Z INFO  reader[atm-04]: Captured card bin count — 1 (session start: 0)
+2026-05-03T16:19:20Z WARN  reader[atm-04]: EJ flag — card capture event logged with card BIN and last 4 digits for retrieval tracking
+2026-05-03T16:19:22Z INFO  ndc[atm-04]: Contactless reader — independent module, no fault, tap transactions available
+2026-05-03T16:19:25Z INFO  monitoring[central]: ATM-04 status changed to PARTIAL_SERVICE — card reader fault, contactless available
+2026-05-03T16:19:40Z INFO  monitoring[central]: Alert routed to branch operations and field service queue — captured card retrieval required

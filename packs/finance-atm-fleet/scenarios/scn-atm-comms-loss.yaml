@@ -1,0 +1,39 @@
+# Scenario: Off-premise ATM loses host connectivity — primary VPN/router down, ISO 8583 session lost
+id: scn-atm-comms-loss
+pack_id: finance-atm-fleet
+target_asset: atm-06
+fault_type: host_communication_loss
+
+emit:
+  event:
+    severity: Critical
+    message_id: "NDC.1.0.COMMSLOSS"
+  log_entries:
+    - severity: Warning
+      message: "VPN tunnel keepalive missed — 3 consecutive intervals, primary WAN link degraded"
+    - severity: Critical
+      message: "Host communication loss — ISO 8583 session down, ATM offline"
+
+log_bundle_ref: bundles/scn-atm-comms-loss.log
+
+error_signatures:
+  - "Host communication loss"
+  - "ISO 8583 session down"
+  - "ATM offline"
+
+kb_article_ref: kb/KB800003.md
+
+remediation_steps:
+  - id: remote_power_cycle_router
+    label: "Remotely power-cycle the site router/VPN endpoint via smart PDU"
+  - id: failover_lte_backup
+    label: "Fail over to LTE backup link if primary WAN does not recover"
+  - id: verify_host_signon
+    label: "Verify ATM completes ISO 8583 sign-on with the host after link recovery"
+  - id: confirm_test_transaction
+    label: "Confirm a test transaction completes successfully before returning ATM to full service"
+impact:
+  summary: "The site router is power-cycled remotely first since that resolves the majority of WAN link degradations; if the primary link does not recover, the ATM fails over to its LTE backup connection to restore service without a truck roll."
+  workload_impact: "ATM is completely out of service — no withdrawals, deposits, balance inquiries, or transfers — for the duration of the outage, since all transaction types require a live host session."
+  service_risk: "Medium — off-premise ATMs without on-site staff have no local recovery option; extended outages at high-traffic off-premise locations (this site: grocery plaza) have direct revenue and customer-experience impact beyond the technical fault."
+  estimated_duration: "~10 minutes for remote power-cycle and recovery; LTE failover is near-immediate once triggered if the backup link is provisioned and healthy."

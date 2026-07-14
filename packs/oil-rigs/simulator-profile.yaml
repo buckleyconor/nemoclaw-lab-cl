@@ -1,0 +1,38 @@
+pack_id: oil-rigs
+assets:
+  - id: mud-pump-01
+    type: mud_pump
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 0
+  - id: mud-pump-02
+    type: mud_pump
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 0
+  - id: top-drive-01
+    type: top_drive
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 0
+  - id: drawworks-01
+    type: drawworks
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 0
+  - id: bop-hpu-01
+    type: bop_control_hpu
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 0
+  - id: gen-01
+    type: generator
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 0

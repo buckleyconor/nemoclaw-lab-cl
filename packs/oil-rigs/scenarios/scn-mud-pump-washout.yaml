@@ -1,0 +1,39 @@
+# Scenario: Fluid end washout — discharge pressure loss at constant stroke rate
+id: scn-mud-pump-washout
+pack_id: oil-rigs
+target_asset: mud-pump-01
+fault_type: fluid_end_washout
+
+emit:
+  event:
+    severity: Critical
+    message_id: "MUD.1.0.WASHOUT"
+  log_entries:
+    - severity: Critical
+      message: "Pump discharge pressure loss detected on Mud Pump 1 — 2140 psi to 1180 psi at constant 95 SPM"
+    - severity: Warning
+      message: "Fluid end washout suspected — pressure deviation at constant SPM, valve seat leak signature"
+
+log_bundle_ref: bundles/scn-mud-pump-washout.log
+
+error_signatures:
+  - "Pump discharge pressure loss"
+  - "fluid end washout"
+  - "pressure deviation at constant SPM"
+
+kb_article_ref: kb/KB600001.md
+
+remediation_steps:
+  - id: switch_standby_pump
+    label: "Bring Mud Pump 2 online and take Mud Pump 1 offline"
+  - id: isolate_depressurize
+    label: "Isolate and bleed down Mud Pump 1 discharge line before teardown"
+  - id: inspect_fluid_end
+    label: "Inspect fluid end valves, seats, and liner for washout damage"
+  - id: schedule_fluid_end_service
+    label: "Schedule fluid end module replacement and log expendables consumed"
+impact:
+  summary: "Standby pump takes over circulation while the affected pump is isolated, depressurized, and inspected; no interruption to mud circulation is expected if the standby pump is available."
+  workload_impact: "Brief circulation interruption (~2-5 min) during pump changeover. Mud Pump 1 is out of service until fluid end is inspected and repaired."
+  service_risk: "Medium — continued operation on a washed-out fluid end risks progressive erosion into the pump body and unrepairable cylinder cracking; do not restart the affected pump before inspection."
+  estimated_duration: "~15 minutes to switch pumps and isolate; fluid end teardown/inspection is a multi-hour maintenance job outside this remediation window."

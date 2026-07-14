@@ -1,0 +1,39 @@
+# Scenario: eCPRI fronthaul link failure — SFP RX power below threshold, link down, cell down
+id: scn-fronthaul-link-fail
+pack_id: telco-edge-5g-masts
+target_asset: gnb-site-05
+fault_type: fronthaul_link_failure
+
+emit:
+  event:
+    severity: Critical
+    message_id: "FH.1.0.LINKDOWN"
+  log_entries:
+    - severity: Warning
+      message: "SFP RX power trending down — fronthaul link to gnb-site-05, -18.2 dBm (nominal -8 to -12 dBm)"
+    - severity: Critical
+      message: "eCPRI link failure — SFP RX power low, fronthaul link down, cell down"
+
+log_bundle_ref: bundles/scn-fronthaul-link-fail.log
+
+error_signatures:
+  - "eCPRI link failure"
+  - "SFP RX power low"
+  - "fronthaul link down"
+
+kb_article_ref: kb/KB900003.md
+
+remediation_steps:
+  - id: switch_protection_path
+    label: "Switch fronthaul traffic to protection fiber path, if provisioned"
+  - id: reset_optical_port
+    label: "Reset the SFP optical port at both baseband and radio ends"
+  - id: verify_rx_levels
+    label: "Verify SFP RX power returns to nominal range after reset/path switch"
+  - id: dispatch_fiber_crew
+    label: "Dispatch fiber crew to inspect and clean/repair the fronthaul fiber run"
+impact:
+  summary: "If a protection fiber path is provisioned, traffic switches to it immediately to restore the cell while the primary fiber run is inspected; if no protection path exists, the cell remains down until the fiber fault is located and repaired."
+  workload_impact: "The affected cell is completely out of service — no coverage or capacity from this cell — for the duration of the fault, since eCPRI carries all fronthaul traffic between baseband and radio."
+  service_risk: "High — a fully down cell means a coverage gap for users in that cell's footprint, who fall back to neighboring cells (if in range) or lose service entirely; this is a full-cell outage, not a degraded-capacity condition like the thermal/derating scenario."
+  estimated_duration: "~10 minutes for protection-path switch or port reset if that resolves it; fiber fault location and physical repair (e.g. a damaged or degraded connector) can take hours depending on the nature of the fault."

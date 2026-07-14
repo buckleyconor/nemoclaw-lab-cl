@@ -1,0 +1,16 @@
+# Log bundle: scn-bop-accumulator-low — BOP control unit (Koomey Type E) PLC extract, bop-hpu-01
+
+2026-04-05T22:00:00Z INFO  bop-hpu[bop-hpu-01]: Accumulator bank pressure 3020 psi — within normal operating range (2800-3400 psi)
+2026-04-05T22:00:00Z INFO  bop-hpu[bop-hpu-01]: Electric pump (duty) standby — air pump (backup) standby
+2026-04-05T22:47:33Z INFO  bop-hpu[bop-hpu-01]: Accumulator bank pressure 2980 psi — normal diurnal decay
+2026-04-05T23:38:12Z WARN  bop-hpu[bop-hpu-01]: Accumulator bank pressure 2810 psi — approaching low-pressure setpoint (2800 psi)
+2026-04-05T23:41:05Z CRIT  bop-hpu[bop-hpu-01]: Accumulator pressure low — bank pressure 2650 psi, below 2800 psi low-pressure setpoint
+2026-04-05T23:41:05Z CRIT  bop-hpu[bop-hpu-01]: Low-pressure auto-start signal sent to duty electric pump
+2026-04-05T23:41:35Z WARN  bop-hpu[bop-hpu-01]: Duty electric pump — no run confirmation received 30s after auto-start signal
+2026-04-05T23:42:05Z CRIT  bop-hpu[bop-hpu-01]: HPU pump failed to start — duty electric pump did not respond to low-pressure auto-start signal
+2026-04-05T23:42:05Z CRIT  bop-hpu[bop-hpu-01]: BOP control pressure below threshold — accumulator bank continuing to decay, no pump response
+2026-04-05T23:42:06Z CRIT  bop-hpu[bop-hpu-01]: Alarm escalated to driller console and company man station — WELL CONTROL READINESS
+2026-04-05T23:42:10Z INFO  bop-hpu[bop-hpu-01]: Standby air-driven pump available — manual start required (duty pump non-responsive)
+2026-04-05T23:44:18Z WARN  bop-hpu[bop-hpu-01]: Accumulator bank pressure 2590 psi — decay continuing, no active pump
+2026-04-05T23:44:18Z WARN  bop-hpu[bop-hpu-01]: Manifold pressure 1480 psi, annular BOP pressure 1180 psi — within range, monitor bank pressure
+2026-04-05T23:45:02Z INFO  bop-hpu[bop-hpu-01]: Electric pump motor overload relay tripped — logged in local pump starter panel

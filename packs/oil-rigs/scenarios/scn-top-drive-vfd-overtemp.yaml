@@ -1,0 +1,39 @@
+# Scenario: Top drive VFD IGBT overtemperature — cooling blower degradation
+id: scn-top-drive-vfd-overtemp
+pack_id: oil-rigs
+target_asset: top-drive-01
+fault_type: vfd_igbt_overtemp
+
+emit:
+  event:
+    severity: Critical
+    message_id: "VFD.1.0.42F1"
+  log_entries:
+    - severity: Critical
+      message: "VFD IGBT overtemperature fault 42F1 — top drive AC drilling motor 1, estimated junction temp 94C"
+    - severity: Warning
+      message: "Drive overtemperature fault — cooling blower airflow below rated, top drive derate imminent"
+
+log_bundle_ref: bundles/scn-top-drive-vfd-overtemp.log
+
+error_signatures:
+  - "VFD IGBT overtemperature"
+  - "drive overtemperature fault"
+  - "top drive derate"
+
+kb_article_ref: kb/KB600002.md
+
+remediation_steps:
+  - id: reduce_torque_setpoint
+    label: "Reduce top drive RPM/torque setpoint to cut IGBT thermal load"
+  - id: verify_cooling_blower
+    label: "Verify motor cooling blower airflow and check intake ducting for blockage"
+  - id: reset_drive_fault
+    label: "Reset VFD fault after temperature returns below threshold"
+  - id: monitor_igbt_temp
+    label: "Monitor IGBT temperature trend through next connection before resuming full torque"
+impact:
+  summary: "Top drive torque is reduced to cool the VFD; drilling continues at reduced rate while cooling airflow is verified, avoiding an uncommanded drive trip mid-connection."
+  workload_impact: "Reduced ROP while torque is limited (~10-20 min). An uncommanded drive trip during an active connection would be more disruptive and is what this remediation avoids."
+  service_risk: "Medium — repeated overtemperature trips accelerate IGBT thermal cycling fatigue; a blocked cooling blower left unaddressed risks a full drive trip during a critical operation (e.g. tripping in/out of hole)."
+  estimated_duration: "~20 minutes to reduce load, verify cooling, and reset; blower service if required is a longer maintenance task."

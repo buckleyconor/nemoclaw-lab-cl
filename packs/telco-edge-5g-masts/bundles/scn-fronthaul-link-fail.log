@@ -1,0 +1,14 @@
+# Log bundle: scn-fronthaul-link-fail — eCPRI fronthaul optical link extract, gnb-site-05 (Suburban Stealth Pole)
+
+2026-08-11T09:15:00Z INFO  fh[gnb-site-05]: eCPRI link active — baseband to AIR 3268, SFP RX -9.4 dBm, TX 0.0 dBm nominal
+2026-08-11T09:15:00Z INFO  fh[gnb-site-05]: Link utilization nominal, no FEC correction events
+2026-08-11T11:47:22Z WARN  fh[gnb-site-05]: SFP RX power trending down — fronthaul link to gnb-site-05, -13.6 dBm (nominal -8 to -12 dBm)
+2026-08-11T11:47:22Z WARN  fh[gnb-site-05]: FEC correction rate elevated — marginal optical budget, possible connector contamination
+2026-08-11T12:03:58Z WARN  fh[gnb-site-05]: SFP RX power trending down — fronthaul link to gnb-site-05, -16.1 dBm (nominal -8 to -12 dBm)
+2026-08-11T12:19:41Z WARN  fh[gnb-site-05]: SFP RX power trending down — fronthaul link to gnb-site-05, -18.2 dBm (nominal -8 to -12 dBm)
+2026-08-11T12:19:41Z WARN  fh[gnb-site-05]: FEC exhausted — uncorrectable errors detected on eCPRI link
+2026-08-11T12:20:15Z CRIT  fh[gnb-site-05]: eCPRI link failure — SFP RX power low, fronthaul link down, cell down
+2026-08-11T12:20:15Z CRIT  bb[gnb-site-05]: Cell gnb-site-05/cell-1 — service state OUT_OF_SERVICE, no fronthaul connectivity
+2026-08-11T12:20:16Z WARN  fh[gnb-site-05]: Protection fiber path — provisioned, not yet active
+2026-08-11T12:20:40Z INFO  oss[central]: Alarm raised — Site 05 fronthaul link down, cell down, priority CRITICAL
+2026-08-11T12:20:40Z INFO  oss[central]: Neighboring sites (04, and macro overlay) — no fronthaul impact, unaffected

@@ -1,0 +1,13 @@
+# Log bundle: scn-gnss-sync-loss — Baseband 6630 sync subsystem extract, gnb-site-03 (Riverside Water Tank)
+
+2026-02-19T04:10:00Z INFO  sync[gnb-site-03]: GNSS receiver locked — 9 satellites tracked, PRTC-A traceable
+2026-02-19T04:10:00Z INFO  sync[gnb-site-03]: Time sync source — GNSS primary, phase error 12ns (within +-1.5us TDD budget)
+2026-02-19T05:32:14Z WARN  sync[gnb-site-03]: GNSS satellite tracking count dropped — 6 satellites tracked
+2026-02-19T05:41:07Z WARN  sync[gnb-site-03]: GNSS satellite tracking count dropped — 4 satellites tracked, below minimum for fix (6)
+2026-02-19T05:41:07Z WARN  sync[gnb-site-03]: GNSS antenna signal strength degraded — possible antenna/cable fault or obstruction
+2026-02-19T05:43:29Z CRIT  sync[gnb-site-03]: GNSS reference lost — time sync failure, cells entering holdover on Stratum 3E oscillator
+2026-02-19T05:43:29Z CRIT  sync[gnb-site-03]: Holdover initiated — estimated phase drift budget 4h 12m before TDD sync-loss threshold
+2026-02-19T05:43:30Z WARN  sync[gnb-site-03]: PTP grandmaster (secondary) — available, not yet selected as active source
+2026-02-19T05:43:31Z INFO  bb[gnb-site-03]: All 3 TDD cells remain in service — operating on holdover oscillator
+2026-02-19T05:44:02Z INFO  oss[central]: Alarm raised — Site 03 GNSS reference lost, holdover active, priority CRITICAL
+2026-02-19T05:44:02Z INFO  oss[central]: Holdover countdown displayed — 4h 08m remaining to estimated sync-loss shutdown

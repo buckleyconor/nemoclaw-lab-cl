@@ -1,0 +1,24 @@
+id: oil-rigs
+name: "Drilling Rig Critical Equipment Fleet"
+asset_noun:
+  singular: unit
+  plural: units
+fleet_label: "Rig Equipment Health"
+monitoring_adapter: generic
+theme: dell-default
+sentinel_name: "Drilling Rig Sentinel"
+asset_spec_label: "NOV / ABB / Cameron rig floor & well-control package"
+fleet_layout: list
+assets:
+  - id: mud-pump-01
+    display_name: "Mud Pump No. 1 (NOV 14-P-220 Triplex)"
+  - id: mud-pump-02
+    display_name: "Mud Pump No. 2 (NOV 14-P-220 Triplex)"
+  - id: top-drive-01
+    display_name: "Top Drive (NOV TDS-11SA)"
+  - id: drawworks-01
+    display_name: "Drawworks (NOV D2000)"
+  - id: bop-hpu-01
+    display_name: "BOP Control HPU (Cameron/Koomey Type E)"
+  - id: gen-01
+    display_name: "Rig Generator No. 1 (Caterpillar 3512C)"

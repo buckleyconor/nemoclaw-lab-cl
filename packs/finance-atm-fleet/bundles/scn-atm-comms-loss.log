@@ -1,0 +1,15 @@
+# Log bundle: scn-atm-comms-loss — ATM WAN/host session extract, atm-06 (Off-Premise — Grocery Plaza)
+
+2026-03-30T19:02:00Z INFO  wan[atm-06]: VPN tunnel active — primary WAN link, keepalive nominal
+2026-03-30T19:02:00Z INFO  iso8583[atm-06]: Host session active — sign-on confirmed, last successful transaction 19:01:12
+2026-03-30T19:47:31Z WARN  wan[atm-06]: VPN tunnel keepalive missed — 1 consecutive interval
+2026-03-30T19:49:46Z WARN  wan[atm-06]: VPN tunnel keepalive missed — 2 consecutive intervals, primary WAN link degraded
+2026-03-30T19:52:01Z WARN  wan[atm-06]: VPN tunnel keepalive missed — 3 consecutive intervals, primary WAN link degraded
+2026-03-30T19:52:01Z WARN  wan[atm-06]: Primary WAN link — no response from provider gateway, packet loss 100%
+2026-03-30T19:52:18Z CRIT  iso8583[atm-06]: Host communication loss — ISO 8583 session down, ATM offline
+2026-03-30T19:52:18Z CRIT  iso8583[atm-06]: All transaction types suspended — withdrawal, deposit, inquiry, transfer
+2026-03-30T19:52:19Z INFO  atm-06: Screen state — "Out of Service" displayed to customer
+2026-03-30T19:52:20Z WARN  wan[atm-06]: LTE backup link — standby, not yet activated
+2026-03-30T19:52:25Z INFO  monitoring[central]: ATM-06 status changed to OUT_OF_SERVICE — host communication loss
+2026-03-30T19:52:40Z INFO  monitoring[central]: Alert routed to network operations — off-premise site, no on-site staff
+2026-03-30T19:55:12Z WARN  wan[atm-06]: Primary WAN link — still no response, packet loss 100%, 3 min elapsed

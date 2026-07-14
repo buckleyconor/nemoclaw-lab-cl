@@ -1,0 +1,15 @@
+# Log bundle: scn-mri-coldhead-failure — Siemens MAGNETOM Aera cryogenics monitoring extract, mri-01
+
+2026-06-20T02:00:00Z INFO  cryo[mri-01]: Coldhead cycling nominal — 1.2 Hz, second-stage temp 4.2K, helium pressure 1.8 bar
+2026-06-20T02:00:00Z INFO  cryo[mri-01]: Compressor running — nominal current draw, no fault flags
+2026-06-20T05:14:22Z WARN  cryo[mri-01]: Compressor cycling irregular — coldhead second-stage temperature trending above nominal
+2026-06-20T05:14:22Z WARN  cryo[mri-01]: Second-stage temp 6.8K (nominal 4.2K), cycling frequency dropped to 0.6 Hz
+2026-06-20T05:22:47Z WARN  cryo[mri-01]: Helium pressure 2.1 bar — trending upward, consistent with reduced recondensation
+2026-06-20T05:31:03Z WARN  cryo[mri-01]: Compressor motor current draw elevated — possible bearing wear or valve fault
+2026-06-20T05:38:19Z CRIT  cryo[mri-01]: Coldhead failure — compressor stopped, helium pressure rising, cryocooler service required
+2026-06-20T05:38:19Z CRIT  cryo[mri-01]: Second-stage temp 11.4K and climbing — recondensation halted
+2026-06-20T05:38:20Z CRIT  cryo[mri-01]: Helium pressure 2.6 bar — magnet pressure relief monitoring active
+2026-06-20T05:38:22Z INFO  scanner-console[mri-01]: Scanner locked out of clinical scanning — cryogenics fault active
+2026-06-20T05:39:05Z INFO  cryo[mri-01]: Helium level sensor — 78% (baseline 82%, normal boil-off rate for reference)
+2026-06-20T06:10:33Z WARN  cryo[mri-01]: Helium pressure 3.0 bar — pressure trend continuing, no active cooling
+2026-06-20T06:10:33Z WARN  cryo[mri-01]: Quench relief valve setpoint reference — 5.5 bar, current margin 2.5 bar

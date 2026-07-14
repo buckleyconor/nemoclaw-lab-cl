@@ -1,0 +1,39 @@
+# Scenario: Infusion pump battery end-of-life — runtime below threshold during transport use
+id: scn-infusion-pump-battery
+pack_id: healthcare-devices
+target_asset: infusion-pump-01
+fault_type: battery_end_of_life
+
+emit:
+  event:
+    severity: Warning
+    message_id: "PUMP.1.0.BATTLOW"
+  log_entries:
+    - severity: Warning
+      message: "Battery run time low — estimated 8 minutes remaining at current infusion rate"
+    - severity: Critical
+      message: "Battery depleted — pump switched to AC power required, alarm silenced by AC connection"
+
+log_bundle_ref: bundles/scn-infusion-pump-battery.log
+
+error_signatures:
+  - "Battery depleted"
+  - "battery run time low"
+  - "battery end of life"
+
+kb_article_ref: kb/KB700001.md
+
+remediation_steps:
+  - id: swap_spare_pump
+    label: "Swap in a spare pump with a healthy battery for the active infusion"
+  - id: tag_out_of_service
+    label: "Tag affected pump out-of-service in CMMS and remove from clinical circulation"
+  - id: replace_battery_pack
+    label: "Replace battery pack per BD-authorized service procedure"
+  - id: verify_runtime_pm
+    label: "Verify full-charge runtime meets spec before returning pump to service"
+impact:
+  summary: "A spare pump takes over the active infusion without interrupting delivery; the affected pump is pulled from circulation for battery replacement rather than left in service on a degraded battery."
+  workload_impact: "Brief pause (~2 min) while lines are transferred to the spare pump. No impact to infusion accuracy or dosing during the swap."
+  service_risk: "Medium — a depleted battery during transport (elevator, imaging transfer) with no AC access would interrupt a running infusion; must not be dispatched for transport use until battery is replaced or verified healthy."
+  estimated_duration: "~10 minutes to swap and tag out; battery replacement and PM verification is a biomed workshop task outside this window."

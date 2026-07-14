@@ -1,0 +1,14 @@
+# Log bundle: scn-dispenser-jam — NCR SelfServ 84 NDC device log extract, atm-02 (Main Branch Drive-Up)
+
+2026-04-14T11:02:03Z INFO  ndc[atm-02]: Transaction complete — withdrawal $200, cassette 2 (20s), dispense OK
+2026-04-14T11:14:51Z INFO  ndc[atm-02]: Transaction complete — withdrawal $100, cassette 1 (20s), dispense OK
+2026-04-14T11:26:07Z WARN  ndc[atm-02]: Note qualification reject rate elevated — cassette 2, 3 rejects in last 5 dispenses
+2026-04-14T11:26:07Z WARN  ndc[atm-02]: Reject bin count 3 — below alarm threshold (10), monitoring
+2026-04-14T11:31:44Z WARN  ndc[atm-02]: Note thickness/skew sensor flagged during pick — cassette 2, note pick retry
+2026-04-14T11:33:12Z CRIT  ndc[atm-02]: Dispenser transport jam — notes jammed in transport, cash handler fatal error, withdrawals suspended
+2026-04-14T11:33:12Z CRIT  ndc[atm-02]: Status code 68 — cash handler fatal, device out of service for withdrawal function
+2026-04-14T11:33:13Z CRIT  ndc[atm-02]: Transaction in progress at time of fault — customer card retained per fault-safe procedure
+2026-04-14T11:33:15Z WARN  ndc[atm-02]: EJ (electronic journal) flag — transaction outcome indeterminate, reconciliation required
+2026-04-14T11:33:20Z INFO  ndc[atm-02]: Screen state — "Temporarily Out of Service" displayed to customer
+2026-04-14T11:33:22Z INFO  monitoring[central]: ATM-02 status changed to OUT_OF_SERVICE — dispenser fault
+2026-04-14T11:33:45Z INFO  monitoring[central]: Alert routed to branch operations and field service queue

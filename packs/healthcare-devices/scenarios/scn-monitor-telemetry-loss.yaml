@@ -1,0 +1,39 @@
+# Scenario: Patient monitor drops off central station — wireless dropout, No Data from Bed
+id: scn-monitor-telemetry-loss
+pack_id: healthcare-devices
+target_asset: monitor-02
+fault_type: telemetry_disconnect
+
+emit:
+  event:
+    severity: Critical
+    message_id: "MON.1.0.NODATA"
+  log_entries:
+    - severity: Warning
+      message: "WLAN signal quality degraded — associated AP roam failure, retry count elevated"
+    - severity: Critical
+      message: "No Data from Bed 12 — central station lost connection to monitor-02, last update 47s ago"
+
+log_bundle_ref: bundles/scn-monitor-telemetry-loss.log
+
+error_signatures:
+  - "Telemetry disconnect"
+  - "No data from bed"
+  - "central station connection lost"
+
+kb_article_ref: kb/KB700002.md
+
+remediation_steps:
+  - id: verify_ap_health
+    label: "Verify wireless AP health and signal coverage at telemetry bed location"
+  - id: reassociate_network
+    label: "Re-associate or restart the monitor's wireless network interface"
+  - id: confirm_waveform_restored
+    label: "Confirm live waveform and vitals restored at the central station"
+  - id: escalate_network_team
+    label: "Escalate to hospital IT/network team if disconnect recurs"
+impact:
+  summary: "The monitor's wireless link is restored and confirmed live at the central station; bedside monitoring at the patient's physical monitor is unaffected throughout, since the fault is a central-station visibility gap, not a monitor malfunction."
+  workload_impact: "Central station and any remote telemetry viewing lose visibility to this bed until reconnected. Bedside alarms and local display at the monitor itself continue to function normally."
+  service_risk: "High — central monitoring is a primary safety net for telemetry patients; a prolonged 'No Data from Bed' condition means remote staff cannot see vitals or arrhythmia alerts for this patient until resolved."
+  estimated_duration: "~5 minutes for a re-association fix; a persistent AP or coverage issue requires IT network team involvement."

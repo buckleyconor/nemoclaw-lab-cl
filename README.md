@@ -127,10 +127,14 @@ tests/          Unit + integration + e2e test suite
 |----------|---------|--------|
 | AI Infrastructure (XE9780L GPU cluster) | `datacenter-xe9680` | ✅ Active |
 | Laptop Fleet (Dell Precision) | `laptop-fleet` | ✅ Active |
-| Oil & Gas | `oil-gas-rigs` | stub |
-| Healthcare | `healthcare-devices` | stub |
-| Financial Services | `finance-atm-fleet` | stub |
-| Edge Computing | `edge-inference` | partial |
+| Oil & Gas (drilling rig equipment) | `oil-rigs` | ✅ Active |
+| Healthcare (hospital biomedical devices) | `healthcare-devices` | ✅ Active |
+| Financial Services (bank ATM fleet) | `finance-atm-fleet` | ✅ Active |
+| Telco & 5G (RAN macro sites) | `telco-edge-5g-masts` | ✅ Active |
+| HPC Cluster | `hpc-cluster` | scaffold |
+| Network Fabric | `network-fabric` | scaffold |
+| Storage (NVMe) | `storage-nvme` | scaffold |
+| Edge Inference | `edge-inference` | scaffold |
 
 See [`docs/VERTICAL-PACK-GUIDE.md`](docs/VERTICAL-PACK-GUIDE.md) to create or extend a vertical.
 

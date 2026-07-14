@@ -1,0 +1,38 @@
+pack_id: finance-atm-fleet
+assets:
+  - id: atm-01
+    type: atm
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 0
+  - id: atm-02
+    type: atm
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 0
+  - id: atm-03
+    type: atm
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 0
+  - id: atm-04
+    type: atm
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 0
+  - id: atm-05
+    type: atm
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 0
+  - id: atm-06
+    type: atm
+    healthy_state:
+      system_status: "OK"
+      power_status: "OK"
+      gpu_count: 0

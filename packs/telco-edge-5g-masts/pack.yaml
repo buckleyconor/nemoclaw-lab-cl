@@ -1,0 +1,22 @@
+id: telco-edge-5g-masts
+name: "5G RAN Macro Site Fleet"
+asset_noun:
+  singular: site
+  plural: sites
+fleet_label: "RAN Site Health"
+monitoring_adapter: generic
+theme: dell-default
+sentinel_name: "5G RAN Site Sentinel"
+asset_spec_label: "Ericsson AIR 3268 AAS radio / Baseband 6630 macro gNodeB fleet"
+fleet_layout: list
+assets:
+  - id: gnb-site-01
+    display_name: "gNB Site 01 — Downtown Rooftop"
+  - id: gnb-site-02
+    display_name: "gNB Site 02 — Highway 9 Monopole"
+  - id: gnb-site-03
+    display_name: "gNB Site 03 — Riverside Water Tank"
+  - id: gnb-site-04
+    display_name: "gNB Site 04 — Industrial Park Lattice Tower"
+  - id: gnb-site-05
+    display_name: "gNB Site 05 — Suburban Stealth Pole"

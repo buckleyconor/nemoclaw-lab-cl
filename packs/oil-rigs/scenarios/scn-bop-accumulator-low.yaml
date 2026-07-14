@@ -1,0 +1,39 @@
+# Scenario: BOP HPU accumulator pressure below API S53 threshold — duty electric pump failed to auto-start
+id: scn-bop-accumulator-low
+pack_id: oil-rigs
+target_asset: bop-hpu-01
+fault_type: accumulator_pressure_low
+
+emit:
+  event:
+    severity: Critical
+    message_id: "BOP.1.0.ACCUMLOW"
+  log_entries:
+    - severity: Critical
+      message: "Accumulator pressure low — bank pressure 2650 psi, below 2800 psi low-pressure setpoint"
+    - severity: Critical
+      message: "HPU pump failed to start — duty electric pump did not respond to low-pressure auto-start signal"
+
+log_bundle_ref: bundles/scn-bop-accumulator-low.log
+
+error_signatures:
+  - "Accumulator pressure low"
+  - "HPU pump failed to start"
+  - "BOP control pressure below threshold"
+
+kb_article_ref: kb/KB600003.md
+
+remediation_steps:
+  - id: start_standby_pump
+    label: "Manually start standby air-driven HPU pump"
+  - id: isolate_suspect_bank
+    label: "Isolate the accumulator bank showing abnormal pressure decay, if identified"
+  - id: verify_pressure_recovery
+    label: "Verify accumulator bank pressure recovers to 3000 psi operating pressure"
+  - id: notify_well_control_engineer
+    label: "Notify subsea/well-control engineer and log the event per API S53 pump-response requirement"
+impact:
+  summary: "Standby air-driven pump is started manually to restore accumulator pressure while the duty electric pump's failure to auto-start is investigated; this is a well-control readiness event and is escalated regardless of how quickly pressure recovers."
+  workload_impact: "No immediate drilling interruption if pressure recovers within the API S53 30-minute window, but well-control operations (BOP function tests, any planned closure) should not proceed until bank pressure is confirmed at operating pressure."
+  service_risk: "High — BOP control pressure below threshold with a non-responding duty pump is a well-control readiness gap. API Standard 53 requires redundant pump capacity able to recharge the system within specified time limits; this event indicates that requirement was not met on the primary pump."
+  estimated_duration: "~10 minutes to start standby pump and confirm recovery; duty pump fault investigation is a separate maintenance task."

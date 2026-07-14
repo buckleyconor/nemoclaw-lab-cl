@@ -1,0 +1,39 @@
+# Scenario: Cash dispenser transport jam — notes jammed, dispenser fatal, withdrawals suspended
+id: scn-dispenser-jam
+pack_id: finance-atm-fleet
+target_asset: atm-02
+fault_type: dispenser_transport_jam
+
+emit:
+  event:
+    severity: Critical
+    message_id: "NDC.1.0.DISPJAM"
+  log_entries:
+    - severity: Warning
+      message: "Note qualification reject rate elevated — cassette 2, 3 rejects in last 5 dispenses"
+    - severity: Critical
+      message: "Dispenser transport jam — notes jammed in transport, cash handler fatal error, withdrawals suspended"
+
+log_bundle_ref: bundles/scn-dispenser-jam.log
+
+error_signatures:
+  - "Dispenser transport jam"
+  - "notes jammed in transport"
+  - "cash handler fatal error"
+
+kb_article_ref: kb/KB800001.md
+
+remediation_steps:
+  - id: remote_dispenser_reset
+    label: "Issue remote dispenser reset/purge command from ATM monitoring platform"
+  - id: run_self_test
+    label: "Run dispenser self-test and confirm transport path clear"
+  - id: set_out_of_service
+    label: "Set ATM out-of-service if reset does not clear the jam"
+  - id: dispatch_field_engineer
+    label: "Dispatch field engineer with cassette/EJ reconciliation task"
+impact:
+  summary: "A remote reset/purge is attempted first since it clears the majority of transport jams without a truck roll; if unsuccessful the ATM is taken out of service and a field engineer dispatched, with electronic journal reconciliation to account for any notes left in the jammed transport path."
+  workload_impact: "ATM is unable to dispense cash from the moment the jam occurs until resolved — deposits, balance inquiries, and transfers may remain available depending on configuration, but all withdrawal transactions fail."
+  service_risk: "Medium — a jam involving notes stuck mid-transport creates a reconciliation exposure (notes debited from customer account but not dispensed) that must be resolved via EJ (electronic journal) reconciliation, not just a physical clear."
+  estimated_duration: "~5 minutes for remote reset attempt; field dispatch and physical clear/reconciliation if needed is typically same-day but not immediate."

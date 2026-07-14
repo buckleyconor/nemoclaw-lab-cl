@@ -1,0 +1,39 @@
+# Scenario: GNSS reference lost — TDD cells enter holdover with countdown to sync-loss shutdown
+id: scn-gnss-sync-loss
+pack_id: telco-edge-5g-masts
+target_asset: gnb-site-03
+fault_type: gnss_reference_loss
+
+emit:
+  event:
+    severity: Critical
+    message_id: "SYNC.1.0.GNSSLOST"
+  log_entries:
+    - severity: Warning
+      message: "GNSS satellite tracking count dropped — 4 satellites tracked, below minimum for fix (6)"
+    - severity: Critical
+      message: "GNSS reference lost — time sync failure, cells entering holdover on Stratum 3E oscillator"
+
+log_bundle_ref: bundles/scn-gnss-sync-loss.log
+
+error_signatures:
+  - "GNSS reference lost"
+  - "time sync failure"
+  - "holdover"
+
+kb_article_ref: kb/KB900001.md
+
+remediation_steps:
+  - id: switch_backup_sync_source
+    label: "Switch baseband to backup PTP grandmaster / SyncE reference"
+  - id: verify_holdover_margin
+    label: "Verify remaining holdover margin against Stratum 3E oscillator drift budget"
+  - id: dispatch_gnss_antenna_inspection
+    label: "Dispatch field technician to inspect GNSS antenna and cabling"
+  - id: confirm_cells_in_service
+    label: "Confirm all TDD cells remain in service after sync source recovery"
+impact:
+  summary: "The baseband switches to backup PTP/SyncE synchronization to extend holdover margin while a technician inspects the physical GNSS antenna; TDD cells at this site will shut down automatically if holdover expires before sync is restored, so the backup source switch is time-critical, not optional."
+  workload_impact: "No immediate service impact if backup sync is engaged before the holdover window expires. If holdover expires first, all TDD cells at this site drop, taking the site fully out of service until GNSS or another valid reference is restored."
+  service_risk: "High — TDD 5G requires tight time synchronization between neighboring cells to avoid uplink/downlink interference; a site that loses sync and continues transmitting out of alignment can degrade neighboring sites' performance, not just its own."
+  estimated_duration: "~15 minutes to switch to backup sync source; GNSS antenna physical fault diagnosis and repair is a field dispatch task, typically same-day to next-day depending on site access."

@@ -1,0 +1,39 @@
+# Scenario: Motorized card reader transport fault — card capture/eject failure, reader offline
+id: scn-card-reader-fault
+pack_id: finance-atm-fleet
+target_asset: atm-04
+fault_type: card_reader_transport_fault
+
+emit:
+  event:
+    severity: Critical
+    message_id: "NDC.1.0.READERFAULT"
+  log_entries:
+    - severity: Warning
+      message: "Card reader motor stall detected during eject cycle — retry initiated"
+    - severity: Critical
+      message: "Card reader transport fault — card reader offline, card capture error, card transactions suspended"
+
+log_bundle_ref: bundles/scn-card-reader-fault.log
+
+error_signatures:
+  - "Card reader transport fault"
+  - "card reader offline"
+  - "card capture error"
+
+kb_article_ref: kb/KB800002.md
+
+remediation_steps:
+  - id: remote_reader_reset
+    label: "Issue remote card reader reset command from ATM monitoring platform"
+  - id: verify_captured_card_handling
+    label: "Verify captured-card bin status and log any card retained during the fault"
+  - id: enable_contactless_fallback
+    label: "Enable contactless-only transaction mode if configured, to keep ATM partially in service"
+  - id: dispatch_field_engineer_reader
+    label: "Dispatch field engineer to physically clear reader and retrieve captured cards"
+impact:
+  summary: "A remote reset is attempted first; if the reader remains offline, contactless transactions continue where supported while chip/magstripe card transactions are suspended, and a field engineer is dispatched to clear the reader and return any captured card to the customer."
+  workload_impact: "Chip and magstripe card transactions fail entirely until resolved. Contactless (tap) transactions may continue if the terminal supports independent contactless processing."
+  service_risk: "Medium — a card captured by a faulted reader must be tracked and returned to the customer; failure to do so is a customer-service and potential regulatory complaint, not just a mechanical inconvenience."
+  estimated_duration: "~5 minutes for remote reset attempt; field dispatch for physical clear and card retrieval is typically same-day."
