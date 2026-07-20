@@ -22,12 +22,17 @@ Wire protocol (per connection — one WS, one PTY, one shell):
   text  frames (in)    {"type": "resize", "cols": C, "rows": R}
   text  frames (out)   {"type": "exit", "code": N}   just before close
 
-Also exposes two bearer-token-gated HTTP actions alongside /ws:
+Also exposes three bearer-token-gated HTTP actions alongside /ws:
   POST /switch-pack    {"pack_id": str} -> restarts the docker-compose stack
                        on a different PACK_ID (deploy/scripts/switch-pack.sh),
                        detached — see docs/PACK-EXPANSION-PLAN.md.
   POST /reset          restricted mode only — non-interactive equivalent of
                        the console's menu option 7 (console.run_reset()).
+  GET  /config-status  restricted mode only — per-target read of whether
+                       SOUL.md/AGENTS.md/the four SKILL.md files have
+                       actually been pasted into the sandbox (console.
+                       check_configured()), for the lab guide's
+                       fault-injection gate.
 """
 
 from __future__ import annotations
@@ -259,6 +264,22 @@ def create_app(token: str | None = None) -> FastAPI:
             loop = asyncio.get_running_loop()
             ok = await loop.run_in_executor(None, console.run_reset, config)
             return {"ok": ok}
+
+        # Backs the lab guide's fault-injection gate: "Inject a fault" should
+        # refuse (with a warning, not silence) until all six files are
+        # actually pasted in — otherwise the agent has no persona/skills and
+        # never reacts, which looks identical to the host-process failures
+        # docs/TROUBLESHOOTING.md exists for. Six sequential `nemoclaw
+        # download` calls, so this can take a few seconds.
+        @app.get("/config-status")
+        async def config_status(request: Request) -> dict[str, object]:
+            if not _authorized_request(request, resolved_token):
+                raise HTTPException(status_code=401)
+            config = console.load_config()
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(None, console.check_configured, config)
+            missing = [t.label for t in console.MENU_TARGETS if not result.get(t.key, False)]
+            return {"configured": not missing, "missing": missing}
 
     @app.websocket("/ws")
     async def terminal_ws(ws: WebSocket) -> None:

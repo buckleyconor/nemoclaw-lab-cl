@@ -21,6 +21,7 @@ import dataclasses
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 _SANDBOX_WORKSPACE = "/sandbox/.openclaw/workspace"
@@ -300,6 +301,43 @@ def run_reset(
     if all_ok:
         print("[console] reset complete — all config files blanked in the sandbox.", file=out)
     return all_ok
+
+
+def check_configured(
+    config: ConsoleConfig,
+    targets: tuple[MenuTarget, ...] = MENU_TARGETS,
+    *,
+    run: type[subprocess.run] = subprocess.run,  # type: ignore[valid-type]
+) -> dict[str, bool]:
+    """Ground truth for "has this target been pasted in", read straight from
+    the sandbox — the fault-injection gate (lab-guide.html's "Inject a
+    fault" button, proxied through GET /config-status) needs this before
+    ever touching main()'s in-process `completed` set, which cannot answer
+    it: services.terminal.main spawns a fresh console.py subprocess per WS
+    connection, so `completed` starts empty on every terminal-panel
+    reconnect regardless of what's actually configured in the sandbox.
+
+    "Configured" means the sandbox file differs from the exact blank stub
+    run_reset() writes (blank_content()); a download failure (file never
+    pushed) counts as unconfigured, same as an empty one.
+    """
+    result: dict[str, bool] = {}
+    for target in targets:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            dest = Path(tmp_dir) / "download"
+            dl = run(
+                [config.nemoclaw_bin, config.sandbox_name, "download", target.sandbox_path, str(dest)],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            # A skill's sandbox_path is a directory (_SANDBOX_SKILLS/<name>),
+            # so download materializes `dest` itself as a directory — same
+            # convention edit_path() uses for the live PTY edit flow.
+            content_path = dest / "SKILL.md" if target.kind == "skill" else dest
+            content = content_path.read_text() if dl.returncode == 0 and content_path.is_file() else None
+        result[target.key] = bool(content) and content != blank_content(target)
+    return result
 
 
 def load_config() -> ConsoleConfig:

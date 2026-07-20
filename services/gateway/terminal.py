@@ -6,14 +6,20 @@ the Gateway, the Gateway opens a client WS to TERMINAL_WS_URL and injects
 the bearer token — the token never reaches the browser.
 
 Endpoints:
-  GET  /api/terminal/enabled      feature flag for the dashboard panel
-  WS   /api/terminal/ws           transparent byte/control-frame proxy
-  POST /api/terminal/reset        forwards to the daemon's /reset (restricted
-                                   mode only — 404s there in shell mode)
-  POST /api/terminal/switch-pack  forwards {"pack_id": str} to the daemon's
-                                   /switch-pack (restarts the docker-compose
-                                   stack on a different pack — always
-                                   registered, any TERMINAL_MODE)
+  GET  /api/terminal/enabled        feature flag for the dashboard panel
+  WS   /api/terminal/ws             transparent byte/control-frame proxy
+  POST /api/terminal/reset          forwards to the daemon's /reset
+                                     (restricted mode only — 404s in shell
+                                     mode)
+  POST /api/terminal/switch-pack    forwards {"pack_id": str} to the
+                                     daemon's /switch-pack (restarts the
+                                     docker-compose stack on a different
+                                     pack — always registered, any
+                                     TERMINAL_MODE)
+  GET  /api/terminal/config-status  forwards to the daemon's /config-status
+                                     (restricted mode only) — lab-guide.html's
+                                     fault-injection gate calls this before
+                                     POSTing /api/presenter/inject
 
 Fail-safe: enabled only when TERMINAL_WS_URL and TERMINAL_TOKEN are both set
 and TERMINAL_ENABLED != "0". The M9 shared deployment MUST keep this off.
@@ -70,6 +76,27 @@ async def terminal_reset() -> dict:
                 _daemon_http_url(url, "reset"), headers={"Authorization": f"Bearer {token}"}
             )
         return resp.json()
+    except httpx.HTTPError:
+        return {"ok": False, "error": "daemon unreachable"}
+
+
+@terminal_router.get("/api/terminal/config-status")
+async def terminal_config_status() -> dict:
+    """Best-effort proxy to the daemon's /config-status. `ok: false` (feature
+    disabled, daemon unreachable, or shell-mode 404) means the caller should
+    fail open and let injection proceed rather than block the demo on an
+    unrelated outage — the gate only fires on a definite `configured: false`."""
+    url, token, enabled = _config()
+    if not enabled:
+        return {"ok": False, "error": "terminal disabled"}
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            resp = await client.get(
+                _daemon_http_url(url, "config-status"), headers={"Authorization": f"Bearer {token}"}
+            )
+        if resp.status_code != 200:
+            return {"ok": False, "error": f"daemon returned {resp.status_code}"}
+        return {"ok": True, **resp.json()}
     except httpx.HTTPError:
         return {"ok": False, "error": "daemon unreachable"}
 

@@ -3814,6 +3814,27 @@ function triggerFault() {
   }
 
   const base = window.location.origin;
+
+  // Gate: an agent with no SOUL.md/AGENTS.md/skills never reacts to a fault
+  // at all — which looks exactly like the agent or the demo being broken.
+  // GET /api/terminal/config-status is the ground-truth check (reads the
+  // actual sandbox files); `ok: false` means the check itself couldn't run
+  // (terminal feature off/unreachable), so fail open rather than block the
+  // demo on an unrelated outage.
+  fetch(`${base}/api/terminal/config-status`)
+    .then(r => r.json())
+    .then(data => {
+      if (data && data.ok && data.configured === false) {
+        status.style.color = "var(--critical)";
+        status.textContent = "Please configure the Agent first — Part 1, Steps 1–6 must be completed before proceeding.";
+        return;
+      }
+      startFaultCountdown(base, btn, status);
+    })
+    .catch(() => startFaultCountdown(base, btn, status));
+}
+
+function startFaultCountdown(base, btn, status) {
   let secs = 2;
   btn.disabled = true;
   btn.style.opacity = ".6";
