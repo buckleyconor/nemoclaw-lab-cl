@@ -9,6 +9,7 @@ export interface PackInfo {
   asset_spec_label: string | null;
   fleet_layout: "grid" | "list";
   asset_display_names: Record<string, string>;
+  asset_image_urls: Record<string, string>;
 }
 
 export interface AssetRecord {

@@ -547,7 +547,7 @@ body.started .curtain-half.right { animation: curtain-right 1.5s cubic-bezier(.6
 
       <div class="takeaway">
         <div class="takeaway-title">What you'll see in the next 10 minutes</div>
-        <ul class="takeaway-list">
+        <ul class="takeaway-list" data-vi="p1takeaways">
           <li>A GPU fault arrive on the health grid in real time</li>
           <li>The NemoClaw agent detect, diagnose, and propose a fix — no prompting</li>
           <li>The approval gate block remediation until you click Approve Self-Heal</li>
@@ -3675,6 +3675,10 @@ function returnToMenu() {
 const VERTICAL_TO_PACK_ID = {
   "ai-infrastructure": "datacenter-xe9680",
   "laptop-fleet": "laptop-fleet",
+  "oil-rigs": "oil-rigs",
+  "healthcare-devices": "healthcare-devices",
+  "finance-atm-fleet": "finance-atm-fleet",
+  "telco-edge-5g-masts": "telco-edge-5g-masts",
 };
 
 function checkPackMatch() {
@@ -3885,6 +3889,10 @@ const VERTICAL_CONFIG = {
     tagline: "An AI agent watches a simulated XE9780L GPU cluster. Your job: decide whether it gets to fix the fault it finds.",
     meta: `<span><span class="dot"></span>Live Demo</span><span>XE9780L · 4 Servers · 8× B300</span><span>NemoClaw v0.0.70</span>`,
     p1lead: `<strong>NemoClaw AI Infrastructure Agent</strong> monitors a 4-node Dell PowerEdge XE9780L GPU cluster (each with 8× NVIDIA B300s), detects hardware faults, diagnoses them against Dell KB articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.`,
+    p1takeaways: `<li>A GPU fault arrive on the health grid in real time</li>
+      <li>The NemoClaw agent detect, diagnose, and propose a fix — no prompting</li>
+      <li>The approval gate block remediation until you click Approve Self-Heal</li>
+      <li>The NemoClaw agent execute the fix and report the cluster healthy again</li>`,
     p1story: `<h3>The story</h3>
       <p>Four XE9780L GPU servers are running model inference. You inject a fault into one of them — a Redfish event surfaced to the NemoClaw agent over MCP. The NemoClaw agent detects it on its next poll, pulls the iDRAC error log, uses the Local LLM to extract the error signature and write a fault assessment, searches the Dell KB, and posts the full diagnosis to the Operator Dashboard.</p>
       <p>Then it <strong>stops</strong>. Nothing gets fixed until you click <strong>Approve Self-Heal</strong>. If you click <strong>Deny</strong>, the NemoClaw agent logs it and moves on — the asset stays red.</p>
@@ -3910,6 +3918,10 @@ const VERTICAL_CONFIG = {
     tagline: "An AI agent monitors a simulated Precision laptop fleet. Your job: decide whether it gets to resolve the device fault it finds.",
     meta: `<span><span class="dot"></span>Live Demo</span><span>Dell Precision · 4 Laptops · NVIDIA RTX</span><span>NemoClaw v0.0.70</span>`,
     p1lead: `<strong>NemoClaw Device Fleet Agent</strong> monitors a 4-device Dell Precision laptop fleet, detects hardware and driver faults, diagnoses them against Dell KB articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.`,
+    p1takeaways: `<li>A laptop hardware fault arrive on the health grid in real time</li>
+      <li>The NemoClaw agent detect, diagnose, and propose a fix — no prompting</li>
+      <li>The approval gate block remediation until you click Approve Self-Heal</li>
+      <li>The NemoClaw agent execute the fix and report the fleet healthy again</li>`,
     p1story: `<h3>The story</h3>
       <p>Four Dell Precision laptops are in active use. You inject a fault into one of them — a device event surfaced to the NemoClaw agent over MCP. The NemoClaw agent detects it on its next poll, pulls the device event log, uses the Local LLM to extract the error signature and write a fault assessment, searches the Dell KB, and posts the full diagnosis to the Operator Dashboard.</p>
       <p>Then it <strong>stops</strong>. Nothing gets fixed until you click <strong>Approve Self-Heal</strong>. If you click <strong>Deny</strong>, the NemoClaw agent logs it and moves on — the device stays red.</p>
@@ -3935,6 +3947,10 @@ const VERTICAL_CONFIG = {
     tagline: "An AI agent watches a simulated drilling rig's critical equipment. Your job: decide whether it gets to act on the fault it finds.",
     meta: `<span><span class="dot"></span>Live Demo</span><span>NOV / ABB / Cameron · 6 Units</span><span>NemoClaw v0.0.70</span>`,
     p1lead: `<strong>NemoClaw Drilling Rig Agent</strong> monitors a drilling rig's critical equipment fleet — mud pumps, top drive, BOP control HPU — detects faults, diagnoses them against vendor KB articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.`,
+    p1takeaways: `<li>Drilling equipment failures arrive on the health grid in real time</li>
+      <li>The NemoClaw agent detect, diagnose, and propose a fix — no prompting</li>
+      <li>The approval gate block remediation until you click Approve Self-Heal</li>
+      <li>The NemoClaw agent execute the fix and report the rig healthy again</li>`,
     p1story: `<h3>The story</h3>
       <p>Six critical rig units are running normally — mud pumps, a top drive, drawworks, a BOP control HPU, and a generator. You inject a fault into one of them — an equipment event surfaced to the NemoClaw agent over MCP. The NemoClaw agent detects it on its next poll, pulls the rig SCADA log, uses the Local LLM to extract the error signature and write a fault assessment, searches the KB, and posts the full diagnosis to the Operator Dashboard.</p>
       <p>Then it <strong>stops</strong>. Nothing gets fixed until you click <strong>Approve Self-Heal</strong>. If you click <strong>Deny</strong>, the NemoClaw agent logs it and moves on — the asset stays red.</p>
@@ -3960,6 +3976,10 @@ const VERTICAL_CONFIG = {
     tagline: "An AI agent watches a simulated hospital biomedical device fleet. Your job: decide whether it gets to act on the fault it finds.",
     meta: `<span><span class="dot"></span>Live Demo</span><span>BD / Philips / Siemens · 5 Devices</span><span>NemoClaw v0.0.70</span>`,
     p1lead: `<strong>NemoClaw Biomedical Device Agent</strong> monitors a hospital's biomedical device fleet — infusion pumps, patient monitors, an MRI scanner — detects faults, diagnoses them against vendor KB articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.`,
+    p1takeaways: `<li>Biomedical equipment failures arrive on the health grid in real time</li>
+      <li>The NemoClaw agent detect, diagnose, and propose a fix — no prompting</li>
+      <li>The approval gate block remediation until you click Approve Self-Heal</li>
+      <li>The NemoClaw agent execute the fix and report the device fleet healthy again</li>`,
     p1story: `<h3>The story</h3>
       <p>Five clinical devices are in active use — two infusion pumps, two patient monitors, and an MRI scanner. You inject a fault into one of them — a device event surfaced to the NemoClaw agent over MCP. The NemoClaw agent detects it on its next poll, pulls the device log, uses the Local LLM to extract the error signature and write a fault assessment, searches the KB, and posts the full diagnosis to the Operator Dashboard.</p>
       <p>Then it <strong>stops</strong>. Nothing gets fixed until you click <strong>Approve Self-Heal</strong>. If you click <strong>Deny</strong>, the NemoClaw agent logs it and moves on — the asset stays red. This lab covers equipment faults only — it never proposes clinical or patient-care decisions.</p>
@@ -3985,6 +4005,10 @@ const VERTICAL_CONFIG = {
     tagline: "An AI agent watches a simulated bank ATM fleet. Your job: decide whether it gets to act on the fault it finds.",
     meta: `<span><span class="dot"></span>Live Demo</span><span>NCR / Diebold Nixdorf · 6 ATMs</span><span>NemoClaw v0.0.70</span>`,
     p1lead: `<strong>NemoClaw ATM Fleet Agent</strong> monitors a retail bank's branch and off-premise ATM fleet, detects faults, diagnoses them against vendor KB articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.`,
+    p1takeaways: `<li>ATM equipment failures arrive on the health grid in real time</li>
+      <li>The NemoClaw agent detect, diagnose, and propose a fix — no prompting</li>
+      <li>The approval gate block remediation until you click Approve Self-Heal</li>
+      <li>The NemoClaw agent execute the fix and report the ATM fleet healthy again</li>`,
     p1story: `<h3>The story</h3>
       <p>Six ATMs across branch and off-premise sites are in active service. You inject a fault into one of them — a device event surfaced to the NemoClaw agent over MCP. The NemoClaw agent detects it on its next poll, pulls the ATM's NDC device log, uses the Local LLM to extract the error signature and write a fault assessment, searches the KB, and posts the full diagnosis to the Operator Dashboard.</p>
       <p>Then it <strong>stops</strong>. Nothing gets fixed until you click <strong>Approve Self-Heal</strong>. If you click <strong>Deny</strong>, the NemoClaw agent logs it and moves on — the asset stays red.</p>
@@ -4010,6 +4034,10 @@ const VERTICAL_CONFIG = {
     tagline: "An AI agent watches a simulated fleet of 5G macro gNodeB sites. Your job: decide whether it gets to act on the fault it finds.",
     meta: `<span><span class="dot"></span>Live Demo</span><span>Ericsson AIR 3268 · 5 Sites</span><span>NemoClaw v0.0.70</span>`,
     p1lead: `<strong>NemoClaw 5G RAN Site Agent</strong> monitors a fleet of Ericsson 5G macro gNodeB sites, detects faults, diagnoses them against vendor KB articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.`,
+    p1takeaways: `<li>Next generation 5G radio base equipment failures arrive on the health grid in real time</li>
+      <li>The NemoClaw agent detect, diagnose, and propose a fix — no prompting</li>
+      <li>The approval gate block remediation until you click Approve Self-Heal</li>
+      <li>The NemoClaw agent execute the fix and report the site healthy again</li>`,
     p1story: `<h3>The story</h3>
       <p>Five 5G macro sites are in active service. You inject a fault into one of them — a site event surfaced to the NemoClaw agent over MCP. The NemoClaw agent detects it on its next poll, pulls the site's baseband/radio log, uses the Local LLM to extract the error signature and write a fault assessment, searches the KB, and posts the full diagnosis to the Operator Dashboard.</p>
       <p>Then it <strong>stops</strong>. Nothing gets fixed until you click <strong>Approve Self-Heal</strong>. If you click <strong>Deny</strong>, the NemoClaw agent logs it and moves on — the asset stays red.</p>

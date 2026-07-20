@@ -1,0 +1,25 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="128" y2="128">
+      <stop offset="0" stop-color="#101d2f"/>
+      <stop offset="1" stop-color="#0a121e"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="20" fill="url(#bg)"/>
+  <rect x="1" y="1" width="126" height="126" rx="19" fill="none" stroke="rgba(96,165,250,0.22)" stroke-width="2"/>
+  <rect x="42" y="28" width="44" height="28" rx="3" fill="#60a5fa" opacity="0.15"/>
+  <g fill="none" stroke="#93c5fd" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="34" y="18" width="60" height="92" rx="8"/>
+    <rect x="42" y="28" width="44" height="28" rx="3"/>
+    <rect x="42" y="86" width="20" height="5" rx="2"/>
+    <rect x="66" y="86" width="20" height="5" rx="2"/>
+  </g>
+  <g fill="#93c5fd">
+    <circle cx="50" cy="66" r="2.5"/>
+    <circle cx="64" cy="66" r="2.5"/>
+    <circle cx="78" cy="66" r="2.5"/>
+    <circle cx="50" cy="76" r="2.5"/>
+    <circle cx="64" cy="76" r="2.5"/>
+    <circle cx="78" cy="76" r="2.5"/>
+  </g>
+</svg>

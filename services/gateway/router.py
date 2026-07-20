@@ -72,6 +72,11 @@ async def get_pack(request: Request) -> dict:
         "asset_display_names": {
             a.id: a.display_name for a in pack.assets if a.display_name
         },
+        # {asset_id: image_url} — only assets with a per-asset override are
+        # included; the UI falls back to pack.asset_image_url for the rest.
+        "asset_image_urls": {
+            a.id: a.image_url for a in pack.assets if a.image_url
+        },
     }
 
 

@@ -12,11 +12,16 @@ fleet_layout: list
 assets:
   - id: infusion-pump-01
     display_name: "Infusion Pump 01 (BD Alaris 8100, Med-Surg 3W)"
+    image_url: "/icons/infusion-pump.svg"
   - id: infusion-pump-02
     display_name: "Infusion Pump 02 (BD Alaris 8100, ICU)"
+    image_url: "/icons/infusion-pump.svg"
   - id: monitor-01
     display_name: "Patient Monitor 01 (Philips IntelliVue MX800, ICU Bed 4)"
+    image_url: "/icons/patient-monitor.svg"
   - id: monitor-02
     display_name: "Patient Monitor 02 (Philips IntelliVue MX450, Telemetry Bed 12)"
+    image_url: "/icons/patient-monitor.svg"
   - id: mri-01
     display_name: "MRI Scanner (Siemens MAGNETOM Aera 1.5T)"
+    image_url: "/icons/mri-scanner.svg"

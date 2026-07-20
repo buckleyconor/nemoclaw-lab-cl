@@ -1,9 +1,6 @@
 import { useState } from "react";
 import type { AssetRecord, PackInfo } from "../types";
 
-const SERVER_IMG =
-  "https://i.dell.com/is/image/DellContent/content/dam/ss2/product-images/dell-enterprise-products/enterprise-systems/poweredge/xe9780l/media-gallery/server-dell-xe9780l-16xe1-c-gallery-2.psd?fmt=pjpg&pscan=auto&scl=1&hei=402&wid=1669&qlt=100,1&resMode=sharp2&size=1669,402&chrss=full";
-
 interface Props {
   assets: AssetRecord[];
   pack: PackInfo | null;
@@ -14,15 +11,18 @@ interface Props {
 // Isolated so image-load-failure state doesn't need to live in a keyed array
 // of hooks — falls back to a plain icon tile if asset_image_url 404s (e.g.
 // a pack references a product photo that hasn't been dropped into place yet)
-// instead of showing the browser's broken-image glyph.
+// instead of showing the browser's broken-image glyph. Also the fallback for
+// `src === null` (no asset_image_url configured at all) — deliberately never
+// defaults to another pack's product photo, since that reads as wrong
+// equipment rather than a generic placeholder.
 function AssetImage({
   src, alt, faulted, size,
-}: { src: string; alt: string; faulted: boolean; size: "tile" | "thumb" }) {
+}: { src: string | null; alt: string; faulted: boolean; size: "tile" | "thumb" }) {
   const [failed, setFailed] = useState(false);
   const dims = size === "thumb"
     ? { width: 56, height: 56, borderRadius: 8 }
     : { width: "100%" as const, aspectRatio: "1669 / 402", borderRadius: 4 };
-  if (failed) {
+  if (!src || failed) {
     return (
       <div style={{
         ...dims,
@@ -87,7 +87,7 @@ function StatusBadge({ faulted }: { faulted: boolean }) {
 interface AssetLayoutProps {
   asset: AssetRecord;
   pack: PackInfo | null;
-  imgSrc: string;
+  imgSrc: string | null;
   specLabel: string;
   onSelectAsset: (id: string) => void;
 }
@@ -207,10 +207,14 @@ function FleetListRow({ asset, pack, imgSrc, specLabel, onSelectAsset }: AssetLa
 }
 
 export function FleetGrid({ assets, pack, onSelectAsset, idle }: Props) {
-  const imgSrc = pack?.asset_image_url ?? SERVER_IMG;
   const specLabel = pack?.asset_spec_label ?? "8× NVIDIA B300";
   const layout = pack?.fleet_layout ?? "grid";
-  const rowProps = { pack, imgSrc, specLabel, onSelectAsset };
+  // Per-asset image wins (packs like oil-rigs/healthcare mix distinct
+  // equipment types), falling back to the pack-wide photo (laptop-fleet,
+  // finance-atm-fleet, telco-edge-5g-masts, datacenter-xe9680, all of which
+  // repeat one equipment type across the whole fleet).
+  const imgSrcFor = (assetId: string) =>
+    pack?.asset_image_urls?.[assetId] ?? pack?.asset_image_url ?? null;
   return (
     <>
       <style>{`
@@ -228,7 +232,10 @@ export function FleetGrid({ assets, pack, onSelectAsset, idle }: Props) {
       }}>
         {layout === "list" ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {assets.map((a) => <FleetListRow key={a.id} asset={a} {...rowProps} />)}
+            {assets.map((a) => (
+              <FleetListRow key={a.id} asset={a} pack={pack} specLabel={specLabel}
+                imgSrc={imgSrcFor(a.id)} onSelectAsset={onSelectAsset} />
+            ))}
           </div>
         ) : (
           <div style={{
@@ -236,7 +243,10 @@ export function FleetGrid({ assets, pack, onSelectAsset, idle }: Props) {
             gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
             gap: 14,
           }}>
-            {assets.map((a) => <FleetTile key={a.id} asset={a} {...rowProps} />)}
+            {assets.map((a) => (
+              <FleetTile key={a.id} asset={a} pack={pack} specLabel={specLabel}
+                imgSrc={imgSrcFor(a.id)} onSelectAsset={onSelectAsset} />
+            ))}
           </div>
         )}
       </div>

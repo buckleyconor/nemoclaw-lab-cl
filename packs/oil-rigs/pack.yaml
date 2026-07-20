@@ -12,13 +12,19 @@ fleet_layout: list
 assets:
   - id: mud-pump-01
     display_name: "Mud Pump No. 1 (NOV 14-P-220 Triplex)"
+    image_url: "/icons/mud-pump.svg"
   - id: mud-pump-02
     display_name: "Mud Pump No. 2 (NOV 14-P-220 Triplex)"
+    image_url: "/icons/mud-pump.svg"
   - id: top-drive-01
     display_name: "Top Drive (NOV TDS-11SA)"
+    image_url: "/icons/top-drive.svg"
   - id: drawworks-01
     display_name: "Drawworks (NOV D2000)"
+    image_url: "/icons/drawworks.svg"
   - id: bop-hpu-01
     display_name: "BOP Control HPU (Cameron/Koomey Type E)"
+    image_url: "/icons/bop-hpu.svg"
   - id: gen-01
     display_name: "Rig Generator No. 1 (Caterpillar 3512C)"
+    image_url: "/icons/generator.svg"

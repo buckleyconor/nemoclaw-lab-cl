@@ -45,6 +45,10 @@ class PackAsset(BaseModel):
     # customer-branded "laptop-acme-001" instead of "laptop-01"). Falls back
     # to id when unset — never used for scenario/simulator lookups.
     display_name: str | None = None
+    # Per-asset override of Pack.asset_image_url, for packs whose fleet
+    # mixes distinct equipment types (e.g. oil-rigs' mud pumps vs top drive
+    # vs BOP HPU). Falls back to the pack-level image when unset.
+    image_url: str | None = None
 
 
 class Pack(BaseModel):
