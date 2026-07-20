@@ -583,9 +583,10 @@ body.started .curtain-half.right { animation: curtain-right 1.5s cubic-bezier(.6
         <ul class="takeaway-list">
           <li>Scroll down to the <strong>Agent Configuration Terminal</strong> panel (below the Operator Dashboard) and pick the matching menu number, 1–6</li>
           <li>The terminal opens that file in <code>vim</code>, seeded from whatever is already in the OpenShell sandbox</li>
-          <li>Type <code>ggVGd</code> to delete any existing text, then press <code>i</code> to enter insert mode <em>(vim ignores pasted text unless you do — this step matters)</em></li>
-          <li>Paste with <strong>Ctrl+Shift+V</strong> (browser terminals don't use plain Ctrl+V), then press <code>Esc</code> and type <code>:wq</code> to save and quit</li>
-          <li>Made a mess? <code>Esc</code> then <code>:q!</code> quits without saving — pick the same menu number and start over</li>
+          <li>For <code>SOUL.md</code>/<code>AGENTS.md</code> (items 1–2) the file opens empty — just right-click at the top of the file and paste</li>
+          <li>For the <code>SKILL.md</code> files (items 3–6), first clear the placeholder lines: scroll to the top and press <code>dd</code> three times, then right-click and paste</li>
+          <li>Save and quit with <code>:wq!</code></li>
+          <li>Made a mess? <code>:q!</code> quits without saving — pick the same menu number and start over</li>
           <li>The terminal <strong>automatically uploads</strong> the file (or installs it, for skills) into the OpenShell sandbox — there is no separate upload command to run</li>
           <li>Back at the menu, that item turns <span style="color:var(--healthy)">green with a ✓</span> once the push succeeds (skills are checked for valid frontmatter before pushing — a red error means the paste got mangled: re-pick the item and try again)</li>
         </ul>
@@ -593,7 +594,7 @@ body.started .curtain-half.right { animation: curtain-right 1.5s cubic-bezier(.6
 
       <details class="file-collapse">
         <summary><span class="file-collapse-num">1</span> Identity <code>SOUL.md</code></summary>
-        <p>Terminal menu item <strong>1) Edit SOUL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick option <strong>1</strong>, clear the file (<code>ggVGd</code>), press <code>i</code>, paste (<strong>Ctrl+Shift+V</strong>), then <code>Esc</code> and <code>:wq</code>.</p>
+        <p>Terminal menu item <strong>1) Edit SOUL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick the option correlating to the config file name <strong>SOUL.md</strong> or <strong>AGENTS.md</strong>, right-click at the top of the file, paste, and save the file with the command <code>:wq!</code>.</p>
         <div class="codeblock" data-vertical="ai-infrastructure">
           <div class="codeblock-header"><span>SOUL.md</span><button class="copy-btn" data-copy-target="soul-md-src">📋 Copy</button></div>
           <pre id="soul-md-src"><code># AI Infrastructure Agent — Soul
@@ -1042,7 +1043,7 @@ SOUL.md v1.0 — NemoClaw 5G RAN Site Agent on OpenClaw (ADR-011), 2026
       </details>
       <details class="file-collapse">
         <summary><span class="file-collapse-num">2</span> Operating guide <code>AGENTS.md</code></summary>
-        <p>Terminal menu item <strong>2) Edit AGENTS.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick option <strong>2</strong>, clear the file (<code>ggVGd</code>), press <code>i</code>, paste (<strong>Ctrl+Shift+V</strong>), then <code>Esc</code> and <code>:wq</code>.</p>
+        <p>Terminal menu item <strong>2) Edit AGENTS.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick the option correlating to the config file name <strong>SOUL.md</strong> or <strong>AGENTS.md</strong>, right-click at the top of the file, paste, and save the file with the command <code>:wq!</code>.</p>
         <div class="codeblock" data-vertical="ai-infrastructure">
           <div class="codeblock-header"><span>AGENTS.md</span><button class="copy-btn" data-copy-target="agents-md-src">📋 Copy</button></div>
           <pre id="agents-md-src"><code># AI Infrastructure Agent — Operating Guide
@@ -1640,7 +1641,7 @@ or re-proposing on every wake-up instead of just checking in and stopping.
       </details>
       <details class="file-collapse">
         <summary><span class="file-collapse-num">3</span> Detect <code>infra-sentinel-monitor/SKILL.md</code></summary>
-        <p>Terminal menu item <strong>3) Edit infra-sentinel-monitor/SKILL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick option <strong>3</strong>, clear the file (<code>ggVGd</code>), press <code>i</code>, paste (<strong>Ctrl+Shift+V</strong>), then <code>Esc</code> and <code>:wq</code>.</p>
+        <p>Terminal menu item <strong>3) Edit infra-sentinel-monitor/SKILL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick the option correlating to the skill name, then clear the file by scrolling to the top and pressing <code>dd</code> three times to clear the placeholder lines, right-click at the top of the file, paste, and save the file with the command <code>:wq!</code>.</p>
         <div class="codeblock" data-vertical="ai-infrastructure">
           <div class="codeblock-header"><span>infra-sentinel-monitor/SKILL.md</span><button class="copy-btn" data-copy-target="skill-monitor-src">📋 Copy</button></div>
           <pre id="skill-monitor-src"><code>---
@@ -1890,7 +1891,7 @@ Or `{ "status": "no_fault" }` when nothing is active.
       </details>
       <details class="file-collapse">
         <summary><span class="file-collapse-num">4</span> Diagnose <code>infra-sentinel-diagnose/SKILL.md</code></summary>
-        <p>Terminal menu item <strong>4) Edit infra-sentinel-diagnose/SKILL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick option <strong>4</strong>, clear the file (<code>ggVGd</code>), press <code>i</code>, paste (<strong>Ctrl+Shift+V</strong>), then <code>Esc</code> and <code>:wq</code>.</p>
+        <p>Terminal menu item <strong>4) Edit infra-sentinel-diagnose/SKILL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick the option correlating to the skill name, then clear the file by scrolling to the top and pressing <code>dd</code> three times to clear the placeholder lines, right-click at the top of the file, paste, and save the file with the command <code>:wq!</code>.</p>
         <div class="codeblock" data-vertical="ai-infrastructure">
           <div class="codeblock-header"><span>infra-sentinel-diagnose/SKILL.md</span><button class="copy-btn" data-copy-target="skill-diagnose-src">📋 Copy</button></div>
           <pre id="skill-diagnose-src"><code>---
@@ -2452,7 +2453,7 @@ Proceed to `infra-sentinel-remediate` to compose the proposal.
       </details>
       <details class="file-collapse">
         <summary><span class="file-collapse-num">5</span> Narrate <code>infra-sentinel-notify/SKILL.md</code></summary>
-        <p>Terminal menu item <strong>5) Edit infra-sentinel-notify/SKILL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick option <strong>5</strong>, clear the file (<code>ggVGd</code>), press <code>i</code>, paste (<strong>Ctrl+Shift+V</strong>), then <code>Esc</code> and <code>:wq</code>.</p>
+        <p>Terminal menu item <strong>5) Edit infra-sentinel-notify/SKILL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick the option correlating to the skill name, then clear the file by scrolling to the top and pressing <code>dd</code> three times to clear the placeholder lines, right-click at the top of the file, paste, and save the file with the command <code>:wq!</code>.</p>
         <div class="codeblock" data-vertical="ai-infrastructure">
           <div class="codeblock-header"><span>infra-sentinel-notify/SKILL.md</span><button class="copy-btn" data-copy-target="skill-notify-src">📋 Copy</button></div>
           <pre id="skill-notify-src"><code>---
@@ -2792,7 +2793,7 @@ the platform, not by you — your narration ends at `present`.
       </details>
       <details class="file-collapse">
         <summary><span class="file-collapse-num">6</span> Propose <code>infra-sentinel-remediate/SKILL.md</code></summary>
-        <p>Terminal menu item <strong>6) Edit infra-sentinel-remediate/SKILL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick option <strong>6</strong>, clear the file (<code>ggVGd</code>), press <code>i</code>, paste (<strong>Ctrl+Shift+V</strong>), then <code>Esc</code> and <code>:wq</code>.</p>
+        <p>Terminal menu item <strong>6) Edit infra-sentinel-remediate/SKILL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick the option correlating to the skill name, then clear the file by scrolling to the top and pressing <code>dd</code> three times to clear the placeholder lines, right-click at the top of the file, paste, and save the file with the command <code>:wq!</code>.</p>
         <div class="codeblock" data-vertical="ai-infrastructure">
           <div class="codeblock-header"><span>infra-sentinel-remediate/SKILL.md</span><button class="copy-btn" data-copy-target="skill-remediate-src">📋 Copy</button></div>
           <pre id="skill-remediate-src"><code>---
