@@ -8,14 +8,30 @@
 # looks exactly like an agent/config bug. Both such incidents during
 # development were host-process failures, not code. Run this first.
 #
-# Usage: make doctor   (or deploy/scripts/doctor.sh)
-# Exit code: 0 if everything passes, 1 otherwise.
+# Usage: make doctor        (report only)
+#        make doctor-fix    (report + apply the fixes automatically)
+#        deploy/scripts/doctor.sh [--fix]
+# Exit code: 0 if everything passes (after fixing, when --fix is given),
+# 1 otherwise. The nemoclaw-doctor.timer systemd unit runs `--fix` on a
+# schedule so these failures self-heal before anyone hits "reconnect" —
+# see deploy/systemd/nemoclaw-doctor.{service,timer}.
 set -uo pipefail
 
 cd "$(dirname "$0")/../.."
 
-GREEN=$'\033[32m'; RED=$'\033[31m'; YELLOW=$'\033[33m'; DIM=$'\033[2m'; RESET=$'\033[0m'
+FIX=0
+[[ "${1:-}" == "--fix" ]] && FIX=1
+
+# No colors when not on a tty (journalctl, log files) — raw escape codes
+# just add noise there.
+if [[ -t 1 ]]; then
+  GREEN=$'\033[32m'; RED=$'\033[31m'; YELLOW=$'\033[33m'; DIM=$'\033[2m'; RESET=$'\033[0m'
+else
+  GREEN=''; RED=''; YELLOW=''; DIM=''; RESET=''
+fi
 FAILURES=0
+STATE_DIR="${HOME}/.local/state"
+mkdir -p "$STATE_DIR"
 
 # Pull the vars we probe with from .env (never exported — read-only probe).
 env_get() { grep -E "^$1=" .env 2>/dev/null | head -1 | cut -d= -f2-; }
@@ -33,6 +49,7 @@ fail() {
   FAILURES=$((FAILURES + 1))
 }
 skip() { printf "  %s-%s %-34s %s%s%s\n" "$DIM" "$RESET" "$1" "$DIM" "$2" "$RESET"; }
+fixing() { printf "      %sfixing:%s %s\n" "$YELLOW" "$RESET" "$1"; }
 
 http_code() { curl -s -o /dev/null -w "%{http_code}" --max-time 4 "$@" 2>/dev/null; }
 
@@ -40,12 +57,35 @@ echo "NemoClaw demo preflight"
 echo
 
 # ── 1. Compose services (probe published healthz ports directly) ────────────
-for entry in "gateway:8001" "orchestrator:8002" "simulator:8003" "mcp-tools:8004"; do
-  name="${entry%%:*}"; port="${entry##*:}"
-  if [[ "$(http_code "http://localhost:${port}/healthz")" == "200" ]]; then
-    pass "$name (:$port)"
+SERVICE_ORDER=(gateway orchestrator simulator mcp-tools)
+declare -A SERVICE_PORT=( [gateway]=8001 [orchestrator]=8002 [simulator]=8003 [mcp-tools]=8004 )
+declare -A SERVICE_UP
+
+check_services() {
+  local any_down=0
+  for name in "${SERVICE_ORDER[@]}"; do
+    if [[ "$(http_code "http://localhost:${SERVICE_PORT[$name]}/healthz")" == "200" ]]; then
+      SERVICE_UP[$name]=1
+    else
+      SERVICE_UP[$name]=0
+      any_down=1
+    fi
+  done
+  return "$any_down"
+}
+
+check_services
+if [[ $? -ne 0 && "$FIX" -eq 1 ]]; then
+  fixing "docker compose up -d"
+  docker compose up -d >/dev/null 2>&1
+  sleep 3
+  check_services || true
+fi
+for name in "${SERVICE_ORDER[@]}"; do
+  if [[ "${SERVICE_UP[$name]}" -eq 1 ]]; then
+    pass "$name (:${SERVICE_PORT[$name]})"
   else
-    fail "$name (:$port)" "not answering" "docker compose up -d   (make up)"
+    fail "$name (:${SERVICE_PORT[$name]})" "not answering" "docker compose up -d   (make up)"
   fi
 done
 
@@ -62,7 +102,18 @@ fi
 if [[ -n "$TERMINAL_WS_URL" ]]; then
   TERM_HTTP="${TERMINAL_WS_URL/ws:\/\//http://}"; TERM_HTTP="${TERM_HTTP%/ws}"
   TERM_HTTP="${TERM_HTTP/host.docker.internal/$TERMINAL_BIND}"
-  if [[ "$(http_code "${TERM_HTTP}/healthz")" == "200" ]]; then
+
+  terminal_up() { [[ "$(http_code "${TERM_HTTP}/healthz")" == "200" ]]; }
+
+  if ! terminal_up && [[ "$FIX" -eq 1 ]]; then
+    fixing "TERMINAL_MODE=restricted SANDBOX_NAME=$SANDBOX_NAME make terminal"
+    TERMINAL_MODE=restricted SANDBOX_NAME="$SANDBOX_NAME" \
+      nohup ./deploy/scripts/run-terminal.sh >> "$STATE_DIR/nemoclaw-terminal.log" 2>&1 &
+    disown
+    sleep 3
+  fi
+
+  if terminal_up; then
     pass "terminal daemon" "$TERM_HTTP"
   else
     fail "terminal daemon" "not answering at $TERM_HTTP" \
@@ -75,10 +126,40 @@ fi
 # ── 4/5. Wake-hook path (openshell forward + hook-relay bridge) ──────────────
 if [[ -n "$HOOK_URL" ]]; then
   HOOK_PORT="${HOOK_URL##*:}"; HOOK_PORT="${HOOK_PORT%%/*}"
+
+  probe_wake_hook() {
+    CODE=$(http_code -X POST "http://127.0.0.1:${HOOK_PORT}/hooks/wake" -H "Authorization: Bearer doctor-probe")
+    RELAY_CODE=$(http_code -X POST "http://172.17.0.1:${HOOK_PORT}/hooks/wake" -H "Authorization: Bearer doctor-probe")
+  }
+
+  probe_wake_hook
+  if [[ ( "$CODE" != "401" || "$RELAY_CODE" != "401" ) && "$FIX" -eq 1 ]]; then
+    fixing "recover loopback forward, then restart hook-relay"
+    # `nemoclaw recover`'s port-in-use check is not interface-aware: if
+    # hook-relay (bound to 172.17.0.1:$HOOK_PORT) is already up, recover sees
+    # the port number taken and silently skips recreating its own loopback
+    # forward on 127.0.0.1:$HOOK_PORT — so hook-relay must come down first.
+    if command -v lsof >/dev/null 2>&1; then
+      RELAY_PID=$(lsof -t -i "172.17.0.1:${HOOK_PORT}" -sTCP:LISTEN 2>/dev/null || true)
+      if [[ -n "$RELAY_PID" ]]; then
+        kill "$RELAY_PID" 2>/dev/null || true
+        for _ in $(seq 1 10); do
+          lsof -i "172.17.0.1:${HOOK_PORT}" -sTCP:LISTEN >/dev/null 2>&1 || break
+          sleep 0.3
+        done
+      fi
+    fi
+    nemoclaw "$SANDBOX_NAME" recover >/dev/null 2>&1 || true
+    HOOK_RELAY_PORT="$HOOK_PORT" \
+      nohup ./deploy/scripts/hook-relay.py >> "$STATE_DIR/nemoclaw-hook-relay.log" 2>&1 &
+    disown
+    sleep 2
+    probe_wake_hook
+  fi
+
   # (4) openshell's loopback SSH forward → openclaw's hook: bad-token probe
   # must 401. Connection refused = the forward died (it does not survive
   # reboots or openshell restarts).
-  CODE=$(http_code -X POST "http://127.0.0.1:${HOOK_PORT}/hooks/wake" -H "Authorization: Bearer doctor-probe")
   if [[ "$CODE" == "401" ]]; then
     pass "sandbox wake-hook (:$HOOK_PORT)" "401 on bad token = auth alive"
   else
@@ -87,7 +168,6 @@ if [[ -n "$HOOK_URL" ]]; then
   fi
   # (5) hook-relay bridges that loopback forward onto the docker bridge so
   # the containerized Gateway can reach it (Linux only).
-  RELAY_CODE=$(http_code -X POST "http://172.17.0.1:${HOOK_PORT}/hooks/wake" -H "Authorization: Bearer doctor-probe")
   if [[ "$RELAY_CODE" == "401" ]]; then
     pass "hook-relay bridge (:$HOOK_PORT)" "container->host path alive"
   else
@@ -114,7 +194,11 @@ echo
 if [[ "$FAILURES" -eq 0 ]]; then
   echo "${GREEN}All checks passed — demo is ready.${RESET}"
 else
-  echo "${RED}${FAILURES} check(s) failed.${RESET} Fix the items above, then re-run: make doctor"
-  echo "Symptom guide: docs/TROUBLESHOOTING.md"
+  if [[ "$FIX" -eq 1 ]]; then
+    echo "${RED}${FAILURES} check(s) still failing after auto-fix.${RESET} Needs a human — see docs/TROUBLESHOOTING.md"
+  else
+    echo "${RED}${FAILURES} check(s) failed.${RESET} Fix the items above, then re-run: make doctor"
+    echo "Symptom guide: docs/TROUBLESHOOTING.md"
+  fi
   exit 1
 fi

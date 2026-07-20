@@ -2,7 +2,16 @@
 
 Symptom-first guide to the failure modes this lab actually hits. First move
 for almost everything: **`make doctor`** — it checks every dependency and
-prints the fix for whatever is down.
+prints the fix for whatever is down. `make doctor-fix` applies those fixes
+instead of just printing them.
+
+**Self-healing:** install `deploy/systemd/nemoclaw-doctor.timer` to run
+`doctor.sh --fix` every 5 minutes, so a dead terminal daemon, hook-relay, or
+wake-hook forward recovers on its own before anyone notices "reconnect does
+nothing" — see the header comment in `nemoclaw-doctor.service` for install
+steps. A run that's still red after fixing shows up as a failed systemd
+unit: `systemctl --user status nemoclaw-doctor` / `journalctl --user -u
+nemoclaw-doctor -e`.
 
 ## "I inject a fault and it's never detected"
 

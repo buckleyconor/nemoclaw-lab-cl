@@ -1,0 +1,25 @@
+# Self-healing preflight (ADR-011/012/013) — runs `doctor.sh --fix` so a
+# dead terminal daemon, hook-relay, or openshell wake-hook forward recovers
+# on its own within one timer interval, instead of a user hitting "reconnect"
+# on a disconnected terminal panel and nothing happening.
+#
+# Install alongside nemoclaw-doctor.timer (adjust WorkingDirectory to your
+# checkout):
+#
+#   mkdir -p ~/.config/systemd/user
+#   cp deploy/systemd/nemoclaw-doctor.{service,timer} ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now nemoclaw-doctor.timer
+#   loginctl enable-linger $USER    # keep user services alive without a login session
+#
+# A run that still fails after attempting fixes exits 1, so it shows up as a
+# failed unit — check with:
+#   systemctl --user status nemoclaw-doctor
+#   journalctl --user -u nemoclaw-doctor -e
+[Unit]
+Description=NemoClaw demo preflight (self-healing)
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/projects/nemoclaw-lab-cl
+ExecStart=%h/projects/nemoclaw-lab-cl/deploy/scripts/doctor.sh --fix

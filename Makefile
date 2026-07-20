@@ -31,12 +31,13 @@ VALUES      ?=               # optional extra helm values file, e.g. values.prod
 BACKEND_IMAGE := $(REGISTRY)/nemoclaw-backend:$(TAG)
 GATEWAY_IMAGE := $(REGISTRY)/nemoclaw-gateway:$(TAG)
 
-.PHONY: help build push push-multiarch deploy undeploy up down logs switch-pack terminal hook-relay demo-up doctor test lint
+.PHONY: help build push push-multiarch deploy undeploy up down logs switch-pack terminal hook-relay demo-up doctor doctor-fix test lint
 
 help:
 	@echo "Targets:"
 	@echo "  demo-up        Bring up EVERYTHING the demo needs (stack + host daemons), then doctor"
 	@echo "  doctor         Preflight: red/green check of all demo dependencies with fixes"
+	@echo "  doctor-fix     Preflight + apply the fixes automatically (what the self-heal timer runs)"
 	@echo "  build          Build images for PLATFORM=$(PLATFORM)"
 	@echo "  push           Build + push to REGISTRY=$(REGISTRY)"
 	@echo "  push-multiarch Build linux/arm64,linux/amd64 and push"
@@ -134,6 +135,12 @@ demo-up:
 # Red/green preflight of every demo dependency, with the fix for anything down.
 doctor:
 	./deploy/scripts/doctor.sh
+
+# Same preflight, but applies each fix automatically instead of just printing
+# it. This is what deploy/systemd/nemoclaw-doctor.timer runs on a schedule so
+# a dead terminal daemon/hook-relay/wake-hook forward self-heals.
+doctor-fix:
+	./deploy/scripts/doctor.sh --fix
 
 # ── Dev quality targets ───────────────────────────────────────────────────────
 
