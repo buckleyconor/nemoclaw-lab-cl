@@ -6,7 +6,7 @@ asset_noun:
 fleet_label: "RAN Site Health"
 monitoring_adapter: generic
 theme: dell-default
-sentinel_name: "5G RAN Site Sentinel"
+sentinel_name: "5G RAN Site Agent"
 asset_spec_label: "Ericsson AIR 3268 AAS radio / Baseband 6630 macro gNodeB fleet"
 fleet_layout: list
 assets:

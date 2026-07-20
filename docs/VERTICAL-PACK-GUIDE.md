@@ -1,6 +1,6 @@
 # Vertical Pack Guide
 
-This document explains how to create a new industry vertical for the NemoClaw Sentinel Lab. All verticals use the **same agent, the same services, the same UI, and the same lab guide** — only the content changes.
+This document explains how to create a new industry vertical for the NemoClaw Lab. All verticals use the **same agent, the same services, the same UI, and the same lab guide** — only the content changes.
 
 ---
 
@@ -187,12 +187,12 @@ Replace the `soon` class cards when the vertical is ready. The `--card-accent` c
 
 ```js
 "your-vertical-id": {
-  eyebrow: "NemoClaw Your Vertical Sentinel",
+  eyebrow: "NemoClaw Your Vertical Agent",
   brand: "DELL × PARTNER",
   tagline: "One sentence — what the agent watches and what you decide.",
   meta: `<span><span class="dot"></span>Live Demo</span><span>Device spec · N Assets</span><span>NemoClaw v0.0.70</span>`,
 
-  p1lead: `<strong>NemoClaw Your Vertical Sentinel</strong> monitors ... one sentence summary ...`,
+  p1lead: `<strong>NemoClaw Your Vertical Agent</strong> monitors ... one sentence summary ...`,
 
   p1story: `<h3>The story</h3>
     <p>Context paragraph — what devices are running, what you inject, what the agent does.</p>

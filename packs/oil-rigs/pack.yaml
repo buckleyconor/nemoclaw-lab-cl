@@ -6,7 +6,7 @@ asset_noun:
 fleet_label: "Rig Equipment Health"
 monitoring_adapter: generic
 theme: dell-default
-sentinel_name: "Drilling Rig Sentinel"
+sentinel_name: "Drilling Rig Agent"
 asset_spec_label: "NOV / ABB / Cameron rig floor & well-control package"
 fleet_layout: list
 assets:

@@ -55,8 +55,8 @@ class Pack(BaseModel):
     monitoring_adapter: MonitoringAdapterType
     theme: str = "default"
     # Big header title shown in the dashboard's top bar, e.g. "AI
-    # Infrastructure Sentinel" / "Laptop Fleet Sentinel".
-    sentinel_name: str = "Infrastructure Sentinel"
+    # Infrastructure Agent" / "Laptop Fleet Agent".
+    sentinel_name: str = "Infrastructure Agent"
     # Product photo shown on each fleet tile. Absolute URL or a path under
     # the SPA's static root (e.g. "/pr-precision-7.png").
     asset_image_url: str | None = None

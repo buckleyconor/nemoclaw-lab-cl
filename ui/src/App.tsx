@@ -154,7 +154,7 @@ export default function App() {
         iconColor: "#f97316",
         title: `${fleetNoun} issue detected`,
         titleColor: "#f97316",
-        body: "— Sentinel Agent investigating, please see Operator Dashboard for issue and remediation",
+        body: "— Agent investigating, please see Operator Dashboard for issue and remediation",
       }
     : hasDeniedFault
     ? {
@@ -184,7 +184,7 @@ export default function App() {
           />
           <span className="app-logo-bar">DELL × NVIDIA</span>
           <span style={{ color: "var(--border-strong)" }}>|</span>
-          <span className="app-title">{pack?.sentinel_name ?? "Infrastructure Sentinel"}</span>
+          <span className="app-title">{pack?.sentinel_name ?? "Infrastructure Agent"}</span>
           {pack && <span className="app-pack-label">{pack.name}</span>}
         </div>
         <NotificationInbox

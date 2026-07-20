@@ -6,7 +6,7 @@ asset_noun:
 fleet_label: "Device Fleet Health"
 monitoring_adapter: generic
 theme: dell-default
-sentinel_name: "Biomedical Device Sentinel"
+sentinel_name: "Biomedical Device Agent"
 asset_spec_label: "BD Alaris / Philips IntelliVue / Siemens MAGNETOM clinical fleet"
 fleet_layout: list
 assets:

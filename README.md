@@ -1,4 +1,4 @@
-# NemoClaw Sentinel Lab
+# NemoClaw Lab
 
 Autonomous AIOps demo: a real NemoClaw/OpenClaw agent (OpenShell-sandboxed, ADR-011) monitors simulated hardware infrastructure, detects faults, analyses logs with a local LLM, matches Dell KB articles, and proposes remediation — blocked by a server-side human-in-the-loop approval gate until an operator decides.
 

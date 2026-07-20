@@ -54,7 +54,7 @@ function exportReport(fault: FaultEvent, activity: ActivityEvent[]) {
   ul { list-style: none; padding: 0; font-size: 13px; }
   .muted { color: #666; font-size: 11px; }
 </style></head><body>
-<h1>NemoClaw Sentinel — Fault Event Report</h1>
+<h1>NemoClaw Agent — Fault Event Report</h1>
 <p class="muted">Generated ${new Date().toLocaleString()} · Fault ID ${escapeHtml(fault.id)}</p>
 <h2>Fault</h2>
 <table class="kv">
@@ -179,7 +179,7 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
         color: "var(--text-dim)", fontSize: 13,
       }}>
         <span style={{ color: "var(--healthy)", fontSize: 15 }}>◉</span>
-        No active fault — NemoClaw Sentinel is monitoring. Fault details, impact
+        No active fault — NemoClaw Agent is monitoring. Fault details, impact
         assessment and approval controls will appear here when an incident is detected.
       </div>
     );

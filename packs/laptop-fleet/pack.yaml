@@ -6,7 +6,7 @@ asset_noun:
 fleet_label: "Fleet Health"
 monitoring_adapter: generic
 theme: dell-precision
-sentinel_name: "Laptop Fleet Sentinel"
+sentinel_name: "Laptop Fleet Agent"
 asset_image_url: "/pr-precision-7.png"
 asset_spec_label: "Dell Pro Precision 7 · NVIDIA RTX PRO 3000 GPU"
 fleet_layout: list

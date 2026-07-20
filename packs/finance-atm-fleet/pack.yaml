@@ -6,7 +6,7 @@ asset_noun:
 fleet_label: "ATM Fleet Health"
 monitoring_adapter: generic
 theme: dell-default
-sentinel_name: "ATM Fleet Sentinel"
+sentinel_name: "ATM Fleet Agent"
 asset_spec_label: "NCR SelfServ 84 / Diebold Nixdorf DN Series 200 branch and off-premise fleet"
 fleet_layout: list
 assets:
