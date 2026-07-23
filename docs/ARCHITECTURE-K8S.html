@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>NemoClaw Lab on Charmed Kubernetes — Architecture</title>
+<style>
+  * { box-sizing: border-box; }
+  :root {
+    --paper: #F7F8F6;
+    --ink: #1C221E;
+    --muted: #55605A;
+    --accent: #3E8500;
+    --accent-soft: #EAF3E2;
+    --slate: #44606C;
+    --slate-soft: #E7EDF0;
+    --amber: #9A6A00;
+    --amber-soft: #F6EFDD;
+    --hairline: #D8DED6;
+    --card: #FFFFFF;
+    --sheet: #FDFDFB;
+    --code-bg: #EDF0EB;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #141812; --ink: #E3E8E0; --muted: #9AA69C; --accent: #8FD44A;
+      --accent-soft: #1F2A18; --slate: #8FB3C4; --slate-soft: #1A2429;
+      --amber: #D9A94A; --amber-soft: #2A2314; --hairline: #2A3128;
+      --card: #1A1F18; --sheet: #FDFDFB; /* diagram stays a print sheet in both themes */
+      --code-bg: #232921;
+    }
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Avenir Next", "Segoe UI Variable Text", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.55;
+    margin: 0;
+    padding: 2.5rem 1.25rem 5rem;
+  }
+  main { max-width: 72rem; margin: 0 auto; }
+
+  code, .mono {
+    font-family: "JetBrains Mono", ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    font-size: 0.85em;
+  }
+  code { background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 3px; }
+
+  header { margin-bottom: 2.25rem; max-width: 46rem; }
+  .eyebrow {
+    text-transform: uppercase; letter-spacing: 0.14em; font-size: 0.72rem;
+    font-weight: 600; color: var(--accent); margin: 0 0 0.6rem;
+  }
+  h1 {
+    font-size: clamp(1.6rem, 3.5vw, 2.3rem); line-height: 1.15; margin: 0 0 0.75rem;
+    font-weight: 700; letter-spacing: -0.015em; text-wrap: balance;
+  }
+  .lede { color: var(--muted); margin: 0; font-size: 1.02rem; }
+  .lede code { font-size: 0.82em; }
+
+  h2 {
+    font-size: 1.15rem; margin: 3rem 0 0.35rem; letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  h2 + p.sub { color: var(--muted); font-size: 0.9rem; margin: 0 0 1rem; max-width: 46rem; }
+
+  .sheet {
+    background: var(--sheet);
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    padding: 1rem;
+    overflow-x: auto;
+    margin-top: 1rem;
+  }
+  .sheet pre.mermaid { margin: 0; min-width: 860px; }
+  /* Before mermaid runs (or if the CDN is unreachable) the fence is raw text —
+     keep it legible rather than styled as a diagram. */
+  .sheet pre.mermaid:not([data-processed]) {
+    font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.72rem; color: #3A403B; white-space: pre;
+  }
+  .offline-note { font-size: 0.78rem; color: var(--muted); margin: 0.5rem 0 0; }
+
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 0.4rem 1.4rem; margin: 0.75rem 0 0;
+    padding: 0; list-style: none; font-size: 0.8rem; color: var(--muted);
+  }
+  .legend li { display: flex; align-items: center; gap: 0.45rem; }
+  .swatch {
+    width: 0.95rem; height: 0.95rem; border-radius: 3px; flex: none;
+    border: 1.5px solid transparent;
+  }
+  .swatch.pod   { background: #EAF3E2; border-color: #3E8500; }
+  .swatch.svc   { background: #FDFDFB; border-color: #3E8500; }
+  .swatch.host  { background: #E7EDF0; border-color: #44606C; }
+  .swatch.cfg   { background: #F1F1EC; border-color: #9AA096; }
+  .swatch.warn  { background: #F6EFDD; border-color: #9A6A00; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: start; }
+  @media (max-width: 880px) { .grid { grid-template-columns: 1fr; } }
+  .grid > section { min-width: 0; }
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--hairline); border-radius: 6px; background: var(--card); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
+  th, td { text-align: left; padding: 0.5rem 0.75rem; border-top: 1px solid var(--hairline); vertical-align: top; }
+  thead th {
+    border-top: none; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.09em;
+    color: var(--muted); font-weight: 600; padding-top: 0.65rem;
+  }
+  td.num, td .port { font-variant-numeric: tabular-nums; }
+  td code { white-space: nowrap; }
+
+  ul.notes { font-size: 0.9rem; padding-left: 1.2rem; max-width: 46rem; }
+  ul.notes li { margin-bottom: 0.55rem; }
+  ul.notes li::marker { color: var(--accent); }
+
+  footer { margin-top: 3.5rem; color: var(--muted); font-size: 0.78rem; border-top: 1px solid var(--hairline); padding-top: 1rem; }
+</style>
+</head>
+<body>
+<main>
+<header>
+  <p class="eyebrow">Deployment architecture · deploy/helm/nemoclaw</p>
+  <h1>NemoClaw Lab on Charmed Kubernetes</h1>
+  <p class="lede">As rendered by the Helm chart with <code>values.prod.yaml</code>: 4-node Intel/amd64 Charmed K8s cluster, one namespace per demo tenant (up to 30 via <code>provision-demo-namespaces.sh</code>). The autonomous agent, its terminal daemons, and the vLLM endpoint deliberately live <em>outside</em> the cluster (ADR-011/ADR-013).</p>
+</header>
+
+<h2>System map — one tenant namespace</h2>
+<p class="sub">Solid arrows are steady-state HTTP/TCP flows; dashed arrows are optional, secret-gated flows that are off by default. Every in-cluster Service is ClusterIP; the only way in is the ingress.</p>
+
+<div class="sheet">
+<pre class="mermaid">
+flowchart TB
+  browser["Operator browser&lt;br/&gt;Welcome page · Lab Guide · Dashboard SPA"]
+
+  subgraph cluster["CHARMED KUBERNETES — 4 × Intel/amd64 workers (lab pods are CPU-only)"]
+    ingress["Ingress: nginx (installed separately — not bundled with Charmed K8s)&lt;br/&gt;host nemoclaw.dell-demo.lab · TLS :443 (Secret nemoclaw-tls)&lt;br/&gt;proxy-read/send-timeout 3600s · proxy-buffering off (SSE + WS)"]
+
+    subgraph ns["NAMESPACE demo-NN — one Helm release per tenant, ×30"]
+      gwsvc(["Service gateway&lt;br/&gt;ClusterIP :8001"])
+      gw["Deployment gateway — 2 replicas&lt;br/&gt;uvicorn :8001 · probes GET /healthz&lt;br/&gt;REST API · SSE mux · SPA host · HITL approval gate"]
+
+      orchsvc(["Service orchestrator&lt;br/&gt;ClusterIP :8002"])
+      orch["Deployment orchestrator — 1 replica&lt;br/&gt;uvicorn :8002 · probes GET /healthz&lt;br/&gt;scenario rotation"]
+
+      mcpsvc(["Service mcp-tools&lt;br/&gt;ClusterIP :8004"])
+      mcp["Deployment mcp-tools — 1 replica&lt;br/&gt;uvicorn :8004 · probes GET /healthz&lt;br/&gt;MCP streamable HTTP /mcp&lt;br/&gt;monitor · logs · kb · remediation&lt;br/&gt;fastembed ONNX + FAISS (in-memory)"]
+
+      simsvc(["Service simulator&lt;br/&gt;ClusterIP :8003"])
+      sim["Deployment simulator — 1 replica&lt;br/&gt;uvicorn :8003 · probes GET /healthz&lt;br/&gt;fake Redfish event surface · fault + log bundles"]
+
+      redissvc(["Service redis&lt;br/&gt;ClusterIP :6379"])
+      redis["Deployment redis — 1 replica&lt;br/&gt;redis:7-alpine :6379&lt;br/&gt;shared gateway state + SSE pub/sub&lt;br/&gt;EPHEMERAL — no volume"]
+
+      cfg["ConfigMap nemoclaw-config&lt;br/&gt;PACK_ID · service URLs · REDIS_URL/prefix&lt;br/&gt;─────────────────────&lt;br/&gt;Secret openclaw-hook (URL + token, optional)&lt;br/&gt;Secret terminal (WS URL + token, optional)&lt;br/&gt;ServiceAccount nemoclaw (no RBAC rules)&lt;br/&gt;5 × NetworkPolicy (per component)&lt;br/&gt;ResourceQuota + LimitRange"]
+
+      pvc["PersistentVolumeClaims: NONE&lt;br/&gt;ResourceQuota pins persistentvolumeclaims: 0&lt;br/&gt;all state is in-memory / Redis-ephemeral"]
+    end
+  end
+
+  subgraph agenthost["AGENT HOST — outside the cluster (Docker + nemoclaw/openclaw/openshell CLIs)"]
+    agent["NemoClaw / OpenClaw agent — host process, ADR-011&lt;br/&gt;OpenShell sandbox · SOUL.md + AGENTS.md + 4 skills&lt;br/&gt;infra plugin (MCP client)"]
+    hook["Wake webhook :18790&lt;br/&gt;SSH forward from sandbox (127.0.0.1)&lt;br/&gt;POST /hooks/wake · Bearer token"]
+    term["Terminal daemon :8006+ — one per tenant&lt;br/&gt;TERMINAL_MODE=restricted (ADR-013)&lt;br/&gt;6-item config console, never a shell"]
+  end
+
+  llm["vLLM endpoint — RTX PRO 6000 GPUs&lt;br/&gt;OpenAI-compatible HTTP · outside the chart&lt;br/&gt;configured at agent onboard time"]
+
+  browser --&gt;|"HTTPS :443 — REST /api · SSE /api/events · WS /api/terminal/ws"| ingress
+  ingress --&gt;|"path / → :8001"| gwsvc
+  gwsvc --&gt; gw
+  gw --&gt;|"HTTP :8002 — scenario control"| orchsvc
+  orchsvc --&gt; orch
+  gw --&gt;|"HTTP :8004 — register fault · mint HITL token&lt;br/&gt;MCP /mcp — remediation.execute"| mcpsvc
+  mcpsvc --&gt; mcp
+  gw --&gt;|"TCP :6379 — state + pub/sub"| redissvc
+  redissvc --&gt; redis
+  orch --&gt;|"HTTP :8003 — fault injection / rotation"| simsvc
+  simsvc --&gt; sim
+  mcp --&gt;|"HTTP :8003 — monitor · logs"| simsvc
+  mcp --&gt;|"HTTP :8001 — notify.post_activity · remediation.propose"| gwsvc
+  gw -.-&gt;|"TCP :18790 — wake on fault (Secret-gated,&lt;br/&gt;NetPol ipBlock egress, off by default)"| hook
+  gw -.-&gt;|"WS :8006 — terminal proxy (Secret-gated,&lt;br/&gt;NetPol ipBlock egress, off by default)"| term
+  hook --&gt; agent
+  term --&gt;|"PTY → sandbox config edit-and-push"| agent
+  agent --&gt;|"HTTPS via ingress — REST (poll · HITL · remediation)"| ingress
+  agent --&gt;|"chat completions"| llm
+
+  classDef pod fill:#EAF3E2,stroke:#3E8500,color:#1C221E
+  classDef svc fill:#FDFDFB,stroke:#3E8500,color:#1C221E
+  classDef host fill:#E7EDF0,stroke:#44606C,color:#1C221E
+  classDef cfgc fill:#F1F1EC,stroke:#9AA096,color:#3A403B
+  classDef warn fill:#F6EFDD,stroke:#9A6A00,color:#5A4200,stroke-dasharray:5 4
+  classDef edge fill:#FDFDFB,stroke:#8A948C,color:#1C221E
+  class gw,orch,mcp,sim,redis pod
+  class gwsvc,orchsvc,mcpsvc,simsvc,redissvc svc
+  class agent,hook,term,llm host
+  class cfg cfgc
+  class pvc warn
+  class browser,ingress edge
+  style cluster fill:none,stroke:#3E8500,stroke-width:1.5px,color:#3E8500
+  style ns fill:none,stroke:#8A948C,stroke-dasharray:6 4,color:#55605A
+  style agenthost fill:none,stroke:#44606C,stroke-width:1.5px,color:#44606C
+</pre>
+</div>
+<p class="offline-note">Diagram renders via mermaid.js from jsdelivr — offline it falls back to the raw source; the same diagram lives in <code>ARCHITECTURE-K8S.md</code>, which GitHub renders natively.</p>
+<ul class="legend">
+  <li><span class="swatch pod"></span> Pod / Deployment</li>
+  <li><span class="swatch svc"></span> ClusterIP Service</li>
+  <li><span class="swatch host"></span> Host process (outside cluster)</li>
+  <li><span class="swatch cfg"></span> Config / policy objects</li>
+  <li><span class="swatch warn"></span> Deliberate absence</li>
+</ul>
+
+<div class="grid">
+<section>
+  <h2>Ports at a glance</h2>
+  <p class="sub">Every in-cluster port is ClusterIP-only; nothing is NodePort or LoadBalancer. External ports live on the agent host.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Port</th><th>Where</th><th>Carries</th></tr></thead>
+    <tbody>
+      <tr><td class="num"><code>443</code></td><td>Ingress (nginx)</td><td>TLS for <code>nemoclaw.dell-demo.lab</code> — REST, SSE, terminal WS</td></tr>
+      <tr><td class="num"><code>8001</code></td><td>gateway pods + Service</td><td>REST API, SSE <code>/api/events</code>, SPA, HITL tokens, WS proxy</td></tr>
+      <tr><td class="num"><code>8002</code></td><td>orchestrator</td><td>Scenario rotation control (from gateway only)</td></tr>
+      <tr><td class="num"><code>8003</code></td><td>simulator</td><td>Fake Redfish events (from orchestrator + mcp-tools)</td></tr>
+      <tr><td class="num"><code>8004</code></td><td>mcp-tools</td><td>MCP streamable HTTP <code>/mcp</code> + REST (from gateway only)</td></tr>
+      <tr><td class="num"><code>6379</code></td><td>redis</td><td>Shared state + SSE pub/sub (from gateway only)</td></tr>
+      <tr><td class="num"><code>53/udp</code></td><td>cluster DNS</td><td>Allowed egress from every policy'd pod</td></tr>
+      <tr><td class="num"><code>18790</code></td><td>agent host</td><td>Wake webhook <code>POST /hooks/wake</code> (gateway egress, secret-gated)</td></tr>
+      <tr><td class="num"><code>8006+</code></td><td>agent host</td><td>Per-tenant restricted terminal WS (gateway egress, secret-gated)</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>NetworkPolicy matrix</h2>
+  <p class="sub">One policy per component; default posture is deny-outside-the-list. All allow DNS egress on 53/udp.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Pod</th><th>Ingress from</th><th>Egress to</th></tr></thead>
+    <tbody>
+      <tr><td><code>gateway</code></td><td>anywhere (demo ingress)</td><td>orchestrator, mcp-tools, redis; + ipBlock <code>:18790</code> / <code>:8006</code> when hook/terminal secrets are set</td></tr>
+      <tr><td><code>orchestrator</code></td><td>gateway only</td><td>simulator</td></tr>
+      <tr><td><code>mcp-tools</code></td><td>gateway only</td><td>simulator, gateway (activity + proposals, ADR-010)</td></tr>
+      <tr><td><code>simulator</code></td><td>orchestrator, mcp-tools</td><td>DNS only</td></tr>
+      <tr><td><code>redis</code></td><td>gateway only</td><td>none</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>Per-namespace object inventory</h2>
+  <p class="sub">Rendered by one Helm release (<code>values.prod.yaml</code>, registry <code>registry.nemoclaw.lab</code>).</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Kind</th><th>Objects</th></tr></thead>
+    <tbody>
+      <tr><td>Deployment</td><td>gateway ×2 replicas, orchestrator, mcp-tools, simulator, redis (1 each)</td></tr>
+      <tr><td>Service</td><td>5 × ClusterIP (gateway, orchestrator, mcp-tools, simulator, redis)</td></tr>
+      <tr><td>Ingress</td><td>gateway only — class <code>nginx</code>, TLS via <code>nemoclaw-tls</code></td></tr>
+      <tr><td>ConfigMap</td><td><code>-config</code>: PACK_ID + intra-namespace service URLs + Redis DSN/prefix, <code>envFrom</code> into all four app pods</td></tr>
+      <tr><td>Secret</td><td><code>-openclaw-hook</code>, <code>-terminal</code> (each rendered only when URL+token set), <code>nemoclaw-tls</code></td></tr>
+      <tr><td>NetworkPolicy</td><td>5 (matrix at left)</td></tr>
+      <tr><td>ResourceQuota</td><td>4 CPU / 6 Gi requests, 8 CPU / 12 Gi limits, 20 pods, 10 services, <strong>0 PVCs</strong></td></tr>
+      <tr><td>LimitRange</td><td>container default 500m/512Mi, max 4 CPU / 8 Gi</td></tr>
+      <tr><td>ServiceAccount</td><td><code>nemoclaw</code> — no K8s API permissions needed</td></tr>
+      <tr><td>PVC</td><td><strong>None, by design</strong> — quota enforces it; Redis is ephemeral, FAISS/fastembed rebuild in-memory at pod start</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>Host processes (outside the cluster)</h2>
+  <p class="sub">ADR-011: the agent stack needs Docker + the <code>nemoclaw</code>/<code>openclaw</code>/<code>openshell</code> CLIs, so it runs as peer host processes, not pods.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Process</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td>OpenClaw agent sandbox</td><td>One OpenShell sandbox per tenant; polls/receives faults, analyses logs via LLM, proposes remediation through the gateway's HITL gate</td></tr>
+      <tr><td>Wake-hook listener <code>:18790</code></td><td>SSH forward published by openshell; gateway POSTs here on fault injection — best-effort, agent falls back to cron poll</td></tr>
+      <tr><td>Terminal daemon <code>:8006+</code></td><td><code>run-terminal-tenant.sh &lt;tenant&gt; &lt;sandbox&gt; &lt;port&gt;</code> — one restricted-console daemon per tenant, unique port each</td></tr>
+      <tr><td>vLLM server</td><td>Serves the local LLM on the RTX PRO 6000 GPUs; credentials configured at agent onboard time, never via Helm</td></tr>
+    </tbody>
+  </table></div>
+</section>
+</div>
+
+<h2>Deployment caveats worth knowing</h2>
+<ul class="notes">
+  <li><strong>Charmed K8s ships no ingress controller.</strong> Deploy ingress-nginx (or equivalent) first and verify with <code>kubectl get ingressclass</code> — an Ingress with an unmatched class is silently never served. The SSE/WS timeout + no-buffering annotations are load-bearing: nginx defaults kill the dashboard's event stream at 60s.</li>
+  <li><strong>Gateway runs 2 replicas only because Redis exists.</strong> Replicas share HITL/state via Redis and fan SSE out over pub/sub; without Redis, scaling the gateway would split state.</li>
+  <li><strong>Hook and terminal are fail-safe off.</strong> Both secrets render only when URL + token are set at deploy time; without them the agent simply polls (slower but functional) and the embedded terminal stays hidden. Narrow the corresponding NetworkPolicy <code>egressCidr</code> to the agent host's /32.</li>
+  <li><strong>Agent → MCP Tools direct access is a single-Docker-host pattern.</strong> On K8s, mcp-tools is ClusterIP-only and admits only the gateway; the out-of-cluster agent reaches the stack through the ingress, and K8s-native agent integration is explicitly deferred by ADR-011's scope note.</li>
+  <li><strong>Images must be amd64.</strong> The Makefile default targets the arm64 GB10 dev host — build with <code>make push PLATFORM=linux/amd64</code> for the Intel workers.</li>
+</ul>
+
+<footer>Derived from <code>deploy/helm/nemoclaw/</code> (chart v0.1.0, <code>values.prod.yaml</code>), <code>deploy/scripts/</code>, and ADR-010/011/012/013.</footer>
+</main>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: "base",
+    themeVariables: {
+      fontFamily: '"Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif',
+      fontSize: "14px",
+      primaryColor: "#EAF3E2",
+      primaryBorderColor: "#3E8500",
+      primaryTextColor: "#1C221E",
+      lineColor: "#55605A",
+      clusterBkg: "transparent",
+      edgeLabelBackground: "#FDFDFB"
+    },
+    flowchart: { curve: "basis", htmlLabels: true }
+  });
+</script>
+</body>
+</html>
