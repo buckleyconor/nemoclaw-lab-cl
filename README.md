@@ -42,6 +42,11 @@ The welcome page lists all available verticals. Click one to open the split-scre
 
 ## Architecture
 
+For the Kubernetes deployment view — pods, services, ports, NetworkPolicies,
+and the out-of-cluster host processes on Charmed K8s — see
+[`docs/ARCHITECTURE-K8S.md`](docs/ARCHITECTURE-K8S.md) (also available as a
+standalone page: [`docs/ARCHITECTURE-K8S.html`](docs/ARCHITECTURE-K8S.html)).
+
 ```
 Pack (content)  →  Framework (agent + services)  →  Lab UI
 ```
