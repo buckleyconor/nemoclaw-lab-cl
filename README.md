@@ -4,7 +4,13 @@ Autonomous AIOps demo: a real NemoClaw/OpenClaw agent (OpenShell-sandboxed, ADR-
 
 One codebase. Swap the **Domain Pack** to switch verticals — GPU cluster, laptop fleet, edge nodes, oil-field rigs — with no code changes.
 
-## Quick start
+## Quick start (GB10 lab host)
+
+These steps are the bring-up for the reference lab host — an **NVIDIA GB10
+(`promaxgb10`, aarch64 Linux, ufw active)** serving its own vLLM endpoint. Other
+Linux hosts work the same way; the GB10-specific parts are the ufw rules and the
+docker-bridge bind address, both called out below. macOS on Intel is **not**
+supported (OpenShell ships no x86_64 macOS assets — ADR-011).
 
 Day-to-day (everything already onboarded once):
 
@@ -19,24 +25,126 @@ endpoint) with the exact fix printed for anything that's down. If faults are
 ever "not being detected", run it first; the cause is almost always a dead
 host process, not the agent. See [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md).
 
-First-time setup (once per host):
+### First-time setup
+
+Three things, in order. Only the first needs a decision from you.
 
 ```bash
-cp .env.example .env                      # set LLM_BASE_URL / LLM_MODEL / LLM_API_KEY
-docker compose up -d --build
-make terminal                             # prints TERMINAL_WS_URL/TERMINAL_TOKEN → add to .env
-deploy/scripts/onboard-openclaw.sh        # onboards the agent sandbox; prints OPENCLAW_HOOK_* → add to .env
-                                          # (confirm the webhook port with `nemoclaw <sandbox> status` —
-                                          #  default 18789, self-reassigns if taken)
-docker compose up -d gateway              # pick up the new .env values
-make demo-up                              # starts host daemons + verifies everything
+# 1. Point the lab at your LLM (see "Configuring the LLM endpoint" below)
+cp .env.example .env
+$EDITOR .env                  # set LLM_BASE_URL and LLM_MODEL
+
+# 2. Build the stack, onboard the agent, start the host daemons, verify
+make bootstrap
+
+# 3. Run the two `sudo ufw allow` commands bootstrap prints, then re-check
+make doctor                   # expect: all checks passed
 ```
 
-Optional: install the systemd user units in `deploy/systemd/` so the terminal
-daemon and hook-relay survive reboots (the compose services already restart
-via `restart: unless-stopped`; openshell's sandbox port-forward is the one
-piece that can't be unit-managed — `make doctor` detects it and prints the
-`nemoclaw <sandbox> recover` fix).
+`make bootstrap` is idempotent — safe to re-run. It will **not** re-onboard an
+existing sandbox (that rebuilds the image and resets the agent's config); use
+`make bootstrap FORCE=1` if you actually want that. It never runs `sudo`
+itself: the ufw rules are printed for you to run.
+
+Then open <http://localhost:8001/lab/>.
+
+<details>
+<summary><strong>What <code>make bootstrap</code> does — and the manual equivalent</strong></summary>
+
+Useful when a step fails partway and you need to resume by hand.
+
+1. **Preflight** — docker, the `nemoclaw` CLI, `.env`, and that `LLM_BASE_URL`
+   actually answers. It fails here rather than 10 minutes into an image build,
+   because the endpoint is baked into the sandbox at onboard time.
+2. **`TERMINAL_BIND`** — detected from `docker0` (`172.17.0.1` here) and written
+   to `.env`. On Linux `host.docker.internal` resolves to the docker bridge, so
+   a loopback bind is unreachable from the gateway container
+   (`docs/SPEC-EMBEDDED-TERMINAL.md` §4).
+3. **`docker compose up -d --build`** — the four services.
+4. **`deploy/scripts/onboard-openclaw.sh`** — builds the sandbox image with the
+   MCP plugin baked in, onboards it against your LLM, seeds the workspace, locks
+   down the built-in tools, then reads the webhook port back out of the
+   sandbox's `openclaw.json` and writes `OPENCLAW_HOOK_URL`/`OPENCLAW_HOOK_TOKEN`
+   into `.env`. (18789 is only the default — openclaw silently self-reassigns if
+   it is taken, and this host landed on **18790**. `nemoclaw <sandbox> status`
+   does not report the chosen port, which is why the script reads the config.)
+5. **`docker compose up -d gateway`** — pick up the new `.env`.
+6. **ufw rules** — printed, not run. ufw's default-deny INPUT drops *all*
+   container→host traffic, which breaks the terminal hop and the wake hook
+   **silently**: the lab looks fine while faults are never detected. The printed
+   subnet is detected live, because the compose network is not pinned in
+   `docker-compose.yaml`.
+7. **`make demo-up`** — starts the terminal daemon and hook-relay (skipping any
+   already alive), then runs the `make doctor` preflight.
+
+</details>
+
+### Surviving a reboot
+
+The compose services come back on their own (`restart: unless-stopped`). The two
+host daemons do **not** — install the user units once:
+
+```bash
+mkdir -p ~/.config/systemd/user
+cp deploy/systemd/nemoclaw-*.{service,timer} ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now nemoclaw-terminal nemoclaw-hook-relay
+sudo loginctl enable-linger $USER     # keep them alive without a login session
+```
+
+Optionally also `systemctl --user enable --now nemoclaw-doctor.timer`, which
+runs `make doctor-fix` on a schedule so a dead daemon self-heals.
+
+One piece can't be unit-managed: openshell's sandbox port-forward. After a
+reboot, recover it **before** starting the relay —
+
+```bash
+nemoclaw <sandbox> recover     # recreates the loopback forward
+make hook-relay                # then bridge it onto the docker bridge
+make doctor
+```
+
+That order matters: `recover`'s port check is not interface-aware, so if the
+relay already holds `172.17.0.1:18790` it wrongly concludes the port is taken
+and skips recreating its own `127.0.0.1:18790` forward — while still printing
+success. `make doctor` catches the result as two failed checks.
+
+## Configuring the LLM endpoint
+
+**Set it in `.env`:**
+
+```bash
+LLM_BASE_URL=http://192.168.68.131:8000/v1   # OpenAI-compatible, e.g. vLLM
+LLM_MODEL=qwen3.6-35b-a3b-fp8                # must match the id from /v1/models
+LLM_API_KEY=vllm
+```
+
+**Only one thing reads these: `deploy/scripts/onboard-openclaw.sh`, and only at
+onboard time.** It passes them to `nemoclaw onboard`, which bakes the endpoint
+into the agent sandbox. The Compose services never contact the LLM at all
+(ADR-011) — the agent does, from inside its sandbox.
+
+**So editing `.env` afterwards does not move a running agent.** To change the
+endpoint or model, re-onboard:
+
+```bash
+make bootstrap FORCE=1        # or: deploy/scripts/onboard-openclaw.sh
+```
+
+Two things that look like bugs but aren't:
+
+- `make doctor`'s "LLM endpoint" check tests the URL **in `.env`**, not the one
+  the agent is using. Green there means your endpoint is reachable — it does not
+  prove the agent is pointed at it. After changing `.env` without re-onboarding,
+  the two disagree.
+- Inside the sandbox the endpoint reads as `https://inference.local/v1`, not the
+  URL you set. That is OpenShell routing it through its own TLS proxy. To see
+  what the agent is really configured with, read the sandbox's own config:
+
+  ```bash
+  nemoclaw <sandbox> download /sandbox/.openclaw/openclaw.json /tmp/oc.json
+  python3 -m json.tool /tmp/oc.json | grep -A3 '"inference"'
+  ```
 
 The welcome page lists all available verticals. Click one to open the split-screen lab guide + live dashboard — switching verticals restarts the stack on the right pack automatically.
 
@@ -178,7 +286,8 @@ uv run pytest tests/e2e/      # end-to-end (requires running stack)
 | `PACK_ID` | `datacenter-xe9680` | Active domain pack |
 | `OPENCLAW_HOOK_URL` | unset | OpenClaw webhook wake-up URL, `http://host.docker.internal:<port>` — port 18789 by default but openclaw self-reassigns if taken (confirm with `nemoclaw <sandbox> status`); on Linux, `make hook-relay` must bridge it to the container |
 | `OPENCLAW_HOOK_TOKEN` | unset | Webhook shared secret (printed by `onboard-openclaw.sh`) |
-| `LLM_BASE_URL` / `LLM_MODEL` / `LLM_API_KEY` | — | Consumed by `onboard-openclaw.sh` only; the Compose stack no longer talks to the LLM |
+| `LLM_BASE_URL` / `LLM_MODEL` / `LLM_API_KEY` | — | Read by `onboard-openclaw.sh` only, and only **at onboard time** — the value is baked into the sandbox, so editing these later does not move a running agent. Re-onboard to change. See [Configuring the LLM endpoint](#configuring-the-llm-endpoint) |
+| `TERMINAL_BIND` | `127.0.0.1` | Address the terminal daemon binds. On Linux must be the docker bridge (`172.17.0.1`) — loopback is unreachable from the gateway container. Set by `make bootstrap` |
 
 ## Milestones
 

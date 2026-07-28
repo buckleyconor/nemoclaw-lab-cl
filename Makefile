@@ -31,10 +31,11 @@ VALUES      ?=               # optional extra helm values file, e.g. values.prod
 BACKEND_IMAGE := $(REGISTRY)/nemoclaw-backend:$(TAG)
 GATEWAY_IMAGE := $(REGISTRY)/nemoclaw-gateway:$(TAG)
 
-.PHONY: help build push push-multiarch deploy undeploy up down logs switch-pack terminal hook-relay demo-up doctor doctor-fix test lint
+.PHONY: help build push push-multiarch deploy undeploy up down logs switch-pack terminal hook-relay bootstrap demo-up doctor doctor-fix test lint
 
 help:
 	@echo "Targets:"
+	@echo "  bootstrap      FIRST RUN on a fresh host: preflight + build + onboard, then demo-up"
 	@echo "  demo-up        Bring up EVERYTHING the demo needs (stack + host daemons), then doctor"
 	@echo "  doctor         Preflight: red/green check of all demo dependencies with fixes"
 	@echo "  doctor-fix     Preflight + apply the fixes automatically (what the self-heal timer runs)"
@@ -126,6 +127,13 @@ terminal-tenant:
 
 hook-relay:
 	./deploy/scripts/hook-relay.py
+
+# First-run setup on a fresh host: preflight, detect TERMINAL_BIND, build the
+# stack, onboard the sandbox (skipped if one exists — FORCE=1 to re-onboard),
+# then hand off to demo-up. Set LLM_BASE_URL/LLM_MODEL in .env first; anything
+# needing sudo (ufw, linger) is printed, never run.
+bootstrap:
+	./deploy/scripts/bootstrap.sh
 
 # One command to a working demo: compose stack + terminal daemon + hook-relay
 # (started in the background if not already running), then the doctor preflight.

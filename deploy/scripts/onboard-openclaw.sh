@@ -7,6 +7,8 @@
 #   3. Applies the lab network-policy preset (mcp-tools:8004 + gateway:8001)
 #   4. Seeds the agent workspace (SOUL.md, AGENTS.md, skills)
 #   5. Locks down OpenClaw built-in tools and enables the webhook wake-up
+#   6. Writes OPENCLAW_HOOK_URL / OPENCLAW_HOOK_TOKEN into .env, resolving the
+#      real webhook port from the sandbox config (it self-reassigns off 18789)
 #
 # Requirements: nemoclaw CLI on a SUPPORTED host (Linux x86_64/aarch64 or
 # Apple Silicon macOS — Intel macOS is unsupported by OpenShell), Docker,
@@ -17,12 +19,17 @@
 #   LLM_MODEL      (required) e.g. qwen3.6-35b-a3b-fp8
 #   LLM_API_KEY    (default: vllm)
 #   SANDBOX_NAME   (default: infra-sentinel)
-#   HOOK_TOKEN     (default: generated) webhook shared secret; export the
-#                  printed value as OPENCLAW_HOOK_TOKEN for docker compose
+#   HOOK_TOKEN     (default: generated) webhook shared secret; written to .env
+#                  as OPENCLAW_HOOK_TOKEN for docker compose
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+# shellcheck source=deploy/scripts/lib/envfile.sh
+source "${REPO_ROOT}/deploy/scripts/lib/envfile.sh"
+cd "$REPO_ROOT"  # env_upsert writes ./.env
+
 SANDBOX_NAME="${SANDBOX_NAME:-infra-sentinel}"
 LLM_API_KEY="${LLM_API_KEY:-vllm}"
 HOOK_TOKEN="${HOOK_TOKEN:-$(openssl rand -hex 24)}"
@@ -152,22 +159,51 @@ nemoclaw "$SANDBOX_NAME" exec -- openclaw cron add \
 # host-side action that restarts the sandbox's gateway/dashboard.
 nemoclaw "$SANDBOX_NAME" recover
 
+# ── 7. Resolve the real webhook port and record it in .env ───────────────────
+# 18789 is only the default: openclaw silently self-reassigns if it is taken
+# (the reference GB10 host landed on 18790), and `nemoclaw <name> status` does
+# NOT report the chosen port. The sandbox's own config is the only authority,
+# so read it back rather than making the operator guess.
+HOOK_PORT=""
+OC_JSON="$(mktemp)"
+if nemoclaw "$SANDBOX_NAME" download /sandbox/.openclaw/openclaw.json "$OC_JSON" >/dev/null 2>&1; then
+  HOOK_PORT="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["gateway"]["port"])' \
+    "$OC_JSON" 2>/dev/null || true)"
+fi
+rm -f "$OC_JSON"
+
 echo
 echo "── Onboarding complete ─────────────────────────────────────────────"
 echo "Sandbox:        $SANDBOX_NAME"
 echo "Webhook token:  $HOOK_TOKEN"
-echo
-echo "Point the lab Gateway at the agent (add to .env, then docker compose up -d gateway)."
-echo "NOTE: 18789 is only openclaw's default webhook port — if it was already"
-echo "taken (e.g. another sandbox on this host), onboarding logs 'Port 18789 is"
-echo "taken. Using port N instead.' (the reference GB10 host landed on 18790)."
-echo "ALWAYS confirm the real port first: nemoclaw $SANDBOX_NAME status"
-echo "  OPENCLAW_HOOK_URL=http://host.docker.internal:<PORT>"
-echo "  OPENCLAW_HOOK_TOKEN=$HOOK_TOKEN"
-echo
-echo "On Linux the containerized Gateway can't reach openshell's loopback-bound"
-echo "forward directly — run the bridge relay on the same port:"
-echo "  HOOK_RELAY_PORT=<PORT> make hook-relay"
+
+if [[ -n "$HOOK_PORT" ]]; then
+  HOOK_URL="http://host.docker.internal:${HOOK_PORT}"
+  echo "Webhook port:   $HOOK_PORT (read from the sandbox's openclaw.json)"
+  echo
+  echo "Wrote the Gateway's agent wiring to .env:"
+  env_upsert OPENCLAW_HOOK_URL "$HOOK_URL"
+  env_upsert OPENCLAW_HOOK_TOKEN "$HOOK_TOKEN"
+  echo "  OPENCLAW_HOOK_URL=${HOOK_URL}"
+  echo "  OPENCLAW_HOOK_TOKEN=${HOOK_TOKEN}"
+  echo
+  echo "Apply it:  docker compose up -d gateway"
+  echo
+  echo "On Linux the containerized Gateway can't reach openshell's loopback-bound"
+  echo "forward directly — run the bridge relay on the same port:"
+  echo "  HOOK_RELAY_PORT=${HOOK_PORT} make hook-relay   (or just: make demo-up)"
+else
+  # Non-fatal: onboarding itself succeeded, only the read-back failed.
+  echo
+  echo "! Could not read the webhook port back from the sandbox, so .env was not"
+  echo "  updated. Find the port under \"gateway\".\"port\" in the sandbox config:"
+  echo "    nemoclaw $SANDBOX_NAME download /sandbox/.openclaw/openclaw.json /tmp/oc.json"
+  echo "  then add to .env and run 'docker compose up -d gateway':"
+  echo "    OPENCLAW_HOOK_URL=http://host.docker.internal:<PORT>"
+  echo "    OPENCLAW_HOOK_TOKEN=$HOOK_TOKEN"
+  echo "  and start the relay on that same port: HOOK_RELAY_PORT=<PORT> make hook-relay"
+fi
+
 echo
 echo "Status:  nemoclaw $SANDBOX_NAME status"
 echo "Logs:    nemoclaw $SANDBOX_NAME logs --follow"
