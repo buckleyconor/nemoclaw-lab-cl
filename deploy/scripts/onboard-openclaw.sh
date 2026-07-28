@@ -14,7 +14,7 @@
 #
 # Environment:
 #   LLM_BASE_URL   (required) e.g. http://192.168.68.131:8000/v1
-#   LLM_MODEL      (required) e.g. qwen3.6-35b-a3b-dflash
+#   LLM_MODEL      (required) e.g. qwen3.6-35b-a3b-fp8
 #   LLM_API_KEY    (default: vllm)
 #   SANDBOX_NAME   (default: infra-sentinel)
 #   HOOK_TOKEN     (default: generated) webhook shared secret; export the
