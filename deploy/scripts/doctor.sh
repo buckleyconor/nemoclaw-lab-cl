@@ -178,7 +178,40 @@ else
   skip "sandbox wake-hook" "OPENCLAW_HOOK_URL unset — webhook wake-up off (cron-only)"
 fi
 
-# ── 6. LLM endpoint ──────────────────────────────────────────────────────────
+# ── 6. Lab proxy (K8s deployment only, ADR-011) ──────────────────────────────
+# The agent-host nginx proxy that carries sandbox MCP/gateway traffic to the
+# cluster ingress (deploy/scripts/run-lab-proxy.sh). Gated on LAB_INGRESS_HOST
+# in .env — the single-Docker-host dev stack doesn't run it.
+LAB_INGRESS_HOST="$(env_get LAB_INGRESS_HOST)"
+if [[ -n "$LAB_INGRESS_HOST" ]]; then
+  MCP_PROXY_PORT="$(env_get MCP_PROXY_PORT)"; MCP_PROXY_PORT="${MCP_PROXY_PORT:-8004}"
+  MCP_INIT='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"doctor","version":"0"}}}'
+  MCP_CODE=$(http_code -X POST "http://127.0.0.1:${MCP_PROXY_PORT}/mcp" \
+    -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+    -d "$MCP_INIT")
+  if [[ "$MCP_CODE" == "200" ]]; then
+    pass "lab proxy -> cluster MCP (:$MCP_PROXY_PORT)" "initialize OK via $LAB_INGRESS_HOST"
+  else
+    fail "lab proxy -> cluster MCP (:$MCP_PROXY_PORT)" "MCP initialize got '${MCP_CODE:-no response}'" \
+      "LAB_INGRESS_HOST=$LAB_INGRESS_HOST MCP_PROXY_PORT=$MCP_PROXY_PORT deploy/scripts/run-lab-proxy.sh"
+  fi
+  # Sandbox-side reachability rides ufw — warn if the docker-bridge allow rule
+  # is missing (best-effort: ufw needs root, so only check when we can).
+  if sudo -n ufw status >/dev/null 2>&1; then
+    if sudo -n ufw status | grep -q "$MCP_PROXY_PORT.*172\.16\.0\.0/12"; then
+      pass "ufw docker-bridge rule (:$MCP_PROXY_PORT)"
+    else
+      fail "ufw docker-bridge rule (:$MCP_PROXY_PORT)" "sandbox cannot reach the proxy" \
+        "sudo ufw allow from 172.16.0.0/12 to any port $MCP_PROXY_PORT proto tcp"
+    fi
+  else
+    skip "ufw docker-bridge rule" "ufw not checkable without sudo — verify manually"
+  fi
+else
+  skip "lab proxy" "LAB_INGRESS_HOST unset — single-host dev stack"
+fi
+
+# ── 7. LLM endpoint ──────────────────────────────────────────────────────────
 if [[ -n "$LLM_BASE_URL" ]]; then
   if [[ "$(http_code "${LLM_BASE_URL%/}/models")" == "200" ]]; then
     pass "LLM endpoint" "$LLM_BASE_URL"

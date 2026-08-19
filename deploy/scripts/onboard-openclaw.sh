@@ -21,6 +21,14 @@
 #   SANDBOX_NAME   (default: infra-sentinel)
 #   HOOK_TOKEN     (default: generated) webhook shared secret; written to .env
 #                  as OPENCLAW_HOOK_TOKEN for docker compose
+#   MCP_PORT       (default: 8004) host-side port the sandbox reaches MCP
+#                  tools on via host.openshell.internal. Defaults match the
+#                  single-Docker-host dev stack; for the K8s deployment point
+#                  these at the per-tenant lab proxy (run-lab-proxy.sh), which
+#                  carries the traffic to the cluster ingress. Do NOT try
+#                  `nemoclaw mcp add` for internal endpoints — its private-IP
+#                  SSRF guard has no override (docs/TROUBLESHOOTING.md).
+#   GATEWAY_PORT   (default: 8001) same, for the gateway API
 
 set -euo pipefail
 
@@ -32,6 +40,8 @@ cd "$REPO_ROOT"  # env_upsert writes ./.env
 
 SANDBOX_NAME="${SANDBOX_NAME:-infra-sentinel}"
 LLM_API_KEY="${LLM_API_KEY:-vllm}"
+MCP_PORT="${MCP_PORT:-8004}"
+GATEWAY_PORT="${GATEWAY_PORT:-8001}"
 HOOK_TOKEN="${HOOK_TOKEN:-$(openssl rand -hex 24)}"
 
 : "${LLM_BASE_URL:?set LLM_BASE_URL to your OpenAI-compatible endpoint (e.g. http://host:8000/v1)}"
@@ -76,7 +86,10 @@ nemoclaw onboard \
   --from "$BUILD_DIR/Dockerfile"
 
 # ── 3. Network policy: allow the sandbox to reach the lab services ───────────
-cat > "$BUILD_DIR/nemoclaw-lab.yaml" <<'POLICY'
+# Unquoted heredoc: only ${MCP_PORT}/${GATEWAY_PORT} expand — the YAML has no
+# other $ content. allowed_ips stays on host.openshell.internal, the one host
+# NemoClaw policy presets may pin (policy guard #6073).
+cat > "$BUILD_DIR/nemoclaw-lab.yaml" <<POLICY
 preset:
   name: nemoclaw-lab
   description: "NemoClaw lab services (mcp-tools + gateway) via host gateway"
@@ -86,7 +99,7 @@ network_policies:
     name: nemoclaw_lab
     endpoints:
       - host: host.openshell.internal
-        port: 8004
+        port: ${MCP_PORT}
         protocol: rest
         enforcement: enforce
         allowed_ips:
@@ -97,7 +110,7 @@ network_policies:
           - allow: { method: GET, path: "/**" }
           - allow: { method: POST, path: "/**" }
       - host: host.openshell.internal
-        port: 8001
+        port: ${GATEWAY_PORT}
         protocol: rest
         enforcement: enforce
         allowed_ips:
@@ -137,7 +150,7 @@ nemoclaw "$SANDBOX_NAME" exec -- openclaw config set tools.deny \
   '["group:runtime","group:fs","group:web","group:ui","group:messaging","*remediation_execute*"]' --strict-json
 nemoclaw "$SANDBOX_NAME" exec -- openclaw config set \
   plugins.entries.nemoclaw-infra-tools.config \
-  '{"mcpUrl":"http://host.openshell.internal:8004/mcp","gatewayUrl":"http://host.openshell.internal:8001"}' --strict-json
+  "{\"mcpUrl\":\"http://host.openshell.internal:${MCP_PORT}/mcp\",\"gatewayUrl\":\"http://host.openshell.internal:${GATEWAY_PORT}\"}" --strict-json
 # Without an explicit trust entry the plugin loads as untracked local code and
 # its tools never register as callable ("no registered tools matched").
 nemoclaw "$SANDBOX_NAME" exec -- openclaw config set plugins.allow \

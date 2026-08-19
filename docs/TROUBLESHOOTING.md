@@ -113,6 +113,35 @@ instead of silent false success). If you see the error in the activity feed,
 the simulator rejected the clear — check `docker compose logs simulator` for
 the `/control/clear` request around that timestamp.
 
+## "MCP server URL host ... is a private, local, or special-use IP address"
+
+`nemoclaw mcp add` (and the resolved-address variant of the same error)
+refusing an internal endpoint like `mcp-*.dev.delllabs.local`. **This is a
+hardcoded SSRF guard with no workaround at the CLI level** — confirmed from
+the NemoClaw source (`src/lib/security/mcp-url-target.ts`): the blocklist
+reads no flag, env var, or config key; `--no-probe` skips a different,
+post-add probe; and the `host.openshell.internal` alias is rejected for MCP
+by design. The inference-side escape hatches (`--no-verify`,
+`NEMOCLAW_TRUSTED_PRIVATE_INFERENCE_HOSTS`) have **no MCP equivalent**, and
+neither do the OpenClaw policy/gateway config keys
+(`network.privateNetwork.allow`, `models.providers.*.request.allowPrivateNetwork`
+— browser- and model-provider-scoped respectively).
+
+Don't fight it: this lab never needed `mcp add`. The supported route is the
+one `deploy/scripts/onboard-openclaw.sh` already uses — the OpenClaw plugin's
+own `mcpUrl` config plus the `policy-add` preset via `host.openshell.internal`.
+For the K8s deployment, front the cluster with the agent-host proxy:
+
+```bash
+# on the agent host, once per tenant (ports per run-lab-proxy.sh header)
+LAB_INGRESS_HOST=nemoclaw-<ns>.dell-demo.lab deploy/scripts/run-lab-proxy.sh
+MCP_PORT=8004 GATEWAY_PORT=8001 deploy/scripts/onboard-openclaw.sh
+```
+
+Requires `mcpTools.exposeMcp: true` in the Helm values (on in
+values.prod.yaml) so the ingress routes `/mcp`. Details in
+docs/ARCHITECTURE-K8S.md; `make doctor` probes the proxy end-to-end.
+
 ## After a host reboot
 
 Compose services restart themselves (`restart: unless-stopped`), but the

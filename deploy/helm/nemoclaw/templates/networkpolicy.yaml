@@ -112,6 +112,17 @@ spec:
             matchLabels:
               {{- include "nemoclaw.selectorLabels" . | nindent 14 }}
               app.kubernetes.io/component: gateway
+    {{- if .Values.mcpTools.exposeMcp }}
+    # Admit the ingress controller for the /mcp path exposed on the gateway
+    # ingress (ADR-011 agent host route). Without this rule the ingress path
+    # renders but every request is silently dropped by this policy.
+    - from:
+        - ipBlock:
+            cidr: {{ .Values.mcpTools.mcpIngressCidr | quote }}
+      ports:
+        - port: {{ .Values.mcpTools.port }}
+          protocol: TCP
+    {{- end }}
   egress:
     - ports:
         - port: 53

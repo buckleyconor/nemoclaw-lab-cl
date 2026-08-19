@@ -1,0 +1,56 @@
+# Agent-host lab proxy (ADR-011, K8s deployment) — template rendered by
+# deploy/scripts/run-lab-proxy.sh; do not edit the rendered copy under
+# /etc/nginx/conf.d/, re-render instead.
+#
+# Purpose: the sandboxed agent may only egress to host.openshell.internal
+# (the one host NemoClaw policy presets may pin, policy guard #6073), and
+# `nemoclaw mcp add` refuses internal endpoints outright (hardcoded private-IP
+# SSRF guard, no override — docs/TROUBLESHOOTING.md). So the sandbox speaks
+# plain HTTP to these two listeners on the agent host, and nginx carries the
+# traffic to the cluster's ingress over TLS. Same pattern as the proven
+# inference proxy on :18100.
+#
+#   sandbox → http://host.openshell.internal:${MCP_PROXY_PORT}/mcp → https://${LAB_INGRESS_HOST}/mcp
+#   sandbox → http://host.openshell.internal:${GW_PROXY_PORT}/     → https://${LAB_INGRESS_HOST}/
+#
+# The listeners bind all interfaces; reachability from the docker bridge is
+# granted (and everything else kept out) by ufw — run-lab-proxy.sh prints the
+# exact rules. Buffering must stay off end-to-end: MCP Streamable HTTP and
+# the gateway's SSE are long-lived responses (the ingress side already carries
+# the matching annotations).
+
+# MCP tools (cluster path /mcp only; /internal/* is not routed by the ingress)
+server {
+    listen ${MCP_PROXY_PORT};
+
+    location / {
+        proxy_pass https://${LAB_INGRESS_HOST};
+        proxy_set_header Host ${LAB_INGRESS_HOST};
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+        proxy_ssl_server_name on;
+        proxy_ssl_name ${LAB_INGRESS_HOST};
+        ${PROXY_SSL_CONF}
+    }
+}
+
+# Gateway API (notify/remediation endpoints used by the plugin's gatewayUrl)
+server {
+    listen ${GW_PROXY_PORT};
+
+    location / {
+        proxy_pass https://${LAB_INGRESS_HOST};
+        proxy_set_header Host ${LAB_INGRESS_HOST};
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+        proxy_ssl_server_name on;
+        proxy_ssl_name ${LAB_INGRESS_HOST};
+        ${PROXY_SSL_CONF}
+    }
+}

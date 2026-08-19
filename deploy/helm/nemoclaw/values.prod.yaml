@@ -54,6 +54,16 @@ orchestrator:
       memory: "512Mi"
 
 mcpTools:
+  # ADR-011: the out-of-cluster agent host reaches MCP tools via the /mcp
+  # path on the gateway ingress (fronted host-side by run-lab-proxy.sh).
+  # `nemoclaw mcp add` cannot be used for internal endpoints — its private-IP
+  # SSRF guard has no override (docs/TROUBLESHOOTING.md).
+  exposeMcp: true
+  # Narrow to the ingress-controller pod CIDR or node CIDR for this cluster.
+  # (A whitelist-source-range annotation would ALSO gate the dashboard "/"
+  # path on the shared ingress host — only add one if operators reach the UI
+  # from an allowed range too.)
+  mcpIngressCidr: "0.0.0.0/0"
   resources:
     requests:
       cpu: "500m"

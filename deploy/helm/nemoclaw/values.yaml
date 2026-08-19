@@ -58,6 +58,19 @@ orchestrator:
 mcpTools:
   image: "nemoclaw-backend"
   port: 8004
+  # Expose ONLY the /mcp path through the gateway ingress host so the
+  # out-of-cluster agent host (ADR-011) can reach MCP tools. /internal/*
+  # stays cluster-only (no ingress path routes to it). Off by default —
+  # the single-Docker-host dev deployment reaches mcp-tools directly.
+  # NOTE: do NOT onboard the internal endpoint with `nemoclaw mcp add`;
+  # its private-IP SSRF guard is hardcoded with no override (see
+  # docs/TROUBLESHOOTING.md). The supported route is the OpenClaw plugin
+  # config + agent-host proxy (deploy/proxy/, deploy/scripts/run-lab-proxy.sh).
+  exposeMcp: false
+  # Source CIDR admitted to port 8004 when exposeMcp is true. 0.0.0.0/0
+  # matches the demo gateway's posture; narrow to the ingress-controller
+  # pod CIDR or node CIDR in real deployments.
+  mcpIngressCidr: "0.0.0.0/0"
   command:
     - python
     - -m

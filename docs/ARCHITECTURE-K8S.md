@@ -164,10 +164,25 @@ CLIs, so it runs as peer host processes, not pods.
   token are set at deploy time; without them the agent simply polls (slower
   but functional) and the embedded terminal stays hidden. Narrow the
   corresponding NetworkPolicy `egressCidr` to the agent host's /32.
-- **Agent → MCP Tools direct access is a single-Docker-host pattern.** On K8s,
-  mcp-tools is ClusterIP-only and admits only the gateway; the out-of-cluster
-  agent reaches the stack through the ingress, and K8s-native agent
-  integration is explicitly deferred by ADR-011's scope note.
+- **Agent → MCP Tools goes through the ingress `/mcp` path + agent-host
+  proxy.** With `mcpTools.exposeMcp: true` (on in values.prod.yaml), the
+  gateway ingress routes **only** `/mcp` to mcp-tools (its `/internal/*`
+  surface stays cluster-only) and the NetworkPolicy admits the ingress
+  controller on 8004 from `mcpTools.mcpIngressCidr` — narrow that to the
+  controller/node CIDR. On the agent host, `deploy/scripts/run-lab-proxy.sh`
+  renders an nginx listener pair (default :8004/:8001, per-tenant pairs for
+  M9) that forwards to the ingress over TLS, because the sandbox may only
+  egress to `host.openshell.internal` (the one host NemoClaw policy presets
+  may pin) and speaks plain HTTP to it. Onboard with
+  `MCP_PORT`/`GATEWAY_PORT` matching the proxy ports.
+  **Do not use `nemoclaw mcp add` for the internal endpoints** — its
+  private-IP SSRF guard is hardcoded with no flag, env var, or config
+  override, and it rejects the `host.openshell.internal` alias for MCP by
+  design (see docs/TROUBLESHOOTING.md). Skipping NemoClaw's managed MCP
+  bridge costs only its credential-replacement feature, which this stack
+  doesn't use: mcp-tools has no client credential, and `remediation.execute`
+  stays gated by the gateway-minted HITL token. K8s-native agent integration
+  remains deferred by ADR-011's scope note.
 - **Images must be amd64.** The Makefile default targets the arm64 GB10 dev
   host — build with `make push PLATFORM=linux/amd64` for the Intel workers.
 

@@ -27,6 +27,21 @@ spec:
     - host: {{ .Values.ingress.host | quote }}
       http:
         paths:
+          {{- if .Values.mcpTools.exposeMcp }}
+          # /mcp only — the out-of-cluster agent host (ADR-011) reaches MCP
+          # tools through this path; mcp-tools' /internal/* surface stays
+          # cluster-only because no other path is routed to it. Must precede
+          # the catch-all / so nginx longest-prefix matching picks it. The
+          # SSE annotations above (buffering off, 3600s timeouts) also cover
+          # MCP Streamable HTTP's long-lived responses.
+          - path: /mcp
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "nemoclaw.fullname" . }}-mcp-tools
+                port:
+                  name: http
+          {{- end }}
           - path: /
             pathType: Prefix
             backend:
