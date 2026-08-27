@@ -38,7 +38,9 @@ LLM_API_KEY="${LLM_API_KEY:-$(env_get LLM_API_KEY)}"
   || { echo "LLM_BASE_URL is unset or still the .env.example placeholder. Set it in .env." >&2; exit 1; }
 LLM_BASE_URL="${LLM_BASE_URL%/}"
 
-command -v nginx >/dev/null || {
+# /usr/sbin is not on every user's PATH — sudo's secure_path has it, so a
+# plain PATH miss must not fail the preflight when the binary is there.
+command -v nginx >/dev/null || [[ -x /usr/sbin/nginx ]] || {
   echo "nginx not found. Install it first: sudo apt-get install -y nginx" >&2
   exit 1
 }
