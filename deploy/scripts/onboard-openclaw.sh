@@ -3,8 +3,10 @@
 #
 # Run AFTER `docker compose up` has the lab stack healthy. This script:
 #   1. Builds a sandbox image with the nemoclaw-infra-tools plugin baked in
-#   2. Onboards a NemoClaw sandbox against your vLLM/OpenAI-compatible endpoint
-#   3. Applies the lab network-policy preset (mcp-tools:8004 + gateway:8001)
+#   2. Onboards a NemoClaw sandbox against the OpenAI-compatible LLM endpoint
+#      (via the host inference proxy by default — see LLM_PROXY_PORT below)
+#   3. Applies the lab network-policy preset (mcp-tools:8004 + gateway:8001
+#      + inference proxy:18100)
 #   4. Seeds the agent workspace (SOUL.md, AGENTS.md, skills)
 #   5. Locks down OpenClaw built-in tools and enables the webhook wake-up
 #   6. Writes OPENCLAW_HOOK_URL / OPENCLAW_HOOK_TOKEN into .env, resolving the
@@ -15,9 +17,16 @@
 # and a reachable OpenAI-compatible LLM endpoint.
 #
 # Environment:
-#   LLM_BASE_URL   (required) e.g. http://192.168.68.131:8000/v1
+#   LLM_BASE_URL   (required) the real endpoint, e.g. https://model.example.lab/api/qwen36/v1
 #   LLM_MODEL      (required) e.g. qwen3.6-35b-a3b-fp8
-#   LLM_API_KEY    (default: vllm)
+#   LLM_API_KEY    (required) the endpoint's real API key — no dummy default
+#   LLM_PROXY_PORT (default: 18100) host inference proxy port; the sandbox is
+#                  onboarded against http://host.openshell.internal:<port>/v1
+#                  (run-inference-proxy.sh must be live first — the inference
+#                  SSRF guard refuses private endpoints but exempts the alias,
+#                  and policy guard #6073 can only pin that host anyway)
+#   LLM_DIRECT     set to 1 to skip the proxy and bake LLM_BASE_URL verbatim
+#                  (only for a genuinely public-resolving endpoint)
 #   SANDBOX_NAME   (default: infra-sentinel)
 #   HOOK_TOKEN     (default: generated) webhook shared secret; written to .env
 #                  as OPENCLAW_HOOK_TOKEN for docker compose
@@ -39,13 +48,34 @@ source "${REPO_ROOT}/deploy/scripts/lib/envfile.sh"
 cd "$REPO_ROOT"  # env_upsert writes ./.env
 
 SANDBOX_NAME="${SANDBOX_NAME:-infra-sentinel}"
-LLM_API_KEY="${LLM_API_KEY:-vllm}"
 MCP_PORT="${MCP_PORT:-8004}"
 GATEWAY_PORT="${GATEWAY_PORT:-8001}"
+LLM_PROXY_PORT="${LLM_PROXY_PORT:-18100}"
 HOOK_TOKEN="${HOOK_TOKEN:-$(openssl rand -hex 24)}"
 
-: "${LLM_BASE_URL:?set LLM_BASE_URL to your OpenAI-compatible endpoint (e.g. http://host:8000/v1)}"
+: "${LLM_BASE_URL:?set LLM_BASE_URL to your OpenAI-compatible endpoint (e.g. https://host/api/.../v1)}"
 : "${LLM_MODEL:?set LLM_MODEL to the model id reported by the endpoint /v1/models}"
+: "${LLM_API_KEY:?set LLM_API_KEY — the lab endpoint requires a real key}"
+[[ "$LLM_API_KEY" != "CHANGE_ME" ]] \
+  || { echo "LLM_API_KEY is still the .env.example placeholder. Set the real key." >&2; exit 1; }
+
+# The endpoint URL is BAKED into the sandbox here. Default route is the host
+# inference proxy (stable sandbox-facing URL; repoint later via `make
+# repoint-llm`); LLM_DIRECT=1 bakes the raw endpoint instead.
+if [[ "${LLM_DIRECT:-0}" == "1" ]]; then
+  LLM_SANDBOX_URL="${LLM_SANDBOX_URL:-$LLM_BASE_URL}"
+else
+  LLM_SANDBOX_URL="${LLM_SANDBOX_URL:-http://host.openshell.internal:${LLM_PROXY_PORT}/v1}"
+  PROXY_CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
+    -H "Authorization: Bearer ${LLM_API_KEY}" \
+    "http://127.0.0.1:${LLM_PROXY_PORT}/v1/models" || true)"
+  [[ "$PROXY_CODE" == "200" ]] || {
+    echo "Inference proxy on :${LLM_PROXY_PORT} is not answering (/v1/models -> '${PROXY_CODE:-no response}')." >&2
+    echo "It must be live BEFORE onboarding — the URL is baked into the sandbox. Run:" >&2
+    echo "  deploy/scripts/run-inference-proxy.sh" >&2
+    exit 1
+  }
+fi
 
 command -v nemoclaw >/dev/null || {
   echo "nemoclaw CLI not found. Install: curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash" >&2
@@ -76,7 +106,7 @@ DOCKERFILE
 
 # ── 2. Onboard against the LLM endpoint ──────────────────────────────────────
 NEMOCLAW_PROVIDER=custom \
-NEMOCLAW_ENDPOINT_URL="$LLM_BASE_URL" \
+NEMOCLAW_ENDPOINT_URL="$LLM_SANDBOX_URL" \
 NEMOCLAW_MODEL="$LLM_MODEL" \
 COMPATIBLE_API_KEY="$LLM_API_KEY" \
 nemoclaw onboard \
@@ -86,13 +116,15 @@ nemoclaw onboard \
   --from "$BUILD_DIR/Dockerfile"
 
 # ── 3. Network policy: allow the sandbox to reach the lab services ───────────
-# Unquoted heredoc: only ${MCP_PORT}/${GATEWAY_PORT} expand — the YAML has no
-# other $ content. allowed_ips stays on host.openshell.internal, the one host
-# NemoClaw policy presets may pin (policy guard #6073).
+# Unquoted heredoc: only ${MCP_PORT}/${GATEWAY_PORT}/${LLM_PROXY_PORT} expand —
+# the YAML has no other $ content. allowed_ips stays on host.openshell.internal,
+# the one host NemoClaw policy presets may pin (policy guard #6073). The
+# LLM_PROXY_PORT endpoint covers the inference proxy; openshell may route
+# inference traffic host-side anyway, in which case the rule is inert.
 cat > "$BUILD_DIR/nemoclaw-lab.yaml" <<POLICY
 preset:
   name: nemoclaw-lab
-  description: "NemoClaw lab services (mcp-tools + gateway) via host gateway"
+  description: "NemoClaw lab services (mcp-tools + gateway + inference proxy) via host gateway"
 
 network_policies:
   nemoclaw_lab:
@@ -121,6 +153,17 @@ network_policies:
           - allow: { method: GET, path: "/**" }
           - allow: { method: POST, path: "/**" }
           - allow: { method: PATCH, path: "/**" }
+      - host: host.openshell.internal
+        port: ${LLM_PROXY_PORT}
+        protocol: rest
+        enforcement: enforce
+        allowed_ips:
+          - 10.0.0.0/8
+          - 172.16.0.0/12
+          - 192.168.0.0/16
+        rules:
+          - allow: { method: GET, path: "/v1/**" }
+          - allow: { method: POST, path: "/v1/**" }
     binaries:
       - { path: /usr/local/bin/openclaw }
       - { path: /usr/local/bin/node }
