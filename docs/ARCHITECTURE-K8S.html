@@ -123,7 +123,7 @@
 <header>
   <p class="eyebrow">Deployment architecture · deploy/helm/nemoclaw</p>
   <h1>NemoClaw Lab on Charmed Kubernetes</h1>
-  <p class="lede">As rendered by the Helm chart with <code>values.prod.yaml</code>: 4-node Intel/amd64 Charmed K8s cluster, one namespace per demo tenant (up to 30 via <code>provision-demo-namespaces.sh</code>). The autonomous agent, its terminal daemons, and the vLLM endpoint deliberately live <em>outside</em> the cluster (ADR-011/ADR-013).</p>
+  <p class="lede">As rendered by the Helm chart with <code>values.prod.yaml</code>: 4-node Intel/amd64 Charmed K8s cluster, one namespace per demo tenant (up to 30 via <code>provision-demo-namespaces.sh</code>). The autonomous agent, its terminal daemons, and the LLM endpoint deliberately live <em>outside</em> the cluster (ADR-011/ADR-013).</p>
 </header>
 
 <h2>System map — one tenant namespace</h2>
@@ -165,7 +165,7 @@ flowchart TB
     term["Terminal daemon :8006+ — one per tenant&lt;br/&gt;TERMINAL_MODE=restricted (ADR-013)&lt;br/&gt;6-item config console, never a shell"]
   end
 
-  llm["vLLM endpoint — RTX PRO 6000 GPUs&lt;br/&gt;OpenAI-compatible HTTP · outside the chart&lt;br/&gt;configured at agent onboard time"]
+  llm["Shared inference endpoint&lt;br/&gt;OpenAI-compatible HTTP · outside the chart&lt;br/&gt;configured at agent onboard time (ADR-014)"]
 
   browser --&gt;|"HTTPS :443 — REST /api · SSE /api/events · WS /api/terminal/ws"| ingress
   ingress --&gt;|"path / → :8001"| gwsvc
@@ -277,7 +277,7 @@ flowchart TB
       <tr><td>OpenClaw agent sandbox</td><td>One OpenShell sandbox per tenant; polls/receives faults, analyses logs via LLM, proposes remediation through the gateway's HITL gate</td></tr>
       <tr><td>Wake-hook listener <code>:18790</code></td><td>SSH forward published by openshell; gateway POSTs here on fault injection — best-effort, agent falls back to cron poll</td></tr>
       <tr><td>Terminal daemon <code>:8006+</code></td><td><code>run-terminal-tenant.sh &lt;tenant&gt; &lt;sandbox&gt; &lt;port&gt;</code> — one restricted-console daemon per tenant, unique port each</td></tr>
-      <tr><td>vLLM server</td><td>Serves the local LLM on the RTX PRO 6000 GPUs; credentials configured at agent onboard time, never via Helm</td></tr>
+      <tr><td>Shared inference endpoint</td><td>Serves the LLM (OpenAI-compatible, tool calling); credentials configured at agent onboard/repoint time (ADR-014), never via Helm</td></tr>
     </tbody>
   </table></div>
 </section>
@@ -289,7 +289,7 @@ flowchart TB
   <li><strong>Gateway runs 2 replicas only because Redis exists.</strong> Replicas share HITL/state via Redis and fan SSE out over pub/sub; without Redis, scaling the gateway would split state.</li>
   <li><strong>Hook and terminal are fail-safe off.</strong> Both secrets render only when URL + token are set at deploy time; without them the agent simply polls (slower but functional) and the embedded terminal stays hidden. Narrow the corresponding NetworkPolicy <code>egressCidr</code> to the agent host's /32.</li>
   <li><strong>Agent → MCP Tools direct access is a single-Docker-host pattern.</strong> On K8s, mcp-tools is ClusterIP-only and admits only the gateway; the out-of-cluster agent reaches the stack through the ingress, and K8s-native agent integration is explicitly deferred by ADR-011's scope note.</li>
-  <li><strong>Images must be amd64.</strong> The Makefile default targets the arm64 GB10 dev host — build with <code>make push PLATFORM=linux/amd64</code> for the Intel workers.</li>
+  <li><strong>Images must be amd64.</strong> The Makefile detects <code>PLATFORM</code> from the build host’s arch — on the arm64 GB10 dev box, build with <code>make push PLATFORM=linux/amd64</code> for the Intel workers.</li>
 </ul>
 
 <footer>Derived from <code>deploy/helm/nemoclaw/</code> (chart v0.1.0, <code>values.prod.yaml</code>), <code>deploy/scripts/</code>, and ADR-010/011/012/013.</footer>

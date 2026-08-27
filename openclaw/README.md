@@ -27,7 +27,7 @@ openclaw/
 | `agent/loop.py` dispatch side-work         | plugin handlers (`src/harness.ts`)               |
 | `agent/loop.py` approval poll + execute    | Gateway `post_decision()` → `services/gateway/executor.py` |
 | `agent/main.py` 5-second poll              | Gateway webhook on inject + cron safety net      |
-| `agent/llm.py` OpenAI client               | OpenClaw's own provider (vLLM compatible endpoint) |
+| `agent/llm.py` OpenAI client               | OpenClaw's own provider (OpenAI-compatible endpoint) |
 
 ## HITL invariant (ADR-004, restated)
 

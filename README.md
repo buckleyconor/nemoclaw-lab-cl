@@ -1,52 +1,76 @@
 # NemoClaw Lab
 
-Autonomous AIOps demo: a real NemoClaw/OpenClaw agent (OpenShell-sandboxed) monitors simulated hardware infrastructure, detects faults, analyses logs with a local LLM, matches Dell KB articles, and proposes remediation — blocked by a server-side human-in-the-loop approval gate until an operator decides.
+Autonomous AIOps demo: a real NemoClaw/OpenClaw agent (OpenShell-sandboxed) monitors simulated hardware infrastructure, detects faults, analyses logs with an LLM, matches Dell KB articles, and proposes remediation — blocked by a server-side human-in-the-loop approval gate until an operator decides.
 
 One codebase. Swap the **Domain Pack** to switch verticals — GPU cluster, laptop fleet, edge nodes, oil-field rigs — with no code changes.
 
-## Quick start (GB10 lab host)
+## Quick start (single Linux host)
 
-These steps are the bring-up for the reference lab host — an **NVIDIA GB10
-(`promaxgb10`, aarch64 Linux, ufw active)** serving its own vLLM endpoint. Other
-Linux hosts work the same way; the GB10-specific parts are the ufw rules and the
-docker-bridge bind address, both called out below.
+These steps bring up everything on one Linux host with docker + git. Reference
+targets: the production **Ubuntu 24.04 x86_64 VM** using the lab's **shared
+inference endpoint** (private/internal, real API key), and the **NVIDIA GB10**
+dev box (`promaxgb10`, aarch64, ufw active) serving its own vLLM. The
+host-specific parts are the ufw rules and the docker-bridge bind address, both
+called out below.
 
 ### First-time setup
 
-Three things, in order. Only the first needs a decision from you.
+Four things, in order. Only the first needs a decision from you.
 
 ```bash
-# 1. Point the lab at your LLM endpoint
+# 1. Point the lab at the LLM endpoint
 cp .env.example .env
-$EDITOR .env                  # set LLM_BASE_URL and LLM_MODEL
+$EDITOR .env                  # set LLM_BASE_URL, LLM_MODEL and LLM_API_KEY (required)
 
-# 2. Build the stack, onboard the agent, start the host daemons, verify
+# 2. Bring up the inference proxy — the sandbox's route to the LLM (ADR-014)
+sudo apt-get install -y nginx           # if not already present
+deploy/scripts/run-inference-proxy.sh
+
+# 3. Build the stack, onboard the agent, start the host daemons, verify
 make bootstrap
 
-# 3. Run the two `sudo ufw allow` commands bootstrap prints, then re-check
+# 4. Run the `sudo ufw allow` commands bootstrap prints (if ufw is active),
+#    then re-check
 make doctor                   # expect: all checks passed
 ```
 
 Then open <http://localhost:8001/lab/>.
 
-`LLM_BASE_URL` and `LLM_MODEL` are read only by `onboard-openclaw.sh`, and only
-at onboard time — the endpoint is baked into the agent's sandbox, so editing
-`.env` later does not move a running agent.
+The agent cannot talk to a private/internal endpoint directly — NemoClaw's
+SSRF guard refuses it, and its network policy can only pin
+`host.openshell.internal`. The inference proxy bridges that alias to the real
+endpoint, and it keeps the sandbox-facing URL stable so the endpoint can move
+later without re-onboarding.
 
 `make bootstrap` is idempotent and safe to re-run. It never runs `sudo` itself:
 the ufw rules are printed for you to run. It will **not** re-onboard an existing
 sandbox, since that rebuilds the image and resets the agent's config — use
-`make bootstrap FORCE=1` when you do want that, which is also how you change the
-LLM endpoint.
+`make bootstrap FORCE=1` when you do want that.
+
+### Changing the LLM endpoint or model
+
+`LLM_BASE_URL`/`LLM_MODEL`/`LLM_API_KEY` are baked into the agent's sandbox at
+onboard time — editing `.env` alone does not move a running agent. To repoint
+(the shared endpoint's models change over time):
+
+```bash
+$EDITOR .env                  # update LLM_BASE_URL / LLM_MODEL / LLM_API_KEY
+make repoint-llm              # re-renders the proxy + syncs the sandbox, no rebuild
+```
+
+`make doctor` flags a `.env`-vs-sandbox model mismatch if a repoint was
+forgotten. If a repoint ever fails, the full reset is `make bootstrap FORCE=1`
+(re-onboards the sandbox).
 
 <details>
 <summary><strong>What <code>make bootstrap</code> does — and the manual equivalent</strong></summary>
 
 Useful when a step fails partway and you need to resume by hand.
 
-1. **Preflight** — docker, the `nemoclaw` CLI, `.env`, and that `LLM_BASE_URL`
-   actually answers. It fails here rather than 10 minutes into an image build,
-   because the endpoint is baked into the sandbox at onboard time.
+1. **Preflight** — docker (+compose plugin), the `nemoclaw` CLI, `.env` with a
+   real `LLM_API_KEY`, that `LLM_BASE_URL` answers the key, and that the
+   inference proxy is live. It fails here rather than 10 minutes into an image
+   build, because the endpoint is baked into the sandbox at onboard time.
 2. **`TERMINAL_BIND`** — detected from `docker0` (`172.17.0.1` here) and written
    to `.env`. On Linux `host.docker.internal` resolves to the docker bridge, so
    a loopback bind is unreachable from the gateway container
@@ -61,10 +85,11 @@ Useful when a step fails partway and you need to resume by hand.
    does not report the chosen port, which is why the script reads the config.)
 5. **`docker compose up -d gateway`** — pick up the new `.env`.
 6. **ufw rules** — printed, not run. ufw's default-deny INPUT drops *all*
-   container→host traffic, which breaks the terminal hop and the wake hook
-   **silently**: the lab looks fine while faults are never detected. The printed
-   subnet is detected live, because the compose network is not pinned in
-   `docker-compose.yaml`.
+   container→host traffic, which breaks the terminal hop, the wake hook and the
+   agent's LLM route **silently**: the lab looks fine while faults are never
+   detected. The compose subnet is pinned in `docker-compose.yaml`
+   (172.28.100.0/24), but the printed rules use the live-detected value in case
+   you changed the pin.
 7. **`make demo-up`** — starts the terminal daemon and hook-relay (skipping any
    already alive), then runs the `make doctor` preflight.
 
@@ -111,7 +136,8 @@ open http://localhost:8001/lab/
 
 `make doctor` re-runs just the preflight — a red/green check of every moving
 part (4 services, terminal daemon, hook-relay, sandbox wake-hook, LLM
-endpoint) with the exact fix printed for anything that's down. If faults are
+endpoint, inference proxy, agent model drift) with the exact fix printed for
+anything that's down. If faults are
 ever "not being detected", run it first; the cause is almost always a dead
 host process, not the agent. See [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md).
 
@@ -163,9 +189,10 @@ Pack (content)  →  Framework (agent + services)  →  Lab UI
                └──────────┬──────────────────┘
                           │
                ┌──────────▼──────────┐
-               │  Local LLM          │
-               │  vLLM endpoint      │
-               │  (OpenClaw provider)│
+               │  LLM endpoint       │
+               │  shared lab / vLLM  │
+               │  via host inference │
+               │  proxy (ADR-014)    │
                └─────────────────────┘
 ```
 
@@ -195,7 +222,7 @@ services/
 packs/          Domain Pack content per vertical (YAML + Markdown + logs)
 ui/             React + TypeScript dashboard (Vite, SSE-driven)
 docs/           Lab guide (split-screen HTML), welcome page, specs
-  adr/          Architecture Decision Records (11 decisions)
+  adr/          Architecture Decision Records (14 decisions)
 docker/         Dockerfiles (backend + gateway with UI build)
 deploy/helm/    Helm chart for Kubernetes deployment
 deploy/scripts/ Host-side ops: demo-up, doctor, switch-pack, terminal, hook-relay, onboarding
@@ -251,5 +278,6 @@ uv run pytest tests/e2e/      # end-to-end (requires running stack)
 | `PACK_ID` | `datacenter-xe9680` | Active domain pack |
 | `OPENCLAW_HOOK_URL` | unset | OpenClaw webhook wake-up URL, `http://host.docker.internal:<port>` — port 18789 by default but openclaw self-reassigns if taken (confirm with `nemoclaw <sandbox> status`); on Linux, `make hook-relay` must bridge it to the container |
 | `OPENCLAW_HOOK_TOKEN` | unset | Webhook shared secret (printed by `onboard-openclaw.sh`) |
-| `LLM_BASE_URL` / `LLM_MODEL` / `LLM_API_KEY` | — | Read by `onboard-openclaw.sh` only, and only **at onboard time** — the value is baked into the sandbox, so editing these later does not move a running agent. Re-onboard to change |
+| `LLM_BASE_URL` / `LLM_MODEL` / `LLM_API_KEY` | — | The OpenAI-compatible endpoint (key **required**). Baked into the sandbox at onboard time — editing these later does not move a running agent; run `make repoint-llm` (or `make bootstrap FORCE=1` for a full reset) |
+| `LLM_PROXY_PORT` | `18100` | Host port of the inference proxy the sandbox reaches the LLM through (ADR-014); `LLM_DIRECT=1` bypasses the proxy for a genuinely public endpoint |
 | `TERMINAL_BIND` | `127.0.0.1` | Address the terminal daemon binds. On Linux must be the docker bridge (`172.17.0.1`) — loopback is unreachable from the gateway container. Set by `make bootstrap` |

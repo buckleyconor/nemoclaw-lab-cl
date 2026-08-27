@@ -142,6 +142,46 @@ Requires `mcpTools.exposeMcp: true` in the Helm values (on in
 values.prod.yaml) so the ingress routes `/mcp`. Details in
 docs/ARCHITECTURE-K8S.md; `make doctor` probes the proxy end-to-end.
 
+## Private/internal LLM endpoint (inference SSRF guard)
+
+The **inference** side of the same guard: `nemoclaw onboard` /
+`nemoclaw inference set` refuse an endpoint that resolves to a private,
+loopback, link-local or special-use address (the lab's shared inference
+endpoint is exactly that). Unlike MCP, inference has escape hatches and a
+supported route — in order of preference:
+
+1. **The host inference proxy (ADR-014) — the standard route, no bypass
+   flags.** The `host.openshell.internal` alias is exempt from the inference
+   guard (a plain `nemoclaw onboard` against
+   `http://host.openshell.internal:18100/...` passed with no `--no-verify` on
+   the reference host), and it is also the *only* host NemoClaw network-policy
+   presets may pin (policy guard #6073) — so a direct private-endpoint route
+   could not be policy'd even if registration succeeded. This is what
+   `deploy/scripts/run-inference-proxy.sh` sets up and what
+   `onboard-openclaw.sh` / `repoint-llm.sh` use by default.
+2. **`nemoclaw inference set ... --no-verify`** — skips the CLI's
+   registration-time reachability probe outright. `repoint-llm.sh` falls back
+   to this automatically if the clean registration is refused (CLI versions
+   differ). It does not solve *runtime* reachability — that is what the proxy
+   is for.
+3. **`NEMOCLAW_TRUSTED_PRIVATE_INFERENCE_HOSTS=<host>`** — exists, but its
+   effect is unconfirmed (the sessions that exported it also used
+   `--no-verify`). Don't rely on it.
+
+Repoint failure modes (`make repoint-llm`):
+- **proxy probe fails (502/504 or no response)** — nginx is down or the
+  rendered conf points at a dead upstream; re-run
+  `deploy/scripts/run-inference-proxy.sh` and check `sudo nginx -t`.
+- **401/403 from the endpoint** — `LLM_API_KEY` in `.env` is wrong or was
+  rotated server-side.
+- **model check warning** — `LLM_MODEL` is not in the endpoint's `/v1/models`
+  list; fix the id in `.env`.
+- **sandbox still reports the old model** — `inference set` did not take;
+  full reset with `make bootstrap FORCE=1`.
+
+MCP has none of these hatches — see the section above; the two guards share
+the design intent but not the enforcement strength.
+
 ## After a host reboot
 
 Compose services restart themselves (`restart: unless-stopped`), but the

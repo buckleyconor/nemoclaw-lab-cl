@@ -3,7 +3,7 @@
 As rendered by the Helm chart (`deploy/helm/nemoclaw/`) with `values.prod.yaml`:
 4-node Intel/amd64 Charmed K8s cluster, one namespace per demo tenant (up to 30
 via `deploy/scripts/provision-demo-namespaces.sh`). The autonomous agent, its
-terminal daemons, and the vLLM endpoint deliberately live **outside** the
+terminal daemons, and the LLM endpoint deliberately live **outside** the
 cluster (ADR-011 / ADR-013).
 
 ## System map — one tenant namespace
@@ -47,7 +47,7 @@ flowchart TB
     term["Terminal daemon :8006+ — one per tenant<br/>TERMINAL_MODE=restricted (ADR-013)<br/>6-item config console, never a shell"]
   end
 
-  llm["vLLM endpoint — RTX PRO 6000 GPUs<br/>OpenAI-compatible HTTP · outside the chart<br/>configured at agent onboard time"]
+  llm["Shared inference endpoint<br/>OpenAI-compatible HTTP · outside the chart<br/>configured at agent onboard time (ADR-014)"]
 
   browser -->|"HTTPS :443 — REST /api · SSE /api/events · WS /api/terminal/ws"| ingress
   ingress -->|"path / → :8001"| gwsvc
@@ -148,7 +148,7 @@ CLIs, so it runs as peer host processes, not pods.
 | OpenClaw agent sandbox      | One OpenShell sandbox per tenant; polls/receives faults, analyses logs via LLM, proposes remediation through the gateway's HITL gate |
 | Wake-hook listener `:18790` | SSH forward published by openshell; gateway POSTs here on fault injection — best-effort, agent falls back to cron poll |
 | Terminal daemon `:8006+`    | `run-terminal-tenant.sh <tenant> <sandbox> <port>` — one restricted-console daemon per tenant, unique port each |
-| vLLM server                 | Serves the local LLM on the RTX PRO 6000 GPUs; credentials configured at agent onboard time, never via Helm |
+| Shared inference endpoint   | Serves the LLM (OpenAI-compatible, tool calling); credentials configured at agent onboard/repoint time (ADR-014), never via Helm |
 
 ## Deployment caveats worth knowing
 
@@ -183,8 +183,9 @@ CLIs, so it runs as peer host processes, not pods.
   doesn't use: mcp-tools has no client credential, and `remediation.execute`
   stays gated by the gateway-minted HITL token. K8s-native agent integration
   remains deferred by ADR-011's scope note.
-- **Images must be amd64.** The Makefile default targets the arm64 GB10 dev
-  host — build with `make push PLATFORM=linux/amd64` for the Intel workers.
+- **Images must be amd64.** The Makefile detects `PLATFORM` from the build
+  host's arch — on the arm64 GB10 dev box, build with
+  `make push PLATFORM=linux/amd64` for the Intel workers.
 
 ---
 
