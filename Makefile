@@ -25,13 +25,16 @@ TAG         ?= latest
 NAMESPACE   ?= nemoclaw
 RELEASE     ?= nemoclaw
 CHART       := deploy/helm/nemoclaw
-PLATFORM    ?= linux/arm64   # override: linux/amd64 or linux/arm64,linux/amd64
+# Native arch by default (GB10 -> arm64, the Ubuntu VM -> amd64); override for
+# cross-builds: linux/amd64 or linux/arm64,linux/amd64
+UNAME_M     := $(shell uname -m)
+PLATFORM    ?= linux/$(if $(filter aarch64 arm64,$(UNAME_M)),arm64,amd64)
 VALUES      ?=               # optional extra helm values file, e.g. values.prod.yaml
 
 BACKEND_IMAGE := $(REGISTRY)/nemoclaw-backend:$(TAG)
 GATEWAY_IMAGE := $(REGISTRY)/nemoclaw-gateway:$(TAG)
 
-.PHONY: help build push push-multiarch deploy undeploy up down logs switch-pack terminal hook-relay bootstrap demo-up doctor doctor-fix test lint
+.PHONY: help build push push-multiarch deploy undeploy up down logs switch-pack terminal hook-relay bootstrap demo-up doctor doctor-fix repoint-llm test lint
 
 help:
 	@echo "Targets:"
@@ -39,6 +42,7 @@ help:
 	@echo "  demo-up        Bring up EVERYTHING the demo needs (stack + host daemons), then doctor"
 	@echo "  doctor         Preflight: red/green check of all demo dependencies with fixes"
 	@echo "  doctor-fix     Preflight + apply the fixes automatically (what the self-heal timer runs)"
+	@echo "  repoint-llm    Repoint the live agent at the LLM_* values in .env — no rebuild (ADR-014)"
 	@echo "  build          Build images for PLATFORM=$(PLATFORM)"
 	@echo "  push           Build + push to REGISTRY=$(REGISTRY)"
 	@echo "  push-multiarch Build linux/arm64,linux/amd64 and push"
@@ -143,6 +147,12 @@ demo-up:
 # Red/green preflight of every demo dependency, with the fix for anything down.
 doctor:
 	./deploy/scripts/doctor.sh
+
+# Move the live sandbox to the LLM_* values in .env without re-onboarding:
+# re-renders the inference proxy and syncs model/key via `nemoclaw inference
+# set`. Full reset fallback: make bootstrap FORCE=1
+repoint-llm:
+	./deploy/scripts/repoint-llm.sh
 
 # Same preflight, but applies each fix automatically instead of just printing
 # it. This is what deploy/systemd/nemoclaw-doctor.timer runs on a schedule so
