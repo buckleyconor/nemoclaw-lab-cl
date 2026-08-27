@@ -13,6 +13,7 @@
 #   env_upsert KEY VALUE [FILE]     -> sets KEY=VALUE, replacing in place
 #   env_set_checked KEY VALUE [FILE] -> upsert, but never silently overwrite a
 #                                       differing operator-set value
+#   bridge_ip                        -> prints the docker bridge IP
 
 # Read a key. Ignores commented-out lines, so a `# KEY=...` placeholder from
 # .env.example reads as unset (which is what it means).
@@ -63,4 +64,13 @@ env_set_checked() {
   fi
   env_upsert "$key" "$value" "$file"
   return 0
+}
+
+# The docker bridge IP the host daemons bind/answer on. 172.17.0.1 is docker's
+# stock default, but it is configurable (daemon.json "bip") — detect rather
+# than assume, falling back to the default when docker0 isn't up yet.
+bridge_ip() {
+  local ip
+  ip="$(ip -4 -o addr show docker0 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -1)"
+  echo "${ip:-172.17.0.1}"
 }

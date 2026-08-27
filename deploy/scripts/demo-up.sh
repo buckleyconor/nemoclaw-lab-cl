@@ -21,6 +21,10 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
+# shellcheck source=deploy/scripts/lib/envfile.sh
+source deploy/scripts/lib/envfile.sh   # for bridge_ip
+BRIDGE_IP="$(bridge_ip)"
+
 # `|| true`: a missing var must yield "", not kill the script under set -e.
 env_get() { { grep -E "^$1=" .env 2>/dev/null || true; } | head -1 | cut -d= -f2-; }
 SANDBOX_NAME="$(env_get SANDBOX_NAME)"; SANDBOX_NAME="${SANDBOX_NAME:-infra-sentinel}"
@@ -55,11 +59,11 @@ if [[ -z "$HOOK_URL" ]]; then
   echo "OPENCLAW_HOOK_URL unset in .env — webhook wake-up off, skipping."
 else
   HOOK_PORT="${HOOK_URL##*:}"; HOOK_PORT="${HOOK_PORT%%/*}"
-  if alive "http://172.17.0.1:${HOOK_PORT}/healthz" \
-     || curl -s -o /dev/null --max-time 3 -X POST "http://172.17.0.1:${HOOK_PORT}/hooks/wake"; then
-    echo "Already running on 172.17.0.1:${HOOK_PORT}."
+  if alive "http://${BRIDGE_IP}:${HOOK_PORT}/healthz" \
+     || curl -s -o /dev/null --max-time 3 -X POST "http://${BRIDGE_IP}:${HOOK_PORT}/hooks/wake"; then
+    echo "Already running on ${BRIDGE_IP}:${HOOK_PORT}."
   else
-    HOOK_RELAY_PORT="$HOOK_PORT" \
+    HOOK_RELAY_PORT="$HOOK_PORT" HOOK_RELAY_BIND="$BRIDGE_IP" \
       nohup ./deploy/scripts/hook-relay.py \
       >> "${STATE_DIR}/nemoclaw-hook-relay.log" 2>&1 &
     echo "Started (port: ${HOOK_PORT}, log: ${STATE_DIR}/nemoclaw-hook-relay.log)."

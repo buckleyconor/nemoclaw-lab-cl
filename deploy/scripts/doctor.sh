@@ -33,6 +33,10 @@ FAILURES=0
 STATE_DIR="${HOME}/.local/state"
 mkdir -p "$STATE_DIR"
 
+# shellcheck source=deploy/scripts/lib/envfile.sh
+source deploy/scripts/lib/envfile.sh   # for bridge_ip (env_get is redefined below)
+BRIDGE_IP="$(bridge_ip)"
+
 # Pull the vars we probe with from .env (never exported — read-only probe).
 env_get() { grep -E "^$1=" .env 2>/dev/null | head -1 | cut -d= -f2-; }
 HOOK_URL="$(env_get OPENCLAW_HOOK_URL)"
@@ -133,28 +137,28 @@ if [[ -n "$HOOK_URL" ]]; then
 
   probe_wake_hook() {
     CODE=$(http_code -X POST "http://127.0.0.1:${HOOK_PORT}/hooks/wake" -H "Authorization: Bearer doctor-probe")
-    RELAY_CODE=$(http_code -X POST "http://172.17.0.1:${HOOK_PORT}/hooks/wake" -H "Authorization: Bearer doctor-probe")
+    RELAY_CODE=$(http_code -X POST "http://${BRIDGE_IP}:${HOOK_PORT}/hooks/wake" -H "Authorization: Bearer doctor-probe")
   }
 
   probe_wake_hook
   if [[ ( "$CODE" != "401" || "$RELAY_CODE" != "401" ) && "$FIX" -eq 1 ]]; then
     fixing "recover loopback forward, then restart hook-relay"
     # `nemoclaw recover`'s port-in-use check is not interface-aware: if
-    # hook-relay (bound to 172.17.0.1:$HOOK_PORT) is already up, recover sees
+    # hook-relay (bound to $BRIDGE_IP:$HOOK_PORT) is already up, recover sees
     # the port number taken and silently skips recreating its own loopback
     # forward on 127.0.0.1:$HOOK_PORT — so hook-relay must come down first.
     if command -v lsof >/dev/null 2>&1; then
-      RELAY_PID=$(lsof -t -i "172.17.0.1:${HOOK_PORT}" -sTCP:LISTEN 2>/dev/null || true)
+      RELAY_PID=$(lsof -t -i "${BRIDGE_IP}:${HOOK_PORT}" -sTCP:LISTEN 2>/dev/null || true)
       if [[ -n "$RELAY_PID" ]]; then
         kill "$RELAY_PID" 2>/dev/null || true
         for _ in $(seq 1 10); do
-          lsof -i "172.17.0.1:${HOOK_PORT}" -sTCP:LISTEN >/dev/null 2>&1 || break
+          lsof -i "${BRIDGE_IP}:${HOOK_PORT}" -sTCP:LISTEN >/dev/null 2>&1 || break
           sleep 0.3
         done
       fi
     fi
     nemoclaw "$SANDBOX_NAME" recover >/dev/null 2>&1 || true
-    HOOK_RELAY_PORT="$HOOK_PORT" \
+    HOOK_RELAY_PORT="$HOOK_PORT" HOOK_RELAY_BIND="$BRIDGE_IP" \
       nohup ./deploy/scripts/hook-relay.py >> "$STATE_DIR/nemoclaw-hook-relay.log" 2>&1 &
     disown
     sleep 2
