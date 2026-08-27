@@ -1,0 +1,36 @@
+# Agent-host inference proxy (ADR-014) — template rendered by
+# deploy/scripts/run-inference-proxy.sh; do not edit the rendered copy under
+# /etc/nginx/conf.d/, re-render instead.
+#
+# Purpose: the sandboxed agent may only egress to host.openshell.internal
+# (the one host NemoClaw policy presets may pin, policy guard #6073), and the
+# inference SSRF guard refuses private/internal endpoints — but exempts that
+# alias. So the sandbox speaks plain HTTP to this listener on the agent host,
+# and nginx carries the traffic to the lab's shared inference endpoint:
+#
+#   sandbox → http://host.openshell.internal:${LLM_PROXY_PORT}/v1/... → ${LLM_BASE_URL}/...
+#
+# The /v1/ prefix is stripped and replaced by the upstream base URL's own path,
+# so the sandbox-facing URL stays stable when the lab endpoint moves (that is
+# what makes `make repoint-llm` a reload instead of a re-onboard).
+#
+# Listeners bind loopback (host-side probes) and the docker bridge (the
+# sandbox) only — never all interfaces. The API key is NOT injected here; the
+# sandbox sends it via its COMPATIBLE_API_KEY credential. Buffering stays off:
+# chat completions stream as long-lived SSE responses.
+
+server {
+    listen 127.0.0.1:${LLM_PROXY_PORT};
+    listen ${BRIDGE_IP}:${LLM_PROXY_PORT};
+
+    location /v1/ {
+        proxy_pass ${LLM_BASE_URL}/;
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+        proxy_ssl_server_name on;
+        ${PROXY_SSL_CONF}
+    }
+}
