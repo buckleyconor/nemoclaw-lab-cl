@@ -56,7 +56,12 @@ else
 fi
 
 # The sandbox reaches us on the docker bridge; loopback serves host-side probes.
-BRIDGE_IP="$(ip -4 -o addr show docker0 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -1)"
+# BRIDGE_IP is env-overridable: the OpenShell sandbox network is NOT necessarily
+# docker0 (it gets its own subnet, e.g. 172.18.0.0/16, and
+# host.openshell.internal resolves to that network's host IP). Set
+# BRIDGE_IP=0.0.0.0 to bind all interfaces and survive sandbox-network
+# recreation; the API-key check + ufw still gate who can use it.
+BRIDGE_IP="${BRIDGE_IP:-$(ip -4 -o addr show docker0 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -1)}"
 BRIDGE_IP="${BRIDGE_IP:-172.17.0.1}"
 
 export LLM_BASE_URL LLM_PROXY_PORT BRIDGE_IP PROXY_SSL_CONF

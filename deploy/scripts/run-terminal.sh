@@ -57,6 +57,12 @@ else
   env_set_checked TERMINAL_WS_URL "$WS_URL" || true
 fi
 
+command -v uv >/dev/null || {
+  echo "uv not found — the terminal daemon runs via 'uv run uvicorn'. Install it and retry:" >&2
+  echo "  curl -LsSf https://astral.sh/uv/install.sh | sh" >&2
+  exit 1
+}
+
 export TERMINAL_TOKEN
 exec uv run uvicorn --factory services.terminal.main:create_app \
   --host "${BIND}" --port "${PORT}"

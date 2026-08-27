@@ -70,12 +70,18 @@ except urllib.error.HTTPError as e: print(e.code)   # want: 401
 except Exception as e: print('BROKEN:', e)"
 ```
 
-## "The terminal panel shows DISCONNECTED"
+## "The terminal panel is missing or shows DISCONNECTED"
 
 The terminal daemon is a host process (`make demo-up` starts it; or
 manually: `TERMINAL_MODE=restricted SANDBOX_NAME=infra-sentinel make terminal`).
 Log: `~/.local/state/nemoclaw-terminal.log`. Also check:
 
+- **Panel missing entirely** (UI shows no terminal at all): `TERMINAL_WS_URL`/
+  `TERMINAL_TOKEN` are absent from `.env` because the daemon never ran on this
+  host — its first run generates them, and it needs `uv` on the host (`curl
+  -LsSf https://astral.sh/uv/install.sh | sh`). Run `make terminal` or
+  `make demo-up` once, then `docker compose up -d gateway` so the proxy's
+  fail-safe (URL+token both set, `TERMINAL_ENABLED != "0"`) opens the panel.
 - `TERMINAL_WS_URL`/`TERMINAL_TOKEN` in `.env` must match what the daemon
   printed when it generated the token, and the gateway must have been
   restarted after adding them (`docker compose up -d gateway`).
@@ -191,3 +197,49 @@ host processes don't unless you installed the `deploy/systemd/` units:
 make demo-up            # restarts anything that's down, then verifies
 nemoclaw infra-sentinel recover   # if doctor still flags the wake-hook
 ```
+
+## NemoClaw LKG (v0.0.109) onboarding contract walls
+
+The installer's `lkg` channel is ahead of the versions this repo was written
+against (ADR-011 names v0.0.56). `make bootstrap` on v0.0.109 hits three
+contract changes — all fixed in-tree, listed here so a future re-onboard
+(`make bootstrap FORCE=1`) doesn't look like a regression:
+
+1. **Custom `--from` Dockerfile must base on the full managed image.**
+   `nemoclaw onboard --from` uses the Dockerfile as the *complete* sandbox
+   image; it does not layer it over the managed runtime. Basing on
+   `ghcr.io/nvidia/nemoclaw/sandbox-base` is the documented "base_only_image"
+   failure — the restart-safe startup clone then exits 127 because
+   `/usr/local/bin/nemoclaw-start` and the baked `/sandbox/.openclaw/
+   openclaw.json` are missing. Fix (in `onboard-openclaw.sh`): base on
+   `ghcr.io/nvidia/nemoclaw/openclaw-sandbox:v<cli-version>` (pin to the
+   installed CLI release) and keep the trailing `WORKDIR /sandbox` +
+   `USER sandbox`.
+2. **`nemoclaw <name> upload` destinations are directories.** The v0.0.109
+   OpenShell transport extracts the source into the destination directory
+   (file → `<dest>/<name>`, dir → `<dest>/<dirname>/`). A file-path
+   destination collides with the workspace templates the managed runtime
+   seeds at first boot: `mkdir: cannot create directory
+   '/sandbox/.openclaw/workspace/SOUL.md': File exists`. Upload files to
+   `/sandbox/.openclaw/workspace/`.
+3. **Inference proxy bind ≠ docker0.** OpenShell puts the sandbox on its own
+   bridge network (e.g. `172.18.0.0/16`) and `host.openshell.internal`
+   resolves to that network's host IP — not docker0's. The proxy then looks
+   dead from the sandbox (`connection refused` on :18100, `503` on the
+   agent's inference route). `run-inference-proxy.sh` now honors a
+   `BRIDGE_IP` env override; the robust setting is `0.0.0.0`:
+   ```bash
+   sudo -E BRIDGE_IP=0.0.0.0 ./deploy/scripts/run-inference-proxy.sh
+   ```
+   If that's not done yet, a stopgap TCP forwarder on the sandbox network's
+   host IP → `127.0.0.1:18100` works until then — kill it before the
+   `0.0.0.0` bind (address conflict).
+
+Cosmetic: until the in-sandbox `openclaw-gateway` process is restarted, the
+main session's execution trace may show the managed default model id
+(`nvidia/nemotron-...`) instead of the `.env` model — the sandbox's
+single-route inference router resolves the request to the route's model
+anyway (doctor's "agent model" check reads the config, not the trace), and a
+sandbox recreate picks up the configured model. `make repoint-llm` after a
+model change needs `--no-verify` internally only because the *host* can't
+resolve `host.openshell.internal` (container DNS does).

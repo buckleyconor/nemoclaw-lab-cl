@@ -30,6 +30,7 @@ env_get() { { grep -E "^$1=" .env 2>/dev/null || true; } | head -1 | cut -d= -f2
 SANDBOX_NAME="$(env_get SANDBOX_NAME)"; SANDBOX_NAME="${SANDBOX_NAME:-infra-sentinel}"
 TERMINAL_BIND="$(env_get TERMINAL_BIND)"; TERMINAL_BIND="${TERMINAL_BIND:-127.0.0.1}"
 TERMINAL_WS_URL="$(env_get TERMINAL_WS_URL)"
+TERMINAL_ENABLED="$(env_get TERMINAL_ENABLED)"
 HOOK_URL="$(env_get OPENCLAW_HOOK_URL)"
 
 STATE_DIR="${HOME}/.local/state"
@@ -42,8 +43,12 @@ docker compose up -d
 
 echo
 echo "── 2/4 terminal daemon (restricted console) ──────────────────────"
-if [[ -z "$TERMINAL_WS_URL" ]]; then
-  echo "TERMINAL_WS_URL unset in .env — terminal feature off, skipping."
+# Gate on the daemon being up, not on TERMINAL_WS_URL: on a first run the URL
+# doesn't exist yet — run-terminal.sh generates TERMINAL_TOKEN and writes
+# TERMINAL_WS_URL to .env as it starts. Hosts that must keep the terminal off
+# (M9 shared deployments) set TERMINAL_ENABLED=0.
+if [[ "$TERMINAL_ENABLED" == "0" ]]; then
+  echo "TERMINAL_ENABLED=0 — terminal feature intentionally off, skipping."
 elif alive "http://${TERMINAL_BIND}:8005/healthz"; then
   echo "Already running on ${TERMINAL_BIND}:8005."
 else
@@ -51,6 +56,10 @@ else
     nohup ./deploy/scripts/run-terminal.sh \
     >> "${STATE_DIR}/nemoclaw-terminal.log" 2>&1 &
   echo "Started (sandbox: ${SANDBOX_NAME}, log: ${STATE_DIR}/nemoclaw-terminal.log)."
+  if [[ -z "$TERMINAL_WS_URL" ]]; then
+    echo "First run — the daemon just wrote TERMINAL_WS_URL/TERMINAL_TOKEN to .env."
+    echo "Restart the gateway so its terminal proxy picks them up:  docker compose up -d gateway"
+  fi
 fi
 
 echo

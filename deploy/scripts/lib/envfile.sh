@@ -17,11 +17,18 @@
 
 # Read a key. Ignores commented-out lines, so a `# KEY=...` placeholder from
 # .env.example reads as unset (which is what it means).
+# Trailing inline comments are stripped the way docker-compose treats
+# unquoted values: whitespace followed by `#` starts a comment (a bare `#` in
+# a URL fragment survives). This matters because .env.example ships commented
+# placeholders (`LLM_API_KEY=CHANGE_ME   # REQUIRED — ...`); an operator who
+# pastes a real key on the same line above the comment otherwise sends
+# `key  # REQUIRED — ...` as the credential and the endpoint 401s.
 env_get() {
   local key="$1" file="${2:-.env}"
   [[ -f "$file" ]] || return 0
   # `|| true`: grep exits 1 on no match, which would kill a `set -e` caller.
-  { grep -E "^${key}=" "$file" 2>/dev/null || true; } | head -1 | cut -d= -f2-
+  { grep -E "^${key}=" "$file" 2>/dev/null || true; } | head -1 | cut -d= -f2- \
+    | sed -E 's/[[:space:]]+#.*$//'
 }
 
 # Set a key, preserving file order, comments and permissions.

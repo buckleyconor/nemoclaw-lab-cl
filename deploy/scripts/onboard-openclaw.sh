@@ -90,8 +90,23 @@ cp -R "$REPO_ROOT/openclaw/plugins/nemoclaw-infra-tools" "$BUILD_DIR/nemoclaw-in
 rm -rf "$BUILD_DIR/nemoclaw-infra-tools/node_modules" "$BUILD_DIR/nemoclaw-infra-tools/dist"
 
 cat > "$BUILD_DIR/Dockerfile" <<'DOCKERFILE'
-ARG SANDBOX_BASE=ghcr.io/nvidia/nemoclaw/sandbox-base:latest
+# `nemoclaw onboard --from` uses this Dockerfile as the COMPLETE sandbox
+# image — the CLI does not layer it over the managed runtime. Basing it on
+# ghcr.io/nvidia/nemoclaw/sandbox-base is the documented "base_only_image"
+# failure: /usr/local/bin/nemoclaw-start and the baked
+# /sandbox/.openclaw/openclaw.json are missing, so the restart-safe startup
+# clone exits 127. The full managed OpenClaw image for the installed CLI
+# release (v0.0.109) carries the managed runtime (nemoclaw-start entrypoint,
+# baked openclaw config + .config-hash, the managed nemoclaw extension).
+ARG SANDBOX_BASE=ghcr.io/nvidia/nemoclaw/openclaw-sandbox:v0.0.109
 FROM ${SANDBOX_BASE}
+
+# NemoClaw >= v0.0.10x tool-disclosure contract: a custom Dockerfile must
+# declare NEMOCLAW_TOOL_DISCLOSURE exactly once in the final stage and promote
+# it to a runtime ENV (the CLI rewrites the ARG to the disclosure it applies,
+# default 'progressive').
+ARG NEMOCLAW_TOOL_DISCLOSURE=progressive
+ENV NEMOCLAW_TOOL_DISCLOSURE=${NEMOCLAW_TOOL_DISCLOSURE}
 
 COPY nemoclaw-infra-tools/ /opt/nemoclaw-infra-tools/
 WORKDIR /opt/nemoclaw-infra-tools
@@ -101,7 +116,14 @@ RUN mkdir -p /sandbox/.openclaw/extensions \
  && cp -a /opt/nemoclaw-infra-tools /sandbox/.openclaw/extensions/nemoclaw-infra-tools \
  && openclaw doctor --fix
 
-WORKDIR /opt/nemoclaw
+# /sandbox is chowned to the sandbox identity by the base image; the OpenShell
+# supervisor validates that the workdir is writable by that identity (the
+# image's WORKDIR is what the docker-driver flow feeds it as --workdir).
+WORKDIR /sandbox
+# OpenShell requires USER sandbox as the image default: the gateway publishes
+# it as OPENSHELL_OCI_IMAGE_USER, and the restart-safe startup clone validates
+# that marker is non-empty (the managed NemoClaw image declares it too).
+USER sandbox
 DOCKERFILE
 
 # ── 2. Onboard against the LLM endpoint ──────────────────────────────────────
@@ -172,9 +194,15 @@ POLICY
 nemoclaw "$SANDBOX_NAME" policy-add --from-file "$BUILD_DIR/nemoclaw-lab.yaml" --yes
 
 # ── 4. Seed the agent workspace ──────────────────────────────────────────────
-nemoclaw "$SANDBOX_NAME" upload "$REPO_ROOT/openclaw/SOUL.md" /sandbox/.openclaw/workspace/SOUL.md
-nemoclaw "$SANDBOX_NAME" upload "$REPO_ROOT/openclaw/AGENTS.md" /sandbox/.openclaw/workspace/AGENTS.md
-nemoclaw "$SANDBOX_NAME" upload "$REPO_ROOT/openclaw/skills" /sandbox/.openclaw/workspace/skills
+# v0.0.109 upload semantics (OpenShell transport): the destination is always
+# the DIRECTORY the source extracts into — a file lands at <dest>/<name>, a
+# directory at <dest>/<dirname>/. A file-path destination collides with the
+# workspace templates the managed runtime seeds at first boot ("mkdir:
+# cannot create directory ... File exists"). Overwrite is intended: the lab's
+# SOUL.md/AGENTS.md/skills replace the managed defaults (ADR-011f).
+nemoclaw "$SANDBOX_NAME" upload "$REPO_ROOT/openclaw/SOUL.md" /sandbox/.openclaw/workspace/
+nemoclaw "$SANDBOX_NAME" upload "$REPO_ROOT/openclaw/AGENTS.md" /sandbox/.openclaw/workspace/
+nemoclaw "$SANDBOX_NAME" upload "$REPO_ROOT/openclaw/skills" /sandbox/.openclaw/workspace/
 
 # ── 5. Tool lockdown + plugin config + webhook wake-up ───────────────────────
 # Built-in tools (exec/browser/web_search/...) are a new attack surface the

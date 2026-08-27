@@ -154,7 +154,12 @@ def push_argv(
             str(workspace_dir / target.scratch_rel),
         ]
     scratch = workspace_dir / target.scratch_rel
-    return [nemoclaw_bin, sandbox_name, "upload", str(scratch), target.sandbox_path]
+    # v0.0.109 OpenShell upload semantics: the destination is the DIRECTORY
+    # the source file extracts into (the file lands at <dest>/<name>). Push to
+    # the sandbox file's parent directory so it lands AT target.sandbox_path —
+    # a file-path destination would mkdir a same-named directory and nest the
+    # file inside it, "succeeding" while the real file stays untouched.
+    return [nemoclaw_bin, sandbox_name, "upload", str(scratch), target.sandbox_path.rsplit("/", 1)[0] + "/"]
 
 
 def editor_argv(editor_bin: str, editor_args: list[str], path: Path) -> list[str]:
@@ -210,7 +215,16 @@ def run_target(
         print(f"[console] download skipped (not yet in sandbox?): {dl.stderr.strip()}", file=out)
 
     ed_argv = editor_argv(config.editor_bin, list(config.editor_args), path)
-    run(ed_argv, check=False)
+    try:
+        run(ed_argv, check=False)
+    except FileNotFoundError:
+        print(
+            f"[console] editor not found: {config.editor_bin!r} is not installed on this host.\n"
+            "[console] Install vim ('sudo apt-get install -y vim'), or set TERMINAL_EDITOR_BIN\n"
+            "[console] (e.g. 'vi' or 'nano') and restart the terminal daemon."
+            , file=out
+        )
+        return False
 
     if target.kind == "skill":
         error = validate_skill_content(path.read_text() if path.exists() else "")
