@@ -40,6 +40,10 @@ TERMINAL_WS_URL="$(env_get TERMINAL_WS_URL)"
 TERMINAL_BIND="$(env_get TERMINAL_BIND)"; TERMINAL_BIND="${TERMINAL_BIND:-127.0.0.1}"
 LLM_BASE_URL="$(env_get LLM_BASE_URL)"
 [[ -z "$LLM_BASE_URL" ]] && LLM_BASE_URL="$(env_get VLLM_BASE_URL)"
+LLM_API_KEY="$(env_get LLM_API_KEY)"
+LLM_MODEL="$(env_get LLM_MODEL)"
+LLM_PROXY_PORT="$(env_get LLM_PROXY_PORT)"; LLM_PROXY_PORT="${LLM_PROXY_PORT:-18100}"
+LLM_DIRECT="$(env_get LLM_DIRECT)"
 SANDBOX_NAME="$(env_get SANDBOX_NAME)"; SANDBOX_NAME="${SANDBOX_NAME:-infra-sentinel}"
 
 pass() { printf "  %s✓%s %-34s %s\n" "$GREEN" "$RESET" "$1" "${2:-}"; }
@@ -211,16 +215,57 @@ else
   skip "lab proxy" "LAB_INGRESS_HOST unset — single-host dev stack"
 fi
 
-# ── 7. LLM endpoint ──────────────────────────────────────────────────────────
+# ── 7. LLM endpoint (authed — the shared lab endpoint 401s bare probes) ──────
+LLM_AUTH=()
+[[ -n "$LLM_API_KEY" ]] && LLM_AUTH=(-H "Authorization: Bearer ${LLM_API_KEY}")
 if [[ -n "$LLM_BASE_URL" ]]; then
-  if [[ "$(http_code "${LLM_BASE_URL%/}/models")" == "200" ]]; then
-    pass "LLM endpoint" "$LLM_BASE_URL"
-  else
-    fail "LLM endpoint" "no response from ${LLM_BASE_URL%/}/models" \
-      "check the vLLM host/container is up and LLM_BASE_URL in .env is right"
-  fi
+  LLM_CODE="$(http_code "${LLM_AUTH[@]}" "${LLM_BASE_URL%/}/models")"
+  case "$LLM_CODE" in
+    200) pass "LLM endpoint" "$LLM_BASE_URL" ;;
+    401|403) fail "LLM endpoint" "key rejected (HTTP ${LLM_CODE})" \
+      "check LLM_API_KEY in .env against the endpoint's real key" ;;
+    *) fail "LLM endpoint" "no response from ${LLM_BASE_URL%/}/models" \
+      "check the endpoint host is up and LLM_BASE_URL in .env is right" ;;
+  esac
 else
   skip "LLM endpoint" "LLM_BASE_URL unset in .env"
+fi
+
+# ── 8. Inference proxy + model drift (ADR-014) ───────────────────────────────
+# The sandbox reaches the LLM via the host nginx proxy (run-inference-proxy.sh);
+# LLM_DIRECT=1 means the raw endpoint was baked in instead. Not auto-fixed
+# under --fix: the proxy install needs sudo and the self-heal timer runs
+# unprivileged (same reason the ufw check is report-only).
+if [[ -n "$LLM_BASE_URL" && "${LLM_DIRECT:-0}" != "1" ]]; then
+  PROXY_CODE="$(http_code "${LLM_AUTH[@]}" "http://127.0.0.1:${LLM_PROXY_PORT}/v1/models")"
+  if [[ "$PROXY_CODE" == "200" ]]; then
+    pass "inference proxy (:$LLM_PROXY_PORT)" "-> $LLM_BASE_URL"
+  else
+    fail "inference proxy (:$LLM_PROXY_PORT)" "/v1/models got '${PROXY_CODE:-no response}'" \
+      "deploy/scripts/run-inference-proxy.sh"
+  fi
+fi
+# Model drift: .env is what doctor/bootstrap trust, the sandbox's openclaw.json
+# is what the agent actually uses — they diverge when .env is edited without a
+# repoint. (Endpoint drift is NOT detectable this way: the sandbox stores a
+# routed placeholder baseUrl, so the proxy probe above covers that hop.)
+if [[ -n "$LLM_MODEL" ]] && nemoclaw "$SANDBOX_NAME" status >/dev/null 2>&1; then
+  OC_JSON="$(mktemp)"
+  if nemoclaw "$SANDBOX_NAME" download /sandbox/.openclaw/openclaw.json "$OC_JSON" >/dev/null 2>&1; then
+    ACTIVE_MODEL="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["agents"]["defaults"]["model"]["primary"])' \
+      "$OC_JSON" 2>/dev/null || true)"
+    if [[ -z "$ACTIVE_MODEL" ]]; then
+      skip "agent model drift" "could not parse the sandbox config"
+    elif [[ "$ACTIVE_MODEL" == *"$LLM_MODEL" ]]; then
+      pass "agent model" "$ACTIVE_MODEL"
+    else
+      fail "agent model" "sandbox runs '$ACTIVE_MODEL', .env says '$LLM_MODEL'" \
+        "make repoint-llm"
+    fi
+  else
+    skip "agent model drift" "sandbox config not readable"
+  fi
+  rm -f "$OC_JSON"
 fi
 
 echo
