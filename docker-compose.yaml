@@ -120,3 +120,14 @@ services:
   # The agent runtime is real NemoClaw/OpenClaw, onboarded as a host process
   # via deploy/scripts/onboard-openclaw.sh (ADR-011). It reaches mcp-tools and
   # gateway through the ports published above.
+
+# Pinned subnet so the ufw rules bootstrap.sh prints are deterministic across
+# hosts and network re-creations (it sits inside 172.16.0.0/12, which every
+# existing allowed_ips/ufw suggestion already covers). If this range collides
+# with something on your host, change it here — bootstrap detects the live
+# subnet either way.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.28.100.0/24
