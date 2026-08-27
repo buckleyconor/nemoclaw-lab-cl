@@ -103,6 +103,47 @@ const cardLabelStyle = {
   color: "var(--text-dim)", marginBottom: 6, fontFamily: "var(--mono)",
 } as const;
 
+// ── Staged reveal timeline ────────────────────────────────────────────────────
+// The agent's backend loop is faster than a human can follow: a Qwen turn
+// completes the whole investigation (logs → signature → KB → assessment →
+// remediation) in seconds, and the dashboard receives the full picture as a
+// burst of SSE updates. For live demos the dashboard replays the
+// investigation in the same causal order the agent worked in, on a fixed
+// timeline anchored at the moment the fault first appears:
+//
+//   T+0.0  fault detected (header + placeholder cards)
+//   T+2.0  agent issues the log-pull command
+//   T+4.0  gathered log evidence
+//   T+7.0  error signature extracted
+//   T+10.0 KB article matched
+//   T+13.0 agent assessment
+//   T+15.0 impact — action
+//   T+16.5 impact — workload impact
+//   T+18.0 impact — service risk
+//   T+19.5 impact — estimated duration
+//   T+21.5 proposed remediation steps
+//   T+23.5 approve / deny controls
+//
+// A stage renders only once its time has arrived AND its data has actually
+// arrived — no stage ever fakes data the agent has not sent. A fault that is
+// already settled when the dashboard first sees it (page reload mid-incident
+// or after remediation) skips the theatre and renders everything at once.
+const STAGE_DELAYS_MS = [
+  0,     // 0: fault detected
+  2000,  // 1: log-pull command issued
+  4000,  // 2: gathered log evidence
+  7000,  // 3: error signature
+  10000, // 4: KB match
+  13000, // 5: agent assessment
+  15000, // 6: impact — action
+  16500, // 7: impact — workload impact
+  18000, // 8: impact — service risk
+  19500, // 9: impact — estimated duration
+  21500, // 10: remediation steps
+  23500, // 11: approve / deny
+] as const;
+const STAGE_MAX = STAGE_DELAYS_MS.length - 1;
+
 interface Props {
   fault: FaultEvent | null;
   activity: ActivityEvent[];
@@ -122,48 +163,30 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
     setDeciding(null);
   }, [fault?.id]);
 
-  // Staged population (dashboard reads top-to-bottom in the order the agent
-  // works): 1) error signature, 2) KB match — both arrive as separate
-  // diagnosis PATCHes from the agent harness. 3) agent assessment, then
-  // 4) impact assessment, then 5) proposed remediation steps. The last three
-  // all become available the moment the agent's proposal lands (analysis +
-  // status change in one burst), so the impact and steps are revealed on
-  // short client-side timers after the assessment — the operator sees them
-  // populate in causal order instead of one simultaneous pop.
-  const assessmentReady =
-    fault !== null &&
-    (fault.analysis !== null ||
-      fault.status === "awaiting_approval" ||
+  // Staged reveal (see STAGE_DELAYS_MS above): one timer chain per fault id,
+  // anchored at the moment this component first sees the fault. A fault that
+  // is already settled when first seen is old news — show it all at once,
+  // no theatre.
+  const [stage, setStage] = useState(0);
+  useEffect(() => {
+    if (!fault) {
+      setStage(0);
+      return;
+    }
+    const settledNow =
       fault.status === "remediating" ||
       fault.status === "resolved" ||
-      fault.status === "denied");
-  const settled =
-    fault !== null &&
-    (fault.status === "remediating" ||
-      fault.status === "resolved" ||
-      fault.status === "denied");
-  const [revealImpact, setRevealImpact] = useState(false);
-  const [revealSteps, setRevealSteps] = useState(false);
-  useEffect(() => {
-    if (!assessmentReady) {
-      setRevealImpact(false);
-      setRevealSteps(false);
+      fault.status === "denied";
+    if (settledNow) {
+      setStage(STAGE_MAX);
       return;
     }
-    if (settled) {
-      // Post-decision (or page reload mid-remediation): everything is old
-      // news — show it all, no theatre.
-      setRevealImpact(true);
-      setRevealSteps(true);
-      return;
-    }
-    const t1 = setTimeout(() => setRevealImpact(true), 1200);
-    const t2 = setTimeout(() => setRevealSteps(true), 2600);
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
-  }, [fault?.id, assessmentReady, settled]);
+    setStage(0);
+    const timers = STAGE_DELAYS_MS.slice(1).map((delay, i) =>
+      setTimeout(() => setStage(i + 1), delay),
+    );
+    return () => timers.forEach((t) => clearTimeout(t));
+  }, [fault?.id]);
 
   // Idle shell — the panel stays visible even with nothing to show (cleared
   // after the post-resolution retention window).
@@ -190,17 +213,9 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
   const canDecide = fault.status === "awaiting_approval" && deciding === null;
   const isActive = fault.status !== "resolved" && fault.status !== "denied";
   const exportable = !isActive;
-  // Both impact assessment and remediation steps are already available on the
-  // FaultEvent as soon as it's created (from the scenario's static content),
-  // well before the agent has actually diagnosed anything. Gate their display
-  // on the KB match *and* the staged-reveal timers above, so the operator sees
-  // the dashboard fill in the causal order the agent works in: signature →
-  // KB match → assessment → impact → remediation steps (last).
-  const showImpact = fault.impact !== null && fault.kb_article_id !== null && revealImpact;
-  const showSteps =
-    fault.kb_article_id !== null &&
-    fault.remediation_step_labels.length > 0 &&
-    revealSteps;
+  // Impact and steps render on the stage timeline above; the data itself is
+  // available on the FaultEvent from creation (scenario static content), so
+  // only the stage gates control when the operator sees them.
 
   async function decide(decision: "approved" | "denied") {
     if (!fault) return;
@@ -305,13 +320,28 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
       {/* Body */}
       <div style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 14 }}>
 
-        {/* Gathered log evidence — populates first (it's captured the moment
-            the log bundle is retrieved, before the agent has extracted a
-            signature or matched a KB article), so the operator can read the
-            raw lines and check them against ERROR SIGNATURE below once it
-            appears, rather than taking the extracted signature on faith. */}
-        {fault.log_extract && (
-          <div style={cardStyle}>
+        {/* Log pull — the operator sees the command the agent issues before
+            the evidence lands (T+2), and the raw lines only once the pull
+            completes (T+4) — still before signature/KB, so the operator can
+            read the raw lines and check them against ERROR SIGNATURE once
+            it appears, rather than taking the extracted signature on faith. */}
+        {stage >= 1 && (
+          <div style={{
+            fontSize: 11, fontFamily: "var(--mono)", color: "var(--accent)",
+            background: "rgba(96,165,250,.06)",
+            border: "1px solid rgba(96,165,250,.22)",
+            borderRadius: 5, padding: "5px 10px",
+            display: "flex", gap: 8, alignItems: "center",
+          }}>
+            <span style={{ color: "var(--text-dim)" }}>agent ▸</span>
+            <span>logs_get_bundle --asset {fault.asset_id}</span>
+            {stage < 2 && (
+              <span style={{ color: "var(--text-dim)", fontSize: 10 }}>… pulling</span>
+            )}
+          </div>
+        )}
+        {stage >= 2 && fault.log_extract && (
+          <div style={{ ...cardStyle, animation: "riseIn .35s ease-out" }}>
             <div style={cardLabelStyle}>GATHERED LOG EVIDENCE — {fault.asset_id}</div>
             <pre style={{
               margin: 0, fontSize: 11, lineHeight: 1.6, color: "#9fb3c8",
@@ -327,10 +357,11 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
           {/* Error signature */}
           <div style={cardStyle}>
             <div style={cardLabelStyle}>ERROR SIGNATURE</div>
-            {fault.error_signature ? (
+            {stage >= 3 && fault.error_signature ? (
               <div style={{
                 fontSize: 15, fontWeight: 700, color: "#f59e0b",
                 fontFamily: "var(--mono)", letterSpacing: ".02em",
+                animation: "riseIn .35s ease-out",
               }}>
                 {fault.error_signature}
               </div>
@@ -342,8 +373,8 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
           {/* KB article */}
           <div style={cardStyle}>
             <div style={cardLabelStyle}>KNOWLEDGE BASE</div>
-            {fault.kb_article_id ? (
-              <div>
+            {stage >= 4 && fault.kb_article_id ? (
+              <div style={{ animation: "riseIn .35s ease-out" }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#60a5fa", fontFamily: "var(--mono)" }}>
                   {fault.kb_article_id}
                 </div>
@@ -367,14 +398,15 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
           </div>
         </div>
 
-        {/* Agent assessment */}
-        {fault.analysis ? (
+        {/* Agent assessment — revealed after the KB match (staged order) */}
+        {stage >= 5 && fault.analysis ? (
           <div style={{
             background: "#0d1117",
             border: "1px solid #8b5cf633",
             borderLeft: "3px solid #8b5cf6",
             borderRadius: "0 8px 8px 0",
             padding: "10px 14px",
+            animation: "riseIn .35s ease-out",
           }}>
             <div style={{
               fontSize: 9, fontWeight: 700, letterSpacing: ".12em",
@@ -405,18 +437,19 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
           </div>
         ) : null}
 
-        {/* Impact assessment — revealed after the agent assessment (staged order) */}
-        {showImpact && fault.impact && (
-          <div style={{ animation: "riseIn .35s ease-out" }}>
+        {/* Impact assessment — the four rows populate one by one (1.5–2 s
+            apart) after the agent assessment (staged order). */}
+        {stage >= 6 && fault.impact && (
+          <div>
             <div style={cardLabelStyle}>IMPACT ASSESSMENT</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               {[
-                { label: "ACTION", value: fault.impact.summary },
-                { label: "WORKLOAD IMPACT", value: fault.impact.workload_impact },
-                { label: "SERVICE RISK", value: fault.impact.service_risk },
-                { label: "ESTIMATED DURATION", value: fault.impact.estimated_duration },
-              ].map(({ label, value }) => (
-                <div key={label} style={{ ...cardStyle, padding: "9px 12px" }}>
+                { stage: 6, label: "ACTION", value: fault.impact.summary },
+                { stage: 7, label: "WORKLOAD IMPACT", value: fault.impact.workload_impact },
+                { stage: 8, label: "SERVICE RISK", value: fault.impact.service_risk },
+                { stage: 9, label: "ESTIMATED DURATION", value: fault.impact.estimated_duration },
+              ].filter((row) => stage >= row.stage).map(({ label, value }) => (
+                <div key={label} style={{ ...cardStyle, padding: "9px 12px", animation: "riseIn .35s ease-out" }}>
                   <div style={{ ...cardLabelStyle, marginBottom: 4 }}>{label}</div>
                   <div style={{ fontSize: 11.5, color: "var(--text)", lineHeight: 1.5 }}>
                     {value}
@@ -427,8 +460,8 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
           </div>
         )}
 
-        {/* Remediation steps — the last section to populate (staged order) */}
-        {showSteps && (
+        {/* Remediation steps — the last content section to populate */}
+        {stage >= 10 && fault.remediation_step_labels.length > 0 && (
           <div style={{ animation: "riseIn .35s ease-out" }}>
             <div style={{ ...cardLabelStyle, marginBottom: 8 }}>
               PROPOSED REMEDIATION STEPS
@@ -455,9 +488,10 @@ export function OperatorDashboard({ fault, activity, onDecision }: Props) {
           </div>
         )}
 
-        {/* Approve / Deny — revealed together with the proposed steps so the
-            decision controls never appear above/before the plan they approve */}
-        {(canDecide || isDecided) && revealSteps && (
+        {/* Approve / Deny — the final stage, revealed after the proposed
+            steps so the decision controls never appear before the plan
+            they approve */}
+        {(canDecide || isDecided) && stage >= 11 && (
           <div style={{ display: "flex", gap: 10, marginTop: 2, flexWrap: "wrap" as const, animation: "riseIn .35s ease-out" }}>
             <button
               onClick={() => decide("approved")}
