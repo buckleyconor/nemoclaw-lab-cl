@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# First-run setup for the GB10 lab host: clean checkout -> verified-green lab.
+# First-run setup for the lab host (reference targets: Ubuntu 24.04 x86_64 VM,
+# NVIDIA GB10): clean checkout -> verified-green lab.
 #
 # The first-run sibling of demo-up.sh, and it delegates to it for the last leg
 # rather than reimplementing the daemon-start/preflight logic. Same house rules:
 # idempotent, skips whatever is already done, ends on the doctor preflight.
 #
-#   1. preflight  — docker, nemoclaw CLI, .env with LLM_BASE_URL/LLM_MODEL set
+#   1. preflight  — docker (+compose plugin), nemoclaw CLI, .env with
+#                   LLM_BASE_URL/LLM_MODEL/LLM_API_KEY set, inference proxy live
 #   2. TERMINAL_BIND — detected from docker0 (loopback is unreachable from the
 #                      containerized gateway on Linux, SPEC-EMBEDDED-TERMINAL §4)
 #   3. docker compose up -d --build
@@ -38,8 +40,15 @@ echo "── 1/5 preflight ─────────────────�
 
 command -v docker >/dev/null || die "docker not found."
 docker info >/dev/null 2>&1 || die "docker daemon not reachable (are you in the 'docker' group?)."
+docker compose version >/dev/null 2>&1 \
+  || die "docker compose plugin not found. Install: sudo apt-get install -y docker-compose-plugin"
 command -v nemoclaw >/dev/null \
   || die "nemoclaw CLI not found. Install: curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash"
+# Load-bearing for hook-relay / doctor / token generation — stock Ubuntu has
+# them, but a minimal VM image may not.
+for tool in python3 openssl curl; do
+  command -v "$tool" >/dev/null || die "$tool not found. Install: sudo apt-get install -y $tool"
+done
 
 if [[ ! -f .env ]]; then
   die ".env not found. Run: cp .env.example .env — then set LLM_BASE_URL and LLM_MODEL."
@@ -47,18 +56,40 @@ fi
 
 LLM_BASE_URL="$(env_get LLM_BASE_URL)"
 LLM_MODEL="$(env_get LLM_MODEL)"
-[[ -n "$LLM_BASE_URL" && "$LLM_BASE_URL" != *YOUR_VLLM_HOST* ]] \
+LLM_API_KEY="$(env_get LLM_API_KEY)"
+LLM_PROXY_PORT="$(env_get LLM_PROXY_PORT)"; LLM_PROXY_PORT="${LLM_PROXY_PORT:-18100}"
+LLM_DIRECT="$(env_get LLM_DIRECT)"
+[[ -n "$LLM_BASE_URL" && "$LLM_BASE_URL" != *YOUR_LLM_HOST* && "$LLM_BASE_URL" != *YOUR_VLLM_HOST* ]] \
   || die "LLM_BASE_URL is unset or still the .env.example placeholder. Set it in .env."
 [[ -n "$LLM_MODEL" ]] || die "LLM_MODEL is unset in .env."
+[[ -n "$LLM_API_KEY" && "$LLM_API_KEY" != "CHANGE_ME" ]] \
+  || die "LLM_API_KEY is unset or still the .env.example placeholder — the lab endpoint needs a real key."
 
 # Fail here rather than 10 minutes later inside `nemoclaw onboard`, which bakes
-# this endpoint into the sandbox image.
-if ! curl -s -o /dev/null --max-time 5 "${LLM_BASE_URL%/}/models"; then
-  die "LLM endpoint ${LLM_BASE_URL%/}/models is not answering. Fix it before onboarding —
-    the endpoint is baked into the sandbox at onboard time, not read at runtime."
+# this endpoint into the sandbox image. Authed probe: a bare one would pass on
+# any HTTP noise (or 401 on a real-auth endpoint) and hide a bad key.
+LLM_CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
+  -H "Authorization: Bearer ${LLM_API_KEY}" "${LLM_BASE_URL%/}/models" || true)"
+case "$LLM_CODE" in
+  200) : ;;
+  401|403) die "LLM endpoint rejected the key (HTTP ${LLM_CODE} from ${LLM_BASE_URL%/}/models). Check LLM_API_KEY in .env." ;;
+  *) die "LLM endpoint ${LLM_BASE_URL%/}/models is not answering (got '${LLM_CODE:-nothing}'). Fix it before onboarding —
+    the endpoint is baked into the sandbox at onboard time, not read at runtime." ;;
+esac
+
+# The sandbox reaches the LLM through the host inference proxy (ADR-014);
+# onboarding bakes that URL in, so the proxy must be live first.
+if [[ "${LLM_DIRECT:-0}" != "1" ]]; then
+  PROXY_CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
+    -H "Authorization: Bearer ${LLM_API_KEY}" "http://127.0.0.1:${LLM_PROXY_PORT}/v1/models" || true)"
+  [[ "$PROXY_CODE" == "200" ]] \
+    || die "inference proxy on :${LLM_PROXY_PORT} is not answering (got '${PROXY_CODE:-nothing}'). Bring it up first:
+    sudo apt-get install -y nginx     (if nginx is missing)
+    deploy/scripts/run-inference-proxy.sh"
 fi
-echo "  ✓ docker, nemoclaw, .env"
+echo "  ✓ docker (+compose), nemoclaw, .env"
 echo "  ✓ LLM endpoint  ${LLM_BASE_URL}  (${LLM_MODEL})"
+[[ "${LLM_DIRECT:-0}" == "1" ]] || echo "  ✓ inference proxy  :${LLM_PROXY_PORT}"
 
 echo
 echo "── 2/5 terminal bind address ─────────────────────────────────────"
@@ -86,8 +117,9 @@ if nemoclaw "$SANDBOX_NAME" status >/dev/null 2>&1 && [[ "$FORCE" != "1" ]]; the
   echo "Sandbox '${SANDBOX_NAME}' already exists — skipping onboarding."
   echo "Re-onboard (rebuilds the image, resets agent config): make bootstrap FORCE=1"
 else
-  LLM_BASE_URL="$LLM_BASE_URL" LLM_MODEL="$LLM_MODEL" \
-    LLM_API_KEY="$(env_get LLM_API_KEY)" SANDBOX_NAME="$SANDBOX_NAME" \
+  LLM_BASE_URL="$LLM_BASE_URL" LLM_MODEL="$LLM_MODEL" LLM_API_KEY="$LLM_API_KEY" \
+    LLM_PROXY_PORT="$LLM_PROXY_PORT" LLM_DIRECT="${LLM_DIRECT:-0}" \
+    SANDBOX_NAME="$SANDBOX_NAME" \
     ./deploy/scripts/onboard-openclaw.sh
   # onboard-openclaw.sh wrote OPENCLAW_HOOK_* into .env; the gateway needs a
   # restart to read them.
@@ -101,13 +133,14 @@ COMPOSE_NET="$(docker network inspect "$(basename "$PWD")_default" \
   --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}' 2>/dev/null || true)"
 if command -v ufw >/dev/null && systemctl is-active --quiet ufw 2>/dev/null; then
   echo
-  echo "── ufw is active — these two rules are required ──────────────────"
+  echo "── ufw is active — these rules are required ──────────────────────"
   echo "Without them the container→host hops fail SILENTLY: the terminal panel"
-  echo "shows disconnected and the wake hook never fires (faults look undetected)."
-  echo "Run these yourself (they need sudo):"
+  echo "shows disconnected, the wake hook never fires (faults look undetected),"
+  echo "and the agent cannot reach the LLM. Run these yourself (they need sudo):"
   echo
   echo "  sudo ufw allow from ${COMPOSE_NET:-172.23.0.0/16} to ${BRIDGE_IP:-172.17.0.1} port 8005 proto tcp comment 'nemoclaw terminal daemon (ADR-012)'"
   echo "  sudo ufw allow from ${COMPOSE_NET:-172.23.0.0/16} to any port 18790 proto tcp comment 'openclaw wake hook (ADR-011)'"
+  echo "  sudo ufw allow from 172.16.0.0/12 to any port ${LLM_PROXY_PORT} proto tcp comment 'nemoclaw inference proxy (ADR-014)'"
   echo
   echo "(${COMPOSE_NET:-subnet} is this compose network, detected live — it is not"
   echo " pinned in docker-compose.yaml, so re-check it if the hook ever stops firing.)"
