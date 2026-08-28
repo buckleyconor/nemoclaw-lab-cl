@@ -13,6 +13,10 @@
 # snap installs ship snap.docker.dockerd.service, and a name missing from
 # After= is silently ignored — on the snap host `After=docker.service` alone
 # was a no-op and this unit raced the docker bridge at every boot.
+# PATH must include /snap/bin for the same reason (2026-08-28 incident):
+# the daemon spawns deploy/scripts/switch-pack.sh, and without snap docker
+# on PATH the switch died at `docker compose down` — silently, after
+# already rewriting PACK_ID in .env. Same PATH as the user units.
 [Unit]
 Description=NemoClaw embedded-terminal daemon (restricted console)
 Wants=network-online.target
@@ -24,7 +28,7 @@ User=__NEMOCLAW_USER__
 Group=__NEMOCLAW_USER__
 WorkingDirectory=__NEMOCLAW_REPO__
 Environment=HOME=__NEMOCLAW_HOME__
-Environment=PATH=__NEMOCLAW_HOME__/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PATH=__NEMOCLAW_HOME__/.local/bin:/snap/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=TERMINAL_MODE=restricted
 Environment=SANDBOX_NAME=__NEMOCLAW_SANDBOX__
 ExecStart=__NEMOCLAW_REPO__/deploy/scripts/run-terminal.sh

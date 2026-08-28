@@ -240,13 +240,20 @@ def create_app(token: str | None = None) -> FastAPI:
                 raise HTTPException(status_code=400, detail="invalid pack_id")
             if not (_REPO_ROOT / "packs" / pack_id / "pack.yaml").is_file():
                 raise HTTPException(status_code=404, detail=f"unknown pack: {pack_id}")
-            subprocess.Popen(  # noqa: S603 — literal argv, pack_id validated above
-                [str(_REPO_ROOT / "deploy" / "scripts" / "switch-pack.sh"), pack_id],
-                cwd=_REPO_ROOT,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True,
-            )
+            # Log rather than DEVNULL (2026-08-28 incident): the script once
+            # died at `docker compose down` (snap docker missing from the
+            # unit's PATH) with nothing anywhere to say so — the UI just
+            # polled /api/pack until its 90s deadline.
+            log_dir = Path.home() / ".local" / "state"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            with (log_dir / "nemoclaw-switch-pack.log").open("ab") as log:
+                subprocess.Popen(  # noqa: S603 — literal argv, pack_id validated above
+                    [str(_REPO_ROOT / "deploy" / "scripts" / "switch-pack.sh"), pack_id],
+                    cwd=_REPO_ROOT,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    start_new_session=True,
+                )
             return {"ok": True, "status": "switch-started", "pack_id": pack_id}
 
     if restricted:
