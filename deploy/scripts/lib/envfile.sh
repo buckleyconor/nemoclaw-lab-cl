@@ -34,10 +34,13 @@ env_get() {
 # Set a key, preserving file order, comments and permissions.
 #
 # awk rather than `sed -i s/…/…/`: values here are URLs and hex tokens
-# containing `/` and `:`, which would need escaping in a sed replacement, and
-# `sed -i` on some platforms replaces the file (losing mode/ownership). Writing
-# through `cat >` keeps the original inode and its 0600-ish permissions — .env
-# holds secrets.
+# containing `/` and `:`, which would need escaping in a sed replacement.
+# The rewrite is ATOMIC: stage to a temp file in the same directory and rename
+# over the original. The old `cat > $file` pattern truncated the file first,
+# leaving a window where a concurrent reader (e.g. a second run-terminal.sh
+# racing at boot) saw an empty file and minted a replacement token — the
+# 2026-08-28 terminal-panel race. chmod --reference keeps the original mode
+# (mktemp stages at 0600); a same-directory rename keeps ownership.
 #
 # A commented placeholder (`# KEY=…`, as shipped in .env.example) is replaced
 # in place rather than leaving a duplicate below it.
@@ -45,7 +48,7 @@ env_upsert() {
   local key="$1" value="$2" file="${3:-.env}"
   [[ -f "$file" ]] || : > "$file"
   local tmp
-  tmp="$(mktemp)"
+  tmp="$(mktemp "${file}.XXXXXX")"
   ENV_KEY="$key" ENV_VALUE="$value" awk '
     BEGIN { key = ENVIRON["ENV_KEY"]; value = ENVIRON["ENV_VALUE"]; done = 0 }
     !done && $0 ~ "^" key "="            { print key "=" value; done = 1; next }
@@ -53,8 +56,8 @@ env_upsert() {
                                          { print }
     END { if (!done) print key "=" value }
   ' "$file" > "$tmp"
-  cat "$tmp" > "$file"
-  rm -f "$tmp"
+  chmod --reference="$file" "$tmp"
+  mv -f "$tmp" "$file"
 }
 
 # Upsert, but refuse to clobber a value the operator set to something else.
@@ -69,6 +72,9 @@ env_set_checked() {
     echo "    (wanted '${value}'; edit ${file} by hand if that is wrong)" >&2
     return 1
   fi
+  # Already exactly what we want — skip the rewrite entirely (no mtime churn,
+  # no write that a concurrent reader could interleave with).
+  [[ "$current" == "$value" ]] && return 0
   env_upsert "$key" "$value" "$file"
   return 0
 }

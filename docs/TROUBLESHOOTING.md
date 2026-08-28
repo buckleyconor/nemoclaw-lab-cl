@@ -85,6 +85,16 @@ Log: `~/.local/state/nemoclaw-terminal.log`. Also check:
 - `TERMINAL_WS_URL`/`TERMINAL_TOKEN` in `.env` must match what the daemon
   printed when it generated the token, and the gateway must have been
   restarted after adding them (`docker compose up -d gateway`).
+- **Panel stuck DISCONNECTED after a reboot while the daemon is running**
+  (token mismatch): `run-terminal.sh` reuses the `.env` token and only
+  generates one if it is missing — a generated token means the gateway
+  container (which bakes the token at creation) holds the stale one:
+  `docker compose up -d gateway`. This race is closed for reboots: `.env`
+  writes are atomic (`lib/envfile.sh`, 2026-08-28) and only the SYSTEM
+  `nemoclaw-terminal` unit runs the daemon — duplicate user-level terminal
+  units racing at boot (torn `.env` reads + a second daemon on the bridge
+  IP) were the original cause. If it recurs, check
+  `systemctl --user list-units | grep nemoclaw` for a re-appearing user unit.
 - On Linux with ufw, the compose subnet needs allow rules to reach the
   bridge-bound daemon and relay (SPEC-EMBEDDED-TERMINAL.md §6):
   `172.23.0.0/16 → 172.17.0.1:8005` and `→ :18790`.

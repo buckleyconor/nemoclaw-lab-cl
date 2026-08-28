@@ -52,8 +52,12 @@ if [[ -z "${TERMINAL_TOKEN:-}" ]]; then
   echo "Restart the gateway so its proxy picks them up:  docker compose up -d gateway"
   echo
 else
-  # Token already known (from .env or the environment). Only fill in the URL if
-  # it is missing; never overwrite an operator-chosen one.
+  # Token already known (from .env or the environment) — REUSE IT. This is
+  # what makes reboots transparent: the daemon and the (pre-reboot-created)
+  # gateway container keep the same token, so the gateway proxy never needs a
+  # re-bake and the panel comes up connected.
+  echo "Reusing existing TERMINAL_TOKEN from .env (no gateway restart needed)."
+  # Only fill in the URL if it is missing; never overwrite an operator-chosen one.
   env_set_checked TERMINAL_WS_URL "$WS_URL" || true
 fi
 
