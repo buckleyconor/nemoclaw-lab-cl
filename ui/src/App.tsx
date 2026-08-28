@@ -32,6 +32,31 @@ export default function App() {
   const [retainedFault, setRetainedFault] = useState<FaultEvent | null>(null);
   const retainTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Agent onboarding/monitoring state (GET /api/agent/status): true only
+  // when Agent + Soul + Skills are live in the sandbox AND the wake hook is
+  // reachable. While false, the Activity panel must show an orange warning
+  // instead of the green "scanning fleet" ticker — a dead or absent agent
+  // must never read as a quietly watched fleet (2026-08-28 incident class).
+  // null until the first fetch resolves.
+  const [agentConfigured, setAgentConfigured] = useState<boolean | null>(null);
+  const [agentStatusDetail, setAgentStatusDetail] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    const load = () => {
+      gateway
+        .getAgentStatus()
+        .then((s) => {
+          const st = s as { configured: boolean; detail?: string };
+          setAgentConfigured(st.configured);
+          setAgentStatusDetail(st.detail);
+        })
+        .catch(() => setAgentConfigured(null));
+    };
+    load();
+    const t = setInterval(load, 20_000);
+    return () => clearInterval(t);
+  }, []);
+
   // Full REST snapshot. Runs on mount, and again whenever the SSE stream
   // reconnects after a drop — the stream only carries deltas, so anything
   // that happened while disconnected (most notably a backend restart from
@@ -215,7 +240,12 @@ export default function App() {
             <div className="section-heading">{pack?.fleet_label ?? "Fleet Health"}</div>
             <FleetGrid assets={assets} pack={pack} onSelectAsset={handleAssetSelect} idle={!hasActiveFault} />
           </div>
-          <ActivityFeed events={activity} idle={!hasActiveFault} />
+          <ActivityFeed
+            events={activity}
+            idle={!hasActiveFault}
+            agentConfigured={agentConfigured}
+            agentStatusDetail={agentStatusDetail}
+          />
         </div>
 
         {/* Operator Dashboard — always visible; idle shell when nothing to show */}

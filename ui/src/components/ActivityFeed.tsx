@@ -54,9 +54,44 @@ function IdleScanTicker() {
 interface Props {
   events: ActivityEvent[];
   idle: boolean;
+  /** null = still loading, true = onboarding complete (Agent+Soul+Skills),
+      false = agent not configured / not monitoring. */
+  agentConfigured: boolean | null;
+  agentStatusDetail?: string;
 }
 
-export function ActivityFeed({ events, idle }: Props) {
+// Orange "not configured" strip (GET /api/agent/status). Shown whenever the
+// agent's onboarding state is known-to-be-absent — regardless of idle —
+// because it is the headline truth: nothing is watching the fleet.
+function UnconfiguredWarning({ detail }: { detail?: string }) {
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column", gap: 3,
+      padding: "10px 14px", fontFamily: "var(--mono)",
+      background: "rgba(245, 158, 11, 0.06)",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{
+          display: "block", width: 6, height: 6, borderRadius: "50%",
+          background: "var(--warning)", flexShrink: 0,
+          animation: "dot-blink 1.2s ease-in-out infinite",
+        }} />
+        <span style={{ color: "var(--warning)", fontSize: 12, fontWeight: 600 }}>
+          ⚠ Agent not configured — not monitoring infrastructure
+        </span>
+      </div>
+      <div style={{
+        fontSize: 10, color: "var(--text-dim)", paddingLeft: 14, lineHeight: 1.5,
+      }}>
+        Agent, Soul and Skills are not live in the sandbox.
+        {detail ? ` (${detail})` : ""} Run <code>make bootstrap</code> on the lab
+        host, or check <code>make doctor</code> / the Lab health chip.
+      </div>
+    </div>
+  );
+}
+
+export function ActivityFeed({ events, idle, agentConfigured, agentStatusDetail }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -110,9 +145,16 @@ export function ActivityFeed({ events, idle }: Props) {
         fontFamily: "var(--mono)",
         fontSize: 11,
       }}>
+        {/* Unconfigured strip — the agent cannot be "scanning" if onboarding
+            (Agent + Soul + Skills) never completed or the wake hook is dead. */}
+        {agentConfigured === false && (
+          <div style={{ borderBottom: "1px solid var(--border)" }}>
+            <UnconfiguredWarning detail={agentStatusDetail} />
+          </div>
+        )}
         {/* Idle liveness strip — shown above whatever history exists, so a
             fleet with only old/resolved entries still reads as "watched". */}
-        {idle && (
+        {idle && agentConfigured === true && (
           <div style={{ borderBottom: events.length > 0 ? "1px solid var(--border)" : undefined }}>
             <IdleScanTicker />
           </div>

@@ -29,6 +29,15 @@ export interface LabHealth {
   checks: LabHealthCheck[];
 }
 
+// Agent runtime + configuration state (GET /api/agent/status). configured
+// = onboarding (Agent + Soul + Skills) completed AND the wake hook is
+// reachable; the dashboard must not claim "scanning fleet" otherwise.
+export interface AgentStatus {
+  configured: boolean;
+  detail: string;
+  last_activity_ts: string | null;
+}
+
 export interface AssetRecord {
   id: string;
   type: string;

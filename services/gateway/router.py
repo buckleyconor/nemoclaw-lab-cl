@@ -3,6 +3,7 @@
 Endpoints:
   GET  /api/pack                     active pack labels + theme
   GET  /api/lab-health               host-side dependency health (UI chip)
+  GET  /api/agent/status             agent configured/monitoring state (UI)
   GET  /api/assets                   fleet health grid
   GET  /api/notifications            notification inbox
   POST /api/notifications/{id}/read  mark notification read
@@ -180,6 +181,57 @@ async def lab_health() -> dict:
         "checked_at": datetime.now(timezone.utc).isoformat(),
         "checks": checks,
     }
+
+
+# ── Agent status ─────────────────────────────────────────────────────────────
+
+# "Is the agent configured (and therefore monitoring)" from the Gateway's
+# vantage point. Onboarding (deploy/scripts/onboard-openclaw.sh) is one
+# set -e script and the webhook (step 5) is configured LAST — after the
+# Agent runtime (step 2), Soul/AGENTS/skills seeding (step 4), tool
+# lockdown and the safety-net cron. So a wake hook that answers 401 on a
+# bad token proves the whole onboarding completed, Agent + Soul + Skills
+# included. Before that (fresh VM, aborted onboarding) or when the
+# relay/forward is dead, the probe is refused — and the dashboard must not
+# show a green "scanning fleet" ticker claiming monitoring is happening.
+# (The 2026-08-28 incident was exactly this class: a dead agent route
+# presenting as a quiet, healthy-looking fleet.)
+
+
+@router.get("/api/agent/status")
+async def agent_status(request: Request) -> dict:
+    """Agent runtime + configuration state (see the section comment).
+
+    ``configured`` is true only when the wake hook answers 401 on a bad
+    token (hooks enabled + token wired = onboarding complete). The agent
+    posts activity only while handling faults, so a stale
+    ``last_activity_ts`` is normal while the fleet is quiet — it is a
+    liveness display, not the configured signal.
+    """
+    import os
+
+    hook_url = os.environ.get("OPENCLAW_HOOK_URL", "")
+    configured = False
+    detail = "OPENCLAW_HOOK_URL unset — onboarding incomplete (make bootstrap)"
+    if hook_url:
+        try:
+            async with httpx.AsyncClient(timeout=_LAB_HEALTH_TIMEOUT) as client:
+                r = await client.post(
+                    f"{hook_url.rstrip('/')}/hooks/wake",
+                    headers={"Authorization": "Bearer doctor-probe"},
+                )
+            if r.status_code == 401:
+                configured = True
+                detail = "wake hook auth alive (401 on bad token)"
+            else:
+                detail = f"POST /hooks/wake -> {r.status_code} (want 401) — hooks not wired"
+        except httpx.HTTPError as e:
+            detail = f"wake hook unreachable ({type(e).__name__}) — no agent, or relay/forward dead"
+
+    evts = await _store(request).list_activity_events()
+    last = max(e.ts for e in evts).isoformat() if evts else None
+
+    return {"configured": configured, "detail": detail, "last_activity_ts": last}
 
 
 # ── Assets ───────────────────────────────────────────────────────────────────

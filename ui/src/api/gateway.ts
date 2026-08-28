@@ -29,4 +29,5 @@ export const gateway = {
   getActivity: () => json("/api/activity"),
   getTerminalEnabled: () => json("/api/terminal/enabled"),
   getLabHealth: () => json("/api/lab-health"),
+  getAgentStatus: () => json("/api/agent/status"),
 };

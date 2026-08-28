@@ -202,7 +202,10 @@ reports the layer's own state on a *self-heal layer* line.
 Without it, only the compose services come back — the host processes are
 gone and nothing notices (the dashboard shows a healthy fleet and an idle
 agent): the **lab health** chip in the dashboard header flags the broken
-hops (agent LLM route / wake hook / terminal), and the fixes are:
+hops (agent LLM route / wake hook / terminal), and the Agent Activity panel
+shows an orange *"Agent not configured — not monitoring infrastructure"*
+strip instead of the green scanning ticker until the wake hook answers again
+(`GET /api/agent/status`):
 
 ```bash
 sudo make install-selfheal    # recommended: one sudo prompt, idempotent
