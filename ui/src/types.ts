@@ -12,6 +12,23 @@ export interface PackInfo {
   asset_image_urls: Record<string, string>;
 }
 
+// Host-side dependency health, probed by the Gateway container (GET
+// /api/lab-health). Surfaces the "agent idle because the lab is broken" class
+// (dead LLM route / dead wake forward) that the dashboard used to show as a
+// plain no-op.
+export interface LabHealthCheck {
+  id: string;
+  name: string;
+  status: "ok" | "fail" | "skip";
+  detail: string;
+}
+
+export interface LabHealth {
+  healthy: boolean;
+  checked_at: string;
+  checks: LabHealthCheck[];
+}
+
 export interface AssetRecord {
   id: string;
   type: string;

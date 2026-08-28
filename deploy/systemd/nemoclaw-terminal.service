@@ -1,26 +1,30 @@
-# Terminal daemon (ADR-012/013) as a user service — survives reboots, unlike
-# a bare `make terminal`. Install (adjust WorkingDirectory to your checkout):
+# Embedded-terminal daemon (ADR-012/013) as a SYSTEM service — survives
+# reboots (a bare `make terminal` nohup does not) and self-restarts on
+# crash. Installed by deploy/scripts/install-selfheal.sh, which substitutes
+# the __NEMOCLAW_*__ placeholders and runs it as the lab user (who owns the
+# repo, its .env, and the nemoclaw CLI state):
 #
-#   mkdir -p ~/.config/systemd/user
-#   cp deploy/systemd/nemoclaw-terminal.service ~/.config/systemd/user/
-#   systemctl --user daemon-reload
-#   systemctl --user enable --now nemoclaw-terminal
-#   loginctl enable-linger $USER    # keep user services alive without a login session
+#   sudo ./deploy/scripts/install-selfheal.sh      (or: sudo make install-selfheal)
 #
 # Requires TERMINAL_TOKEN/TERMINAL_BIND in the repo's .env (run-terminal.sh
-# reads them) and SANDBOX_NAME below matching the onboarded sandbox.
+# reads them). While a nohup'd demo instance holds port 8005, the installer
+# enables the unit without starting it — the unit takes over at next boot.
 [Unit]
 Description=NemoClaw embedded-terminal daemon (restricted console)
-After=network-online.target
+After=network-online.target docker.service
 
 [Service]
-Type=exec
-WorkingDirectory=%h/projects/nemoclaw-lab-cl
+Type=simple
+User=__NEMOCLAW_USER__
+Group=__NEMOCLAW_USER__
+WorkingDirectory=__NEMOCLAW_REPO__
+Environment=HOME=__NEMOCLAW_HOME__
+Environment=PATH=__NEMOCLAW_HOME__/.local/bin:/usr/local/bin:/usr/bin:/bin
 Environment=TERMINAL_MODE=restricted
-Environment=SANDBOX_NAME=infra-sentinel
-ExecStart=%h/projects/nemoclaw-lab-cl/deploy/scripts/run-terminal.sh
+Environment=SANDBOX_NAME=__NEMOCLAW_SANDBOX__
+ExecStart=__NEMOCLAW_REPO__/deploy/scripts/run-terminal.sh
 Restart=on-failure
 RestartSec=3
 
 [Install]
-WantedBy=default.target
+WantedBy=multi-user.target

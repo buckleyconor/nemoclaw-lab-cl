@@ -34,7 +34,7 @@ VALUES      ?=               # optional extra helm values file, e.g. values.prod
 BACKEND_IMAGE := $(REGISTRY)/nemoclaw-backend:$(TAG)
 GATEWAY_IMAGE := $(REGISTRY)/nemoclaw-gateway:$(TAG)
 
-.PHONY: help build push push-multiarch deploy undeploy up down logs switch-pack terminal hook-relay bootstrap demo-up doctor doctor-fix repoint-llm install-inference-watchdog test lint
+.PHONY: help build push push-multiarch deploy undeploy up down logs switch-pack terminal hook-relay bootstrap demo-up doctor doctor-fix repoint-llm install-inference-watchdog install-selfheal test lint
 
 help:
 	@echo "Targets:"
@@ -55,6 +55,7 @@ help:
 	@echo "  terminal       Run the embedded-terminal daemon on the host (ADR-012)"
 	@echo "  hook-relay     Relay the OpenClaw wake hook onto the docker bridge (ADR-011)"
 	@echo "  install-inference-watchdog  sudo: enable the inference-proxy watchdog timer (ADR-014)"
+	@echo "  install-selfheal  sudo: install the full self-heal layer (watchdog + doctor timer + daemon services)"
 	@echo "  test           uv run pytest"
 	@echo "  lint           uv run ruff check . && uv run ruff format --check ."
 
@@ -166,6 +167,13 @@ doctor-fix:
 # 503s after a reboot). Must run as root: sudo make install-inference-watchdog
 install-inference-watchdog:
 	./deploy/scripts/install-watchdog.sh
+
+# Install + enable the FULL self-heal layer as system units: inference
+# watchdog (60s, root), doctor --fix timer (5 min, lab user), terminal +
+# hook-relay services (lab user, Restart=on-failure). Idempotent. Must run
+# as root: sudo make install-selfheal   (demo-up offers this with one prompt)
+install-selfheal:
+	./deploy/scripts/install-selfheal.sh
 
 # ── Dev quality targets ───────────────────────────────────────────────────────
 

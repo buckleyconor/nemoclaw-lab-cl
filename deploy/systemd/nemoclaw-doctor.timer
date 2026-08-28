@@ -1,6 +1,9 @@
-# Schedule for nemoclaw-doctor.service — see that file for install steps.
+# Schedule for the self-healing preflight — doctor.sh --fix every 5 minutes,
+# starting 2 minutes after boot (nemoclaw-doctor.service has the install
+# steps: sudo ./deploy/scripts/install-selfheal.sh).
 [Unit]
-Description=Run NemoClaw demo preflight self-heal periodically
+Description=Run the NemoClaw demo preflight self-heal periodically
+After=network-online.target
 
 [Timer]
 OnBootSec=2min

@@ -6,6 +6,7 @@ import { FleetGrid } from "./components/FleetGrid";
 import { OperatorDashboard } from "./components/OperatorDashboard";
 import { NotificationInbox } from "./components/NotificationInbox";
 import { TerminalPanel } from "./components/TerminalPanel";
+import { LabHealthBadge } from "./components/LabHealthBadge";
 import "./App.css";
 import type {
   ActivityEvent,
@@ -186,6 +187,7 @@ export default function App() {
           <span style={{ color: "var(--border-strong)" }}>|</span>
           <span className="app-title">{pack?.sentinel_name ?? "Infrastructure Agent"}</span>
           {pack && <span className="app-pack-label">{pack.name}</span>}
+          <LabHealthBadge />
         </div>
         <NotificationInbox
           notifications={notifications}

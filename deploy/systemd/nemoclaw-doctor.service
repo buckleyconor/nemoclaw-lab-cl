@@ -1,25 +1,32 @@
-# Self-healing preflight (ADR-011/012/013) — runs `doctor.sh --fix` so a
-# dead terminal daemon, hook-relay, or openshell wake-hook forward recovers
-# on its own within one timer interval, instead of a user hitting "reconnect"
-# on a disconnected terminal panel and nothing happening.
+# Self-healing preflight (ADR-011/012/013) — a system timer that runs
+# `doctor.sh --fix` every 5 minutes AS THE LAB USER (see install-selfheal.sh
+# for the placeholder substitution), so a dead terminal daemon, hook-relay,
+# or openshell wake-hook forward recovers on its own within one timer
+# interval, instead of a user hitting "reconnect" on a disconnected terminal
+# panel and nothing happening.
 #
-# Install alongside nemoclaw-doctor.timer (adjust WorkingDirectory to your
-# checkout):
+# Install (with the other self-heal units):
 #
-#   mkdir -p ~/.config/systemd/user
-#   cp deploy/systemd/nemoclaw-doctor.{service,timer} ~/.config/systemd/user/
-#   systemctl --user daemon-reload
-#   systemctl --user enable --now nemoclaw-doctor.timer
-#   loginctl enable-linger $USER    # keep user services alive without a login session
+#   sudo ./deploy/scripts/install-selfheal.sh      (or: sudo make install-selfheal)
 #
 # A run that still fails after attempting fixes exits 1, so it shows up as a
 # failed unit — check with:
-#   systemctl --user status nemoclaw-doctor
-#   journalctl --user -u nemoclaw-doctor -e
+#   systemctl status nemoclaw-doctor
+#   journalctl -u nemoclaw-doctor -e
+#
+# The daemon parts (terminal / hook-relay) are owned by their own services
+# (nemoclaw-terminal / nemoclaw-hook-relay); doctor's --fix skips its nohup
+# paths for units that systemd already manages, so the two never fight over
+# a port.
 [Unit]
 Description=NemoClaw demo preflight (self-healing)
+After=network-online.target docker.service
 
 [Service]
 Type=oneshot
-WorkingDirectory=%h/projects/nemoclaw-lab-cl
-ExecStart=%h/projects/nemoclaw-lab-cl/deploy/scripts/doctor.sh --fix
+User=__NEMOCLAW_USER__
+Group=__NEMOCLAW_USER__
+WorkingDirectory=__NEMOCLAW_REPO__
+Environment=HOME=__NEMOCLAW_HOME__
+Environment=PATH=__NEMOCLAW_HOME__/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=__NEMOCLAW_REPO__/deploy/scripts/doctor.sh --fix

@@ -190,17 +190,30 @@ the design intent but not the enforcement strength.
 
 ## After a host reboot
 
-Compose services restart themselves (`restart: unless-stopped`), but the
-host processes don't unless you installed the `deploy/systemd/` units:
+If the self-heal layer is installed (`sudo make install-selfheal` — `make
+demo-up` offers it with one prompt), a reboot self-heals: compose services
+return via `restart: unless-stopped`; the terminal daemon and hook-relay run
+as systemd services with `Restart=on-failure`; the inference watchdog
+restarts nginx within 60s if it lost the boot race; and
+`nemoclaw-doctor.timer` (5 min) runs `doctor.sh --fix`, which re-establishes
+the openshell wake-hook forward that does not survive reboots. `make doctor`
+reports the layer's own state on a *self-heal layer* line.
+
+Without it, only the compose services come back — the host processes are
+gone and nothing notices (the dashboard shows a healthy fleet and an idle
+agent): the **lab health** chip in the dashboard header flags the broken
+hops (agent LLM route / wake hook / terminal), and the fixes are:
 
 ```bash
+sudo make install-selfheal    # recommended: one sudo prompt, idempotent
 make demo-up            # restarts anything that's down, then verifies
 nemoclaw infra-sentinel recover   # if doctor still flags the wake-hook
 ```
 
 If `make doctor` flags the **inference proxy** line red after a reboot,
-see below — the root watchdog timer (`sudo make install-inference-watchdog`)
-fixes that class automatically within a minute.
+see below — the root watchdog timer (`sudo make install-inference-watchdog`,
+or the full `sudo make install-selfheal`) fixes that class automatically
+within a minute.
 
 ## "Agent idle: LLM 503 'inference service unavailable' in the sandbox gateway log"
 

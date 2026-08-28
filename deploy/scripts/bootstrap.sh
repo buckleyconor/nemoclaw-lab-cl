@@ -17,8 +17,10 @@
 # Deliberately NOT automated:
 #   - your LLM endpoint: set LLM_BASE_URL/LLM_MODEL in .env first, this script
 #     will not guess them
-#   - anything needing sudo: the ufw rules and `loginctl enable-linger` are
-#     PRINTED for you to run, never executed here
+#   - anything needing sudo: the ufw rules and the self-heal layer
+#     (install-selfheal) are PRINTED for you to run, never executed here
+#     (demo-up additionally offers the self-heal install with one prompt
+#     when it runs interactively)
 #
 # Usage: make bootstrap            (or deploy/scripts/bootstrap.sh)
 #        make bootstrap FORCE=1    re-onboard over an existing sandbox
@@ -144,6 +146,16 @@ if command -v ufw >/dev/null && systemctl is-active --quiet ufw 2>/dev/null; the
   echo
   echo "(${COMPOSE_NET:-subnet} is this compose network, detected live — it is not"
   echo " pinned in docker-compose.yaml, so re-check it if the hook ever stops firing.)"
+fi
+
+if ! systemctl is-enabled --quiet nemoclaw-doctor.timer 2>/dev/null; then
+  echo "── self-heal layer (recommended) ──────────────────────────────────"
+  echo "Makes reboots self-heal instead of silently dying: inference"
+  echo "watchdog (60s) + doctor --fix timer (5 min) + terminal/relay"
+  echo "systemd units. One sudo prompt:"
+  echo
+  echo "  sudo make install-selfheal"
+  echo
 fi
 
 echo

@@ -114,11 +114,18 @@ if [[ -n "$TERMINAL_WS_URL" ]]; then
   terminal_up() { [[ "$(http_code "${TERM_HTTP}/healthz")" == "200" ]]; }
 
   if ! terminal_up && [[ "$FIX" -eq 1 ]]; then
-    fixing "TERMINAL_MODE=restricted SANDBOX_NAME=$SANDBOX_NAME make terminal"
-    TERMINAL_MODE=restricted SANDBOX_NAME="$SANDBOX_NAME" \
-      nohup ./deploy/scripts/run-terminal.sh >> "$STATE_DIR/nemoclaw-terminal.log" 2>&1 &
-    disown
-    sleep 3
+    if systemctl is-enabled --quiet nemoclaw-terminal 2>/dev/null; then
+      # systemd owns the daemon (sudo make install-selfheal): a nohup here
+      # would fight it for the port, and Restart=on-failure already covers
+      # crashes — the only thing a non-root doctor can do is point at it.
+      fixing "systemd owns the daemon — sudo systemctl restart nemoclaw-terminal"
+    else
+      fixing "TERMINAL_MODE=restricted SANDBOX_NAME=$SANDBOX_NAME make terminal"
+      TERMINAL_MODE=restricted SANDBOX_NAME="$SANDBOX_NAME" \
+        nohup ./deploy/scripts/run-terminal.sh >> "$STATE_DIR/nemoclaw-terminal.log" 2>&1 &
+      disown
+      sleep 3
+    fi
   fi
 
   if terminal_up; then
@@ -142,25 +149,33 @@ if [[ -n "$HOOK_URL" ]]; then
 
   probe_wake_hook
   if [[ ( "$CODE" != "401" || "$RELAY_CODE" != "401" ) && "$FIX" -eq 1 ]]; then
-    fixing "recover loopback forward, then restart hook-relay"
-    # `nemoclaw recover`'s port-in-use check is not interface-aware: if
-    # hook-relay (bound to $BRIDGE_IP:$HOOK_PORT) is already up, recover sees
-    # the port number taken and silently skips recreating its own loopback
-    # forward on 127.0.0.1:$HOOK_PORT — so hook-relay must come down first.
-    if command -v lsof >/dev/null 2>&1; then
-      RELAY_PID=$(lsof -t -i "${BRIDGE_IP}:${HOOK_PORT}" -sTCP:LISTEN 2>/dev/null || true)
-      if [[ -n "$RELAY_PID" ]]; then
-        kill "$RELAY_PID" 2>/dev/null || true
-        for _ in $(seq 1 10); do
-          lsof -i "${BRIDGE_IP}:${HOOK_PORT}" -sTCP:LISTEN >/dev/null 2>&1 || break
-          sleep 0.3
-        done
+    if systemctl is-enabled --quiet nemoclaw-hook-relay 2>/dev/null; then
+      # systemd owns the relay: it self-restarts on crash — only re-establish
+      # the openshell forward it bridges to. No kill/nohup here, or the
+      # nohup would double-start against the unit.
+      fixing "recover loopback forward (relay is systemd-managed)"
+      nemoclaw "$SANDBOX_NAME" recover >/dev/null 2>&1 || true
+    else
+      fixing "recover loopback forward, then restart hook-relay"
+      # `nemoclaw recover`'s port-in-use check is not interface-aware: if
+      # hook-relay (bound to $BRIDGE_IP:$HOOK_PORT) is already up, recover sees
+      # the port number taken and silently skips recreating its own loopback
+      # forward on 127.0.0.1:$HOOK_PORT — so hook-relay must come down first.
+      if command -v lsof >/dev/null 2>&1; then
+        RELAY_PID=$(lsof -t -i "${BRIDGE_IP}:${HOOK_PORT}" -sTCP:LISTEN 2>/dev/null || true)
+        if [[ -n "$RELAY_PID" ]]; then
+          kill "$RELAY_PID" 2>/dev/null || true
+          for _ in $(seq 1 10); do
+            lsof -i "${BRIDGE_IP}:${HOOK_PORT}" -sTCP:LISTEN >/dev/null 2>&1 || break
+            sleep 0.3
+          done
+        fi
       fi
+      nemoclaw "$SANDBOX_NAME" recover >/dev/null 2>&1 || true
+      HOOK_RELAY_PORT="$HOOK_PORT" HOOK_RELAY_BIND="$BRIDGE_IP" \
+        nohup ./deploy/scripts/hook-relay.py >> "$STATE_DIR/nemoclaw-hook-relay.log" 2>&1 &
+      disown
     fi
-    nemoclaw "$SANDBOX_NAME" recover >/dev/null 2>&1 || true
-    HOOK_RELAY_PORT="$HOOK_PORT" HOOK_RELAY_BIND="$BRIDGE_IP" \
-      nohup ./deploy/scripts/hook-relay.py >> "$STATE_DIR/nemoclaw-hook-relay.log" 2>&1 &
-    disown
     sleep 2
     probe_wake_hook
   fi
@@ -298,6 +313,17 @@ if [[ -n "$LLM_MODEL" ]] && nemoclaw "$SANDBOX_NAME" status >/dev/null 2>&1; the
     skip "agent model drift" "sandbox config not readable"
   fi
   rm -f "$OC_JSON"
+fi
+
+# ── 9. Self-heal layer (systemd units, install-selfheal.sh) ─────────────────
+# The units that make reboots self-heal: inference watchdog (60s), doctor
+# --fix timer (5 min), terminal + hook-relay services. Absence is not a
+# failure — a fresh VM is offered the install by demo-up — so `skip`.
+if systemctl is-enabled --quiet nemoclaw-doctor.timer 2>/dev/null \
+   && systemctl is-enabled --quiet nemoclaw-inference-watchdog.timer 2>/dev/null; then
+  pass "self-heal layer" "watchdog + doctor timer enabled"
+else
+  skip "self-heal layer" "not fully installed — sudo make install-selfheal (reboots won't self-heal)"
 fi
 
 echo

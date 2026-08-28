@@ -2,6 +2,7 @@
 
 Endpoints:
   GET  /api/pack                     active pack labels + theme
+  GET  /api/lab-health               host-side dependency health (UI chip)
   GET  /api/assets                   fleet health grid
   GET  /api/notifications            notification inbox
   POST /api/notifications/{id}/read  mark notification read
@@ -77,6 +78,107 @@ async def get_pack(request: Request) -> dict:
         "asset_image_urls": {
             a.id: a.image_url for a in pack.assets if a.image_url
         },
+    }
+
+
+# ── Lab health ─────────────────────────────────────────────────────────────────
+
+# The container can't run the host's `make doctor` (no docker/nginx visibility),
+# but it can probe every host dependency the demo rides on: compose services
+# (same network), the inference proxy + wake hook + terminal daemon
+# (host.docker.internal). Before this endpoint, a dead agent LLM route or a
+# dead wake forward presented in the UI as a plain "agent idle" — indistinguish
+# from "no faults right now" (the 2026-08-28 incident). A red chip here means
+# the lab is broken, not the scenario.
+
+_LAB_HEALTH_TIMEOUT = 4.0
+
+
+@router.get("/api/lab-health")
+async def lab_health() -> dict:
+    """Probe lab dependencies from inside the container.
+
+    `skip` (feature not configured) is not a failure; `healthy` is true when
+    nothing is `fail`. See the section comment for the failure mode this
+    surfaces.
+    """
+    import os
+    from datetime import datetime, timezone
+
+    checks: list[dict] = []
+
+    def add(cid: str, name: str, status: str, detail: str) -> None:
+        checks.append({"id": cid, "name": name, "status": status, "detail": detail})
+
+    orch_url = os.environ.get("ORCHESTRATOR_URL", "http://orchestrator:8002")
+    mcp_url = os.environ.get("MCP_TOOLS_URL", "http://mcp-tools:8004")
+    sim_url = os.environ.get("SIMULATOR_URL", "http://simulator:8003")
+    hook_url = os.environ.get("OPENCLAW_HOOK_URL", "")
+    llm_key = os.environ.get("LLM_API_KEY", "")
+    llm_port = os.environ.get("LLM_PROXY_PORT", "18100")
+    term_ws = os.environ.get("TERMINAL_WS_URL", "")
+    term_enabled = os.environ.get("TERMINAL_ENABLED", "")
+
+    async with httpx.AsyncClient(timeout=_LAB_HEALTH_TIMEOUT) as client:
+        for cid, name, base in (
+            ("orchestrator", "Orchestrator", orch_url),
+            ("simulator", "Simulator", sim_url),
+            ("mcp-tools", "MCP tools", mcp_url),
+        ):
+            try:
+                r = await client.get(f"{base.rstrip('/')}/healthz")
+                add(cid, name, "ok" if r.status_code == 200 else "fail",
+                    f"{base}/healthz -> {r.status_code}")
+            except httpx.HTTPError as e:
+                add(cid, name, "fail", f"{base}/healthz unreachable ({type(e).__name__})")
+
+        # Inference proxy — the agent's LLM route (ADR-014). When this dies
+        # the agent's cron wakes burn on 503s and the UI shows "idle".
+        probe = f"http://host.docker.internal:{llm_port}/v1/models"
+        headers = {"Authorization": f"Bearer {llm_key}"} if llm_key else None
+        try:
+            r = await client.get(probe, headers=headers)
+            if llm_key:
+                add("inference-proxy", "Agent LLM route (inference proxy)",
+                    "ok" if r.status_code == 200 else "fail", f"{probe} -> {r.status_code}")
+            else:
+                add("inference-proxy", "Agent LLM route (inference proxy)",
+                    "skip",
+                    f"{probe} -> {r.status_code} — LLM_API_KEY unset in the gateway; run `make doctor` on the host")
+        except httpx.HTTPError as e:
+            add("inference-proxy", "Agent LLM route (inference proxy)", "fail",
+                f"{probe} unreachable ({type(e).__name__}) — `sudo systemctl restart nginx` / `make doctor`")
+
+        # Wake hook — a bad token must 401: forward alive AND auth wired.
+        if hook_url:
+            try:
+                r = await client.post(f"{hook_url.rstrip('/')}/hooks/wake",
+                                      headers={"Authorization": "Bearer doctor-probe"})
+                add("wake-hook", "Agent wake hook", "ok" if r.status_code == 401 else "fail",
+                    f"POST /hooks/wake -> {r.status_code} (want 401)")
+            except httpx.HTTPError as e:
+                add("wake-hook", "Agent wake hook", "fail",
+                    f"{hook_url}/hooks/wake unreachable ({type(e).__name__}) — `nemoclaw <sandbox> recover` + `make hook-relay`")
+        else:
+            add("wake-hook", "Agent wake hook", "skip", "OPENCLAW_HOOK_URL unset — webhook wake-up off (cron-only)")
+
+        # Terminal daemon — host process (ADR-012).
+        if term_ws and term_enabled != "0":
+            base_http = term_ws.replace("wss://", "https://").replace("ws://", "http://").rsplit("/", 1)[0]
+            try:
+                r = await client.get(f"{base_http}/healthz")
+                add("terminal", "Terminal daemon", "ok" if r.status_code == 200 else "fail",
+                    f"{base_http}/healthz -> {r.status_code}")
+            except httpx.HTTPError as e:
+                add("terminal", "Terminal daemon", "fail",
+                    f"{base_http}/healthz unreachable ({type(e).__name__}) — `make terminal` / `make doctor-fix`")
+        else:
+            add("terminal", "Terminal daemon", "skip", "terminal feature off")
+
+    return {
+        "healthy": not any(c["status"] == "fail" for c in checks),
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "checks": checks,
     }
 
 

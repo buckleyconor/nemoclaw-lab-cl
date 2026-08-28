@@ -136,3 +136,100 @@
   0%, 100% { opacity: .4; transform: scale(.85); }
   50%      { opacity: 1; transform: scale(1); }
 }
+
+/* ── Lab health chip (host-side dependency state, Gateway-probed) ────────── */
+.lab-health { position: relative; flex-shrink: 0; }
+
+.lab-health-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-family: var(--mono);
+  letter-spacing: .04em;
+  color: var(--text-muted);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.lab-health-chip:hover { border-color: var(--border-strong); }
+
+.lab-health-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.lab-health-chip.ok .lab-health-dot {
+  background: var(--healthy);
+  box-shadow: 0 0 6px var(--healthy);
+}
+.lab-health-chip.degraded { color: var(--critical); border-color: rgba(239, 68, 68, .4); }
+.lab-health-chip.degraded .lab-health-dot {
+  background: var(--critical);
+  box-shadow: 0 0 6px var(--critical);
+  animation: dot-blink 1.2s ease-in-out infinite;
+}
+.lab-health-chip.unknown { color: var(--warning); }
+.lab-health-chip.unknown .lab-health-dot {
+  background: var(--warning);
+  box-shadow: 0 0 6px var(--warning);
+}
+
+.lab-health-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 50;
+  width: 440px;
+  max-width: 90vw;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 10px 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .5);
+}
+.lab-health-pop-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+.lab-health-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 12px;
+}
+.lab-health-row-mark {
+  font-family: var(--mono);
+  width: 12px;
+  flex-shrink: 0;
+}
+.lab-health-row.ok .lab-health-row-mark { color: var(--healthy); }
+.lab-health-row.fail .lab-health-row-mark { color: var(--critical); }
+.lab-health-row.skip .lab-health-row-mark { color: var(--text-dim); }
+.lab-health-row-name { font-weight: 600; white-space: nowrap; }
+.lab-health-row.fail .lab-health-row-name { color: var(--critical); }
+.lab-health-row-detail {
+  color: var(--text-dim);
+  font-size: 11px;
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lab-health-foot {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 10.5px;
+  color: var(--text-dim);
+}
+.lab-health-foot code { font-family: var(--mono); }
