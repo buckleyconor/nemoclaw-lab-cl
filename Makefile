@@ -34,7 +34,7 @@ VALUES      ?=               # optional extra helm values file, e.g. values.prod
 BACKEND_IMAGE := $(REGISTRY)/nemoclaw-backend:$(TAG)
 GATEWAY_IMAGE := $(REGISTRY)/nemoclaw-gateway:$(TAG)
 
-.PHONY: help build push push-multiarch deploy undeploy up down logs switch-pack terminal hook-relay bootstrap demo-up doctor doctor-fix repoint-llm test lint
+.PHONY: help build push push-multiarch deploy undeploy up down logs switch-pack terminal hook-relay bootstrap demo-up doctor doctor-fix repoint-llm install-inference-watchdog test lint
 
 help:
 	@echo "Targets:"
@@ -54,6 +54,7 @@ help:
 	@echo "  switch-pack    Restart the stack bound to PACK_ID=<id> (e.g. make switch-pack PACK_ID=laptop-fleet)"
 	@echo "  terminal       Run the embedded-terminal daemon on the host (ADR-012)"
 	@echo "  hook-relay     Relay the OpenClaw wake hook onto the docker bridge (ADR-011)"
+	@echo "  install-inference-watchdog  sudo: enable the inference-proxy watchdog timer (ADR-014)"
 	@echo "  test           uv run pytest"
 	@echo "  lint           uv run ruff check . && uv run ruff format --check ."
 
@@ -159,6 +160,12 @@ repoint-llm:
 # a dead terminal daemon/hook-relay/wake-hook forward self-heals.
 doctor-fix:
 	./deploy/scripts/doctor.sh --fix
+
+# Root timer that restarts nginx when the inference proxy is down or running
+# stale sockets (the two failure modes that leave the agent idle with LLM
+# 503s after a reboot). Must run as root: sudo make install-inference-watchdog
+install-inference-watchdog:
+	./deploy/scripts/install-watchdog.sh
 
 # ── Dev quality targets ───────────────────────────────────────────────────────
 

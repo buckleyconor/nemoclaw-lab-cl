@@ -241,6 +241,34 @@ fi
 # under --fix: the proxy install needs sudo and the self-heal timer runs
 # unprivileged (same reason the ufw check is report-only).
 if [[ -n "$LLM_BASE_URL" && "${LLM_DIRECT:-0}" != "1" ]]; then
+  # nginx service + bind state: the smoke below only proves loopback. A boot
+  # race (nginx dies before the bridge IP exists) or a no-op reload (a reload
+  # cannot change listen addresses) leaves nginx loopback-serving while the
+  # sandbox's bridge hop is connection-refused — the agent then idles with
+  # 503s in /tmp/gateway.log. Verify the conf's non-loopback binds are live.
+  if ! systemctl is-active --quiet nginx; then
+    fail "inference proxy (:$LLM_PROXY_PORT)" "nginx service is not active" \
+      "sudo systemctl restart nginx   (boot race: it died before the bridge IP existed)"
+  else
+    CONF_BINDS="$(grep -E '^[[:space:]]*listen[[:space:]]+' \
+      "/etc/nginx/conf.d/nemoclaw-inference-proxy-${LLM_PROXY_PORT}.conf" 2>/dev/null \
+      | sed -E 's/^[[:space:]]*listen[[:space:]]+//' | sed -E 's/(:[0-9]+).*//' \
+      | grep -vE '^127\.' | sort -u)"
+    LISTENING="$(ss -tln 2>/dev/null | awk '{print $4}')"
+    BIND_FAIL=""
+    for B in $CONF_BINDS; do
+      if [[ "$B" == "0.0.0.0" || "$B" == "[::]" ]]; then
+        # a wildcard bind covers the sandbox bridge; specific-IP-only does not
+        echo "$LISTENING" | grep -qE "(0\.0\.0\.0|\[::\]):${LLM_PROXY_PORT}$" || BIND_FAIL="0.0.0.0:$LLM_PROXY_PORT"
+      else
+        echo "$LISTENING" | grep -q "^${B//./\.}:${LLM_PROXY_PORT}$" || BIND_FAIL="${B}:${LLM_PROXY_PORT}"
+      fi
+    done
+    if [[ -n "$BIND_FAIL" ]]; then
+      fail "inference proxy (:$LLM_PROXY_PORT)" "conf bind ${BIND_FAIL} not live — stale sockets from a no-op reload" \
+        "sudo systemctl restart nginx   (the inference watchdog timer does this automatically)"
+    fi
+  fi
   PROXY_CODE="$(http_code "${LLM_AUTH[@]}" "http://127.0.0.1:${LLM_PROXY_PORT}/v1/models")"
   if [[ "$PROXY_CODE" == "200" ]]; then
     pass "inference proxy (:$LLM_PROXY_PORT)" "-> $LLM_BASE_URL"

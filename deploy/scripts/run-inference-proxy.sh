@@ -56,13 +56,14 @@ else
 fi
 
 # The sandbox reaches us on the docker bridge; loopback serves host-side probes.
-# BRIDGE_IP is env-overridable: the OpenShell sandbox network is NOT necessarily
-# docker0 (it gets its own subnet, e.g. 172.18.0.0/16, and
-# host.openshell.internal resolves to that network's host IP). Set
-# BRIDGE_IP=0.0.0.0 to bind all interfaces and survive sandbox-network
-# recreation; the API-key check + ufw still gate who can use it.
-BRIDGE_IP="${BRIDGE_IP:-$(ip -4 -o addr show docker0 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -1)}"
-BRIDGE_IP="${BRIDGE_IP:-172.17.0.1}"
+# Default binds all interfaces (0.0.0.0): the OpenShell sandbox network is NOT
+# necessarily docker0 (it gets its own subnet, e.g. 172.18.0.0/16, and
+# host.openshell.internal resolves to that network's host IP), and a
+# specific-IP bind fails at boot when the bridge address is not assigned yet
+# (nginx starts before Docker and the service stays dead until restarted).
+# 0.0.0.0 survives both; the LLM API key + ufw still gate who can use it.
+# Set BRIDGE_IP=<ip> to bind a single interface instead.
+BRIDGE_IP="${BRIDGE_IP:-0.0.0.0}"
 
 export LLM_BASE_URL LLM_PROXY_PORT BRIDGE_IP PROXY_SSL_CONF
 
@@ -88,7 +89,20 @@ ${OTHER}" >&2
   echo "Installing ${CONF} (port ${LLM_PROXY_PORT} -> ${LLM_BASE_URL})"
   sudo install -m 0644 "$RENDERED" "$CONF"
   sudo nginx -t
-  sudo systemctl reload nginx
+  # A reload CANNOT change listen addresses: with the old sockets still up,
+  # the new (e.g. 0.0.0.0) bind dies with EADDRINUSE, the reload aborts, and
+  # the previous conf keeps serving — a silent no-op. Any conf change is
+  # therefore applied with a full restart (sub-second drop, idempotent).
+  sudo systemctl restart nginx
+fi
+
+# Assert the listener actually exists before the smoke test: catches the
+# stale-socket case where nginx runs the previous conf and the sandbox's
+# bridge hop would die with connection refused despite a green loopback.
+if ! ss -tln 2>/dev/null | awk '{print $4}' | grep -q ":${LLM_PROXY_PORT}$"; then
+  echo "✗ nginx is up but :${LLM_PROXY_PORT} is not listening — the conf was not applied (boot race or reload no-op)." >&2
+  echo "  fix: sudo systemctl restart nginx" >&2
+  exit 1
 fi
 
 # Smoke test: the OpenAI models listing through the proxy, authed if a key is

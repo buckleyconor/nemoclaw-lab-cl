@@ -198,6 +198,97 @@ make demo-up            # restarts anything that's down, then verifies
 nemoclaw infra-sentinel recover   # if doctor still flags the wake-hook
 ```
 
+If `make doctor` flags the **inference proxy** line red after a reboot,
+see below — the root watchdog timer (`sudo make install-inference-watchdog`)
+fixes that class automatically within a minute.
+
+## "Agent idle: LLM 503 'inference service unavailable' in the sandbox gateway log"
+
+Symptom: the fault injects fine (simulator/orchestrator logs show 200s) but
+the dashboard never detects it and the agent stays idle. The sandbox's
+`/tmp/gateway.log` (inside the openshell container) shows the cron safety-net
+waking every minute, each run dying with `status=503 … rawError=503
+"inference service unavailable"`. The agent's LLM route — sandbox →
+`host.openshell.internal:18100` → host nginx → shared endpoint — is broken.
+Two root causes, both boot-related:
+
+1. **nginx never came up (boot race).** nginx started before Docker assigned
+   the bridge address the conf binds, and the bind failed (`journalctl -u
+   nginx` shows `bind() to <ip>:18100 failed (99: Cannot assign requested
+   address)`). The service does not retry — it stays dead until restarted.
+2. **nginx runs stale sockets.** `systemctl reload` cannot change listen
+   addresses: with the old sockets still up, a new (e.g. `0.0.0.0`) bind dies
+   with `EADDRINUSE`, the reload aborts, and the previous conf keeps
+   serving. Loopback probes look green while the sandbox's bridge hop is
+   connection-refused. (`deploy/scripts/run-inference-proxy.sh` now applies
+   conf changes with a restart instead of a reload, and defaults to
+   `BRIDGE_IP=0.0.0.0` so there is no specific IP to race at boot.)
+
+Diagnose:
+
+```bash
+systemctl is-active nginx
+ss -tln | grep 18100    # compare with the `listen` lines in
+                        # /etc/nginx/conf.d/nemoclaw-inference-proxy-*.conf
+curl -s -o /dev/null -w "%{http_code}\n" \
+  -H "Authorization: Bearer $(grep LLM_API_KEY .env | cut -d= -f2)" \
+  http://127.0.0.1:18100/v1/models
+docker exec <openshell container> sh -c 'curl -sk -w "%{http_code}\n" \
+  -x http://10.200.0.1:3128 https://inference.local/v1/models'  # the agent's
+  # own route, through the sandbox egress proxy (NEMOCLAW_PROXY_* env vars)
+```
+
+Fix — a full restart re-reads the conf and rebinds, curing both states:
+
+```bash
+sudo systemctl restart nginx
+```
+
+Prevention: `sudo make install-inference-watchdog` (or `sudo
+./deploy/scripts/install-watchdog.sh`) installs a root timer
+(`deploy/systemd/nemoclaw-inference-watchdog.*`) that restarts nginx within
+60s whenever the service is down or the conf's non-loopback bind is missing
+(the stale-socket no-op-reload state above — the watchdog compares the
+`listen` lines in the rendered conf against `ss -tln`, so a green loopback
+smoke never hides a dead sandbox hop). A 5xx on the authed smoke alone is
+logged, not restarted: that is an upstream LLM problem a restart would not
+cure. The script now also defaults to `BRIDGE_IP=0.0.0.0` (nothing to race
+at boot) and applies conf changes with a restart, and `make doctor` fails the
+inference-proxy line on both failure states, not just a failed loopback
+smoke.
+
+## "Sandbox wake-hook dead: `openshell forward start` hangs, forward stuck `dead`"
+
+Symptom: `nemoclaw <sandbox> status` reports "the agent delivery chain could
+not be proven (forward-recovery: the primary dashboard/API host forward could
+not be re-established)"; doctor's *sandbox wake-hook* line is red (000).
+The agent's 1-minute cron safety net still runs, so detection degrades to
+~1-minute latency rather than failing. Cause (OpenShell LKG): the dashboard
+forward is an openshell-managed SSH tunnel to the host loopback that does not
+survive an `openshell-gateway` restart or a host reboot, does not
+re-establish on its own, and leaves a stale `dead` record that blocks
+re-creation — after which `openshell forward start --background` hangs
+waiting on a tunnel that never comes up (Ctrl-C it; safe to abort).
+
+Recovery (worked 2026-08-28, in order):
+
+```bash
+# 1. Free the port number — openshell's port-in-use check is not
+#    interface-aware, so a hook-relay bound to 172.17.0.1:<port> blocks the
+#    127.0.0.1:<port> forward from being created.
+pkill -f hook-relay.py
+openshell forward stop <port> <sandbox>     # clear the stale dead record
+docker restart <openshell sandbox container>  # fresh daemon + supervisor session
+nemoclaw <sandbox> recover                  # re-establishes the loopback forward
+HOOK_RELAY_PORT=<port> make hook-relay      # re-bridge onto the docker bridge
+```
+
+`make doctor-fix` (run by `nemoclaw-doctor.timer` every 5 min when installed,
+see `deploy/systemd/`) retries the recover + relay steps automatically, so
+once the forward *can* be re-established it converges without a human.
+Upstream fix pending: the sandbox forward client should reconnect after a
+gateway restart.
+
 ## NemoClaw LKG (v0.0.109) onboarding contract walls
 
 The installer's `lkg` channel is ahead of the versions this repo was written

@@ -1,0 +1,16 @@
+# Inference-proxy watchdog (ADR-014) — see deploy/scripts/inference-watchdog.sh.
+# Installed by deploy/scripts/install-watchdog.sh (run as root / sudo), which
+# substitutes __NEMOCLAW_REPO__ with the checkout path:
+#
+#   sudo ./deploy/scripts/install-watchdog.sh
+#
+# Keeps the sandbox->host LLM route alive across reboots: restarts nginx when
+# it is down (boot race) or running stale sockets (reload cannot change listen
+# addresses). A 5xx on the upstream hop is logged, not restarted.
+[Unit]
+Description=NemoClaw inference-proxy watchdog (ADR-014) — keeps the sandbox LLM route alive
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=__NEMOCLAW_REPO__/deploy/scripts/inference-watchdog.sh
