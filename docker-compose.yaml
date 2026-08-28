@@ -14,6 +14,13 @@ x-backend-build: &backend-build
 x-env-common: &env-common
   PACK_ID: ${PACK_ID:-datacenter-xe9680}
 
+# Host-disk hygiene: cap per-container json logs (daemon has no default rotation).
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
 
   # ── Simulator ────────────────────────────────────────────────────────────────
@@ -32,6 +39,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    logging: *logging
 
   # ── Orchestrator ─────────────────────────────────────────────────────────────
   orchestrator:
@@ -53,6 +61,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    logging: *logging
 
   # ── MCP Tools ────────────────────────────────────────────────────────────────
   mcp-tools:
@@ -78,6 +87,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    logging: *logging
 
   # ── Gateway (API + React SPA) ─────────────────────────────────────────────────
   gateway:
@@ -116,6 +126,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    logging: *logging
 
   # The agent runtime is real NemoClaw/OpenClaw, onboarded as a host process
   # via deploy/scripts/onboard-openclaw.sh (ADR-011). It reaches mcp-tools and
