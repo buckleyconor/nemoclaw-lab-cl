@@ -190,7 +190,7 @@ Replace the `soon` class cards when the vertical is ready. The `--card-accent` c
   eyebrow: "NemoClaw Your Vertical Agent",
   brand: "DELL × PARTNER",
   tagline: "One sentence — what the agent watches and what you decide.",
-  meta: `<span><span class="dot"></span>Live Demo</span><span>Device spec · N Assets</span><span>NemoClaw v0.0.70</span>`,
+  meta: `<span><span class="dot"></span>Live Demo</span><span>Device spec · N Assets</span><span>NemoClaw</span>`,
 
   p1lead: `<strong>NemoClaw Your Vertical Agent</strong> monitors ... one sentence summary ...`,
 

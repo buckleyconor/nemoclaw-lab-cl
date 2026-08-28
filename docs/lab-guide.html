@@ -551,7 +551,7 @@ body.started .curtain-half.right { animation: curtain-right 1.5s cubic-bezier(.6
         <div class="hero-meta" data-vi="meta">
           <span><span class="dot"></span>Live Demo</span>
           <span>XE9780L · 4 Servers · 8× B300</span>
-          <span>NemoClaw v0.0.70</span>
+          <span>NemoClaw</span>
         </div>
       </div>
     </header>
@@ -3501,7 +3501,7 @@ buttons in the dashboard:
       <p data-vi="p5summary">You configured a real NemoClaw agent from scratch — pasted its identity, its orientation, and its four skills into a live OpenClaw sandbox — then watched it work an incident end to end with no prompting: detect a hardware fault, pull the raw log, reason about it with the lab's LLM, match it against a Dell knowledge base article, and propose a remediation plan. You read that plan in the Operator Dashboard and decided whether to approve it. The agent never touched the infrastructure without your explicit, single-use approval token.</p>
 
       <h3>How SOUL.md, AGENTS.md, and the skills give the agent its autonomy</h3>
-      <p>The agent runs as a real NemoClaw v0.0.70 / OpenClaw deployment inside an OpenShell-hardened sandbox. Three kinds of file, loaded together into its context, are everything it knows about itself and its job:</p>
+      <p>The agent runs as a real NemoClaw / OpenClaw deployment inside an OpenShell-hardened sandbox. Three kinds of file, loaded together into its context, are everything it knows about itself and its job:</p>
       <ul class="beat-list">
         <li class="active-beat">
           <span class="beat-num">🪪</span>
@@ -3918,7 +3918,7 @@ const VERTICAL_CONFIG = {
     eyebrow: "NemoClaw AI Infrastructure Agent",
     brand: "DELL × NVIDIA",
     tagline: "An AI agent watches a simulated XE9780L GPU cluster. Your job: decide whether it gets to fix the fault it finds.",
-    meta: `<span><span class="dot"></span>Live Demo</span><span>XE9780L · 4 Servers · 8× B300</span><span>NemoClaw v0.0.70</span>`,
+    meta: `<span><span class="dot"></span>Live Demo</span><span>XE9780L · 4 Servers · 8× B300</span><span>NemoClaw</span>`,
     p1lead: `<strong>NemoClaw AI Infrastructure Agent</strong> monitors a 4-node Dell PowerEdge XE9780L GPU cluster (each with 8× NVIDIA B300s), detects hardware faults, diagnoses them against Dell KB articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.`,
     p1takeaways: `<li>A GPU fault arrive on the health grid in real time</li>
       <li>The NemoClaw agent detect, diagnose, and propose a fix — no prompting</li>
@@ -3947,7 +3947,7 @@ const VERTICAL_CONFIG = {
     eyebrow: "NemoClaw Device Fleet Agent",
     brand: "DELL × NVIDIA",
     tagline: "An AI agent monitors a simulated Precision laptop fleet. Your job: decide whether it gets to resolve the device fault it finds.",
-    meta: `<span><span class="dot"></span>Live Demo</span><span>Dell Precision · 4 Laptops · NVIDIA RTX</span><span>NemoClaw v0.0.70</span>`,
+    meta: `<span><span class="dot"></span>Live Demo</span><span>Dell Precision · 4 Laptops · NVIDIA RTX</span><span>NemoClaw</span>`,
     p1lead: `<strong>NemoClaw Device Fleet Agent</strong> monitors a 4-device Dell Precision laptop fleet, detects hardware and driver faults, diagnoses them against Dell KB articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.`,
     p1takeaways: `<li>A laptop hardware fault arrive on the health grid in real time</li>
       <li>The NemoClaw agent detect, diagnose, and propose a fix — no prompting</li>
@@ -3976,7 +3976,7 @@ const VERTICAL_CONFIG = {
     eyebrow: "NemoClaw Drilling Rig Agent",
     brand: "DELL × NOV",
     tagline: "An AI agent watches a simulated drilling rig's critical equipment. Your job: decide whether it gets to act on the fault it finds.",
-    meta: `<span><span class="dot"></span>Live Demo</span><span>NOV / ABB / Cameron · 6 Units</span><span>NemoClaw v0.0.70</span>`,
+    meta: `<span><span class="dot"></span>Live Demo</span><span>NOV / ABB / Cameron · 6 Units</span><span>NemoClaw</span>`,
     p1lead: `<strong>NemoClaw Drilling Rig Agent</strong> monitors a drilling rig's critical equipment fleet — mud pumps, top drive, BOP control HPU — detects faults, diagnoses them against vendor KB articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.`,
     p1takeaways: `<li>Drilling equipment failures arrive on the health grid in real time</li>
       <li>The NemoClaw agent detect, diagnose, and propose a fix — no prompting</li>
@@ -4005,7 +4005,7 @@ const VERTICAL_CONFIG = {
     eyebrow: "NemoClaw Biomedical Device Agent",
     brand: "DELL × PHILIPS",
     tagline: "An AI agent watches a simulated hospital biomedical device fleet. Your job: decide whether it gets to act on the fault it finds.",
-    meta: `<span><span class="dot"></span>Live Demo</span><span>BD / Philips / Siemens · 5 Devices</span><span>NemoClaw v0.0.70</span>`,
+    meta: `<span><span class="dot"></span>Live Demo</span><span>BD / Philips / Siemens · 5 Devices</span><span>NemoClaw</span>`,
     p1lead: `<strong>NemoClaw Biomedical Device Agent</strong> monitors a hospital's biomedical device fleet — infusion pumps, patient monitors, an MRI scanner — detects faults, diagnoses them against vendor KB articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.`,
     p1takeaways: `<li>Biomedical equipment failures arrive on the health grid in real time</li>
       <li>The NemoClaw agent detect, diagnose, and propose a fix — no prompting</li>
@@ -4034,7 +4034,7 @@ const VERTICAL_CONFIG = {
     eyebrow: "NemoClaw ATM Fleet Agent",
     brand: "DELL × NCR",
     tagline: "An AI agent watches a simulated bank ATM fleet. Your job: decide whether it gets to act on the fault it finds.",
-    meta: `<span><span class="dot"></span>Live Demo</span><span>NCR / Diebold Nixdorf · 6 ATMs</span><span>NemoClaw v0.0.70</span>`,
+    meta: `<span><span class="dot"></span>Live Demo</span><span>NCR / Diebold Nixdorf · 6 ATMs</span><span>NemoClaw</span>`,
     p1lead: `<strong>NemoClaw ATM Fleet Agent</strong> monitors a retail bank's branch and off-premise ATM fleet, detects faults, diagnoses them against vendor KB articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.`,
     p1takeaways: `<li>ATM equipment failures arrive on the health grid in real time</li>
       <li>The NemoClaw agent detect, diagnose, and propose a fix — no prompting</li>
@@ -4063,7 +4063,7 @@ const VERTICAL_CONFIG = {
     eyebrow: "NemoClaw 5G RAN Site Agent",
     brand: "DELL × ERICSSON",
     tagline: "An AI agent watches a simulated fleet of 5G macro gNodeB sites. Your job: decide whether it gets to act on the fault it finds.",
-    meta: `<span><span class="dot"></span>Live Demo</span><span>Ericsson AIR 3268 · 5 Sites</span><span>NemoClaw v0.0.70</span>`,
+    meta: `<span><span class="dot"></span>Live Demo</span><span>Ericsson AIR 3268 · 5 Sites</span><span>NemoClaw</span>`,
     p1lead: `<strong>NemoClaw 5G RAN Site Agent</strong> monitors a fleet of Ericsson 5G macro gNodeB sites, detects faults, diagnoses them against vendor KB articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.`,
     p1takeaways: `<li>Next generation 5G radio base equipment failures arrive on the health grid in real time</li>
       <li>The NemoClaw agent detect, diagnose, and propose a fix — no prompting</li>
@@ -4138,7 +4138,7 @@ if (archLb && archFigBtn) {
 const AMAP = {
   you:   { role: "the human in the loop", body: "You watch the Operator Dashboard, read the NemoClaw agent's fault diagnosis and analysis, and click Approve Self-Heal or Deny. Nothing is remediated without your explicit decision." },
   appui: { role: "port :8001 · React/Vite · SSE", body: "Cluster health grid, Operator Dashboard, and Agent Activity feed. All panels update live via Server-Sent Events — no page refresh needed." },
-  agent: { role: "NemoClaw v0.0.70 · 5 skills · soul.md", body: "NemoClaw AI agent that dynamically decides which skill/tool to call next — monitor, diagnose, notify, or propose remediation — based on what it observes at each wake-up. Uses the lab's LLM with chain-of-thought reasoning for log analysis and fault assessment. Can propose a remediation plan, but cannot execute it — execution requires a valid human approval token retrieved outside the LLM's context." },
+  agent: { role: "NemoClaw · 5 skills · soul.md", body: "NemoClaw AI agent that dynamically decides which skill/tool to call next — monitor, diagnose, notify, or propose remediation — based on what it observes at each wake-up. Uses the lab's LLM with chain-of-thought reasoning for log analysis and fault assessment. Can propose a remediation plan, but cannot execute it — execution requires a valid human approval token retrieved outside the LLM's context." },
   gate:  { role: "server-side HITL enforcement", body: "Lives in the Gateway service, not the NemoClaw agent prompt. When you click Approve Self-Heal, a single-use token is minted server-side and bound to that specific fault event. The remediation tool validates it before running anything." },
   mcp:   { role: "monitor · logs · kb · notify · remediation", body: "MCP tools over Streamable HTTP, surfaced to the LLM as callable functions. monitor reads Redfish events. logs fetches the iDRAC log bundle. kb runs fastembed ONNX + FAISS semantic search plus word-match fallback. notify posts activity narration in the agent's own words. remediation splits in two: propose (LLM-callable, records a recommended plan) and execute (never given to the LLM — runs only in harness code, and refuses without a valid human approval token)." },
   sim:   { role: "fake XE9780L · Redfish surface", body: "Simulated Dell PowerEdge XE9780L GPU cluster. Emits Redfish events and log entries on fault injection. Reports healthy again after successful remediation. Safe to reset at any time." },
