@@ -302,18 +302,25 @@ Recovery (worked 2026-08-28, in order):
 # 1. Free the port number — openshell's port-in-use check is not
 #    interface-aware, so a hook-relay bound to 172.17.0.1:<port> blocks the
 #    127.0.0.1:<port> forward from being created.
-pkill -f hook-relay.py
+pkill -f hook-relay.py        # systemd-managed relay: use kill -9 <pid> —
+                              # SIGKILL trips Restart=on-failure (auto-revives);
+                              # SIGTERM is a clean exit and will NOT restart it
 openshell forward stop <port> <sandbox>     # clear the stale dead record
 docker restart <openshell sandbox container>  # fresh daemon + supervisor session
 nemoclaw <sandbox> recover                  # re-establishes the loopback forward
 HOOK_RELAY_PORT=<port> make hook-relay      # re-bridge onto the docker bridge
+#    (systemd-managed relay: `sudo systemctl start nemoclaw-hook-relay`
+#     instead — never nohup a second instance against the unit)
 ```
 
 `make doctor-fix` (run by `nemoclaw-doctor.timer` every 5 min when installed,
-see `deploy/systemd/`) retries the recover + relay steps automatically, so
-once the forward *can* be re-established it converges without a human.
-Upstream fix pending: the sandbox forward client should reconnect after a
-gateway restart.
+see `deploy/systemd/`) now performs the relay dance automatically (SIGKILL
+the relay, `forward stop`, `forward start --background`, `recover`) —
+verified 2026-08-28 against a simulated reboot (forward dead, relay running):
+converged in ~15s without a human. The manual sequence above remains the
+escalation path when the sandbox container's own daemon is stale (the
+`docker restart` step). Upstream fix pending: the sandbox forward client
+should reconnect after a gateway restart.
 
 ## NemoClaw LKG (v0.0.109) onboarding contract walls
 

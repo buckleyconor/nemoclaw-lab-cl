@@ -61,6 +61,16 @@ fixing() { printf "      %sfixing:%s %s\n" "$YELLOW" "$RESET" "$1"; }
 
 http_code() { curl -s -o /dev/null -w "%{http_code}" --max-time 4 "$@" 2>/dev/null; }
 
+# PID listening on $1:$2 (a specific address). lsof's `host:port` -i form
+# does NOT parse (returns nothing — 2026-08-28: the relay-kill below silently
+# no-opped on it), so scan the port on all interfaces and match the address
+# in the NAME column.
+bridge_port_pid() {
+  command -v lsof >/dev/null 2>&1 || return 0
+  lsof -nP -i ":$2" -sTCP:LISTEN 2>/dev/null \
+    | awk -v ip="$1" 'NR>1 && $9 ~ "^" ip ":" {print $2; exit}'
+}
+
 echo "NemoClaw demo preflight"
 echo
 
@@ -150,26 +160,51 @@ if [[ -n "$HOOK_URL" ]]; then
   probe_wake_hook
   if [[ ( "$CODE" != "401" || "$RELAY_CODE" != "401" ) && "$FIX" -eq 1 ]]; then
     if systemctl is-enabled --quiet nemoclaw-hook-relay 2>/dev/null; then
-      # systemd owns the relay: it self-restarts on crash — only re-establish
-      # the openshell forward it bridges to. No kill/nohup here, or the
-      # nohup would double-start against the unit.
+      # systemd owns the relay, but NOT its loopback forward — and a running
+      # relay blocks the forward: the CLI's port-in-use check is not
+      # interface-aware, so the relay's $BRIDGE_IP:$HOOK_PORT listener makes
+      # `nemoclaw recover`/`openshell forward start` silently skip re-creating
+      # 127.0.0.1:$HOOK_PORT (2026-08-28 incident — this is why the timer
+      # could not self-heal the reboot case).
+      #
+      # The dance: SIGKILL the relay (a SIGKILL is a failure ->
+      # Restart=on-failure revives it in ~3s; a SIGTERM is a clean exit and
+      # would NOT restart it) to free the port NUMBER, clear any stale forward
+      # record, and create the forward while the port is free — the relay
+      # comes back on its bridge address (different interface, no conflict).
+      # Retry a few times: the relay's ~3s revival races the CLI's port check.
       fixing "recover loopback forward (relay is systemd-managed)"
+      # At a real reboot the sandbox container is stopped too; `recover`
+      # restarts it — the forward's in-sandbox target is openclaw's hook,
+      # which needs the container up.
       nemoclaw "$SANDBOX_NAME" recover >/dev/null 2>&1 || true
+      for _attempt in 1 2 3; do
+        if [[ "$(http_code -X POST "http://127.0.0.1:${HOOK_PORT}/hooks/wake" -H "Authorization: Bearer doctor-probe")" == "401" ]]; then
+          break
+        fi
+        RELAY_PID="$(bridge_port_pid "$BRIDGE_IP" "$HOOK_PORT")"
+        [[ -n "$RELAY_PID" ]] && kill -9 "$RELAY_PID" 2>/dev/null || true
+        if command -v openshell >/dev/null 2>&1; then
+          openshell forward stop "$HOOK_PORT" "$SANDBOX_NAME" >/dev/null 2>&1 || true
+          nohup openshell forward start --background "$HOOK_PORT" "$SANDBOX_NAME" \
+            >> "$STATE_DIR/nemoclaw-forward-start.log" 2>&1 &
+          disown
+          sleep 5
+        fi
+      done
     else
       fixing "recover loopback forward, then restart hook-relay"
       # `nemoclaw recover`'s port-in-use check is not interface-aware: if
       # hook-relay (bound to $BRIDGE_IP:$HOOK_PORT) is already up, recover sees
       # the port number taken and silently skips recreating its own loopback
       # forward on 127.0.0.1:$HOOK_PORT — so hook-relay must come down first.
-      if command -v lsof >/dev/null 2>&1; then
-        RELAY_PID=$(lsof -t -i "${BRIDGE_IP}:${HOOK_PORT}" -sTCP:LISTEN 2>/dev/null || true)
-        if [[ -n "$RELAY_PID" ]]; then
-          kill "$RELAY_PID" 2>/dev/null || true
-          for _ in $(seq 1 10); do
-            lsof -i "${BRIDGE_IP}:${HOOK_PORT}" -sTCP:LISTEN >/dev/null 2>&1 || break
-            sleep 0.3
-          done
-        fi
+      RELAY_PID="$(bridge_port_pid "$BRIDGE_IP" "$HOOK_PORT")"
+      if [[ -n "$RELAY_PID" ]]; then
+        kill "$RELAY_PID" 2>/dev/null || true   # TERM: nothing restarts a
+        for _ in $(seq 1 10); do                # nohup relay — it is started
+          [[ -z "$(bridge_port_pid "$BRIDGE_IP" "$HOOK_PORT")" ]] && break  # below
+          sleep 0.3
+        done
       fi
       nemoclaw "$SANDBOX_NAME" recover >/dev/null 2>&1 || true
       HOOK_RELAY_PORT="$HOOK_PORT" HOOK_RELAY_BIND="$BRIDGE_IP" \
