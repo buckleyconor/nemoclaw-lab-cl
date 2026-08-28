@@ -9,7 +9,7 @@ One codebase. Swap the **Domain Pack** to switch verticals — GPU cluster, lapt
 These steps bring up everything on one Linux host with docker + git. Reference
 targets: the production **Ubuntu 24.04 x86_64 VM** using the lab's **shared
 inference endpoint** (private/internal, real API key), and the **NVIDIA GB10**
-dev box (`promaxgb10`, aarch64, ufw active) serving its own vLLM. The
+dev box (aarch64, ufw active) serving its own vLLM. The
 host-specific parts are the ufw rules and the docker-bridge bind address, both
 called out below.
 
