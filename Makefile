@@ -157,8 +157,9 @@ repoint-llm:
 	./deploy/scripts/repoint-llm.sh
 
 # Same preflight, but applies each fix automatically instead of just printing
-# it. This is what deploy/systemd/nemoclaw-doctor.timer runs on a schedule so
-# a dead terminal daemon/hook-relay/wake-hook forward self-heals.
+# it. This is what the nemoclaw-doctor.timer USER unit (deploy/systemd/user/)
+# runs on a schedule so a dead terminal daemon/hook-relay/wake-hook forward
+# self-heals.
 doctor-fix:
 	./deploy/scripts/doctor.sh --fix
 
@@ -168,11 +169,13 @@ doctor-fix:
 install-inference-watchdog:
 	./deploy/scripts/install-watchdog.sh
 
-# Install + enable the FULL self-heal layer as system units: inference
-# watchdog (60s, root), doctor --fix timer (5 min, lab user), terminal +
-# hook-relay services (lab user, Restart=on-failure), and the scoped
-# passwordless systemctl (stop/start/is-active on the hook-relay unit only)
-# doctor --fix needs to stop the relay around `nemoclaw recover`. Idempotent.
+# Install + enable the FULL self-heal layer: system units (inference watchdog
+# 60s root, terminal daemon) plus the lab user's USER units for the whole
+# wake-hook chain — gateway boot-takeover, forward keeper, relay, doctor
+# --fix timer (5 min). The chain lives in the user manager because the
+# nemoclaw CLI needs the user session's D-Bus and the gateway->forward->relay
+# boot ordering is only expressible in one manager domain (2026-08-28 reboot
+# incident). Idempotent; migrates the legacy all-system layout in place.
 # Must run as root: sudo make install-selfheal   (demo-up offers this with one prompt)
 install-selfheal:
 	./deploy/scripts/install-selfheal.sh

@@ -1,0 +1,40 @@
+# NemoClaw shared OpenShell gateway — boot-takeover unit. Installed by
+# deploy/scripts/install-selfheal.sh as
+# ~/.config/systemd/user/nemoclaw-gateway-__NEMOCLAW_GATEWAY_PORT__.service
+# (the filename carries the port: the CLI identifies its "owned" host gateway
+# by the exact argv0 below, OWNED_HOST_GATEWAY_ARGV0_RE).
+#
+# The CLI normally spawns the gateway as a detached child of the terminal
+# that ran `nemoclaw onboard`; it does NOT survive a reboot. This unit
+# resumes the SAME gateway: all config is carried by the EnvironmentFile
+# below, captured ONCE from the running process (the installer skips this
+# unit with a warning when the file is missing):
+#
+#   tr '\0' '\n' < /proc/<gw-pid>/environ | grep -E '^(OPENSHELL|NEMOCLAW)_' \
+#     > ~/.config/nemoclaw/gateway-__NEMOCLAW_GATEWAY_PORT__.env
+#
+# Do NOT start while the detached CLI-spawned gateway still holds the port —
+# `systemctl --user status` = inactive now is correct on a freshly-onboarded
+# host; the unit takes over at next boot.
+[Unit]
+Description=NemoClaw shared OpenShell gateway (__NEMOCLAW_GATEWAY__, docker driver)
+After=network-online.target
+# A user unit cannot declare After= against the SYSTEM docker unit (snap:
+# snap.docker.dockerd.service) — this unit failed its first start at every
+# boot with "Socket not found: /var/run/docker.sock". Gate on the socket
+# instead, and never exhaust the start limit while docker is still coming up.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/nemoclaw/gateway-__NEMOCLAW_GATEWAY_PORT__.env
+ExecStartPre=/usr/bin/timeout 120 /usr/bin/bash -c 'until [ -S /var/run/docker.sock ]; do sleep 2; done'
+ExecStartPre=%h/.local/bin/openshell-gateway generate-certs --output-dir %h/.local/state/nemoclaw/openshell-docker-gateway-__NEMOCLAW_GATEWAY_PORT__/tls --server-san host.openshell.internal
+# /bin/sh is dash here and does not support `exec -a` (exit 127 — this unit
+# crash-looped on it 2026-08-28, so the CLI orphan kept winning the port).
+ExecStart=/usr/bin/bash -c 'exec -a "openshell-gateway[nemoclaw=__NEMOCLAW_GATEWAY__;port=__NEMOCLAW_GATEWAY_PORT__]" %h/.local/bin/openshell-gateway'
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=default.target

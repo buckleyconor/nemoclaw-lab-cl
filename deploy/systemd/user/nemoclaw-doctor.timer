@@ -3,7 +3,6 @@
 # steps: sudo ./deploy/scripts/install-selfheal.sh).
 [Unit]
 Description=Run the NemoClaw demo preflight self-heal periodically
-After=network-online.target
 
 [Timer]
 OnBootSec=2min

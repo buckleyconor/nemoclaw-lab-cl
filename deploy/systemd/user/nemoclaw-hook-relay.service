@@ -1,0 +1,32 @@
+# Wake-hook relay (ADR-011) as a USER service, ordered after the forward
+# keeper — survives reboots and never races the forward for the port number.
+# Installed by deploy/scripts/install-selfheal.sh (substitutes the
+# __NEMOCLAW_*__ placeholders):
+#
+#   sudo ./deploy/scripts/install-selfheal.sh      (or: sudo make install-selfheal)
+#
+# Ordering is load-bearing (2026-08-28 reboot incident): the openshell CLI's
+# port-in-use check is not interface-aware, so a relay holding
+# 172.17.0.1:<port> blocks the loopback forward from ever being re-created.
+# The ExecStartPre gate below refuses to bind until the forward answers;
+# nemoclaw-hook-forward.service stops this unit around every forward
+# (re)creation and starts it again after.
+[Unit]
+Description=NemoClaw wake-hook relay (docker bridge -> openshell loopback forward)
+After=nemoclaw-hook-forward.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=exec
+WorkingDirectory=__NEMOCLAW_REPO__
+Environment=HOOK_RELAY_PORT=__NEMOCLAW_HOOK_PORT__
+# Gate on the loopback forward actually listening (bounded — on timeout the
+# unit fails and Restart= retries; the forward keeper also starts us when it
+# lands). hook-relay.py itself retries the bridge bind while docker0 appears.
+ExecStartPre=/usr/bin/timeout 300 /usr/bin/bash -c 'until (exec 3<>/dev/tcp/127.0.0.1/__NEMOCLAW_HOOK_PORT__) 2>/dev/null; do sleep 2; done'
+ExecStart=/usr/bin/env python3 __NEMOCLAW_REPO__/deploy/scripts/hook-relay.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target

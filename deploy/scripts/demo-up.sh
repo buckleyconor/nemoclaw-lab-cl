@@ -43,20 +43,24 @@ docker compose up -d
 
 echo
 echo "── 2/5 self-heal layer (watchdog + doctor timer + daemon units) ─────"
-# The systemd units that make reboots self-heal: inference watchdog (60s),
-# doctor --fix timer (5 min), terminal + hook-relay services. One sudo
-# prompt; offered interactively, printed (not run) on non-interactive
-# runs — same print-never-run posture as bootstrap's ufw block.
-if systemctl is-enabled --quiet nemoclaw-doctor.timer 2>/dev/null; then
-  echo "Already installed (nemoclaw-doctor.timer enabled)."
+# The systemd units that make reboots self-heal: inference watchdog (60s,
+# system), the user-domain wake-hook chain (gateway takeover, forward
+# keeper, relay) + doctor --fix timer (5 min), and the terminal service.
+# One sudo prompt; offered interactively, printed (not run) on
+# non-interactive runs — same print-never-run posture as bootstrap's ufw
+# block. The doctor timer is a USER unit (2026-08-28: as a system unit the
+# CLI had no user session and every heal failed).
+if systemctl --user is-enabled --quiet nemoclaw-doctor.timer 2>/dev/null \
+   && ! systemctl is-enabled --quiet nemoclaw-doctor.timer 2>/dev/null; then
+  echo "Already installed (user nemoclaw-doctor.timer enabled)."
 elif [[ -t 0 ]]; then
-  read -r -p "Install the self-heal layer now? (one sudo prompt — watchdog + doctor timer + terminal/relay systemd units) [Y/n] " REPLY
+  read -r -p "Install the self-heal layer now? (one sudo prompt — watchdog + wake-hook chain + doctor timer units) [Y/n] " REPLY
   case "${REPLY:-Y}" in
     [Nn]*) echo "Skipping — install later with:  sudo make install-selfheal" ;;
     *) sudo ./deploy/scripts/install-selfheal.sh ;;
   esac
 else
-  echo "Not installed (nemoclaw-doctor.timer missing). Recommended:"
+  echo "Not installed (user nemoclaw-doctor.timer missing). Recommended:"
   echo "  sudo make install-selfheal"
   echo "(skipped — non-interactive run)"
 fi

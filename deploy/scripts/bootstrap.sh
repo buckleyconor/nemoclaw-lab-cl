@@ -141,7 +141,9 @@ if command -v ufw >/dev/null && systemctl is-active --quiet ufw 2>/dev/null; the
   echo "and the agent cannot reach the LLM. Run these yourself (they need sudo):"
   echo
   echo "  sudo ufw allow from ${COMPOSE_NET:-172.23.0.0/16} to ${BRIDGE_IP:-172.17.0.1} port 8005 proto tcp comment 'nemoclaw terminal daemon (ADR-012)'"
-  echo "  sudo ufw allow from ${COMPOSE_NET:-172.23.0.0/16} to any port 18790 proto tcp comment 'openclaw wake hook (ADR-011)'"
+  BOOT_HOOK_URL="$(env_get OPENCLAW_HOOK_URL)"
+  BOOT_HOOK_PORT="${BOOT_HOOK_URL##*:}"; BOOT_HOOK_PORT="${BOOT_HOOK_PORT%%/*}"
+  echo "  sudo ufw allow from ${COMPOSE_NET:-172.23.0.0/16} to any port ${BOOT_HOOK_PORT:-18790} proto tcp comment 'openclaw wake hook (ADR-011)'"
   echo "  sudo ufw allow from 172.16.0.0/12 to any port ${LLM_PROXY_PORT} proto tcp comment 'nemoclaw inference proxy (ADR-014)'"
   echo
   echo "(${COMPOSE_NET:-subnet} is this compose network, detected live — it is not"

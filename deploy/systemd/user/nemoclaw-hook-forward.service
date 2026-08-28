@@ -1,0 +1,47 @@
+# Wake-hook loopback forward KEEPER (2026-08-28 reboot incident) — the unit
+# that makes 127.0.0.1:<hook port> survive reboots. Installed by
+# deploy/scripts/install-selfheal.sh into ~/.config/systemd/user/ (the
+# __NEMOCLAW_*__ placeholders are substituted from .env):
+#
+#   sudo ./deploy/scripts/install-selfheal.sh      (or: sudo make install-selfheal)
+#
+# Why a keeper unit: openshell's SSH forward is a plain process that dies at
+# reboot, and nothing recreated it — the relay (172.17.0.1:<port>) came up
+# first, and the openshell CLI's port-in-use check is not interface-aware, so
+# every later `forward start`/`recover` silently skipped re-creating the
+# loopback forward. This unit owns the whole dance: stop the relay, clear the
+# stale forward record, run the forward in the FOREGROUND (so systemd sees it
+# die and restarts it), hand the port back to the relay.
+#
+# Lives in the USER manager (with the gateway unit): `After=` ordering across
+# the gateway -> forward -> relay chain is only expressible in one manager
+# domain, and the openshell CLI needs the user session anyway.
+[Unit]
+Description=NemoClaw wake-hook loopback forward keeper (openshell forward -> sandbox)
+After=__NEMOCLAW_GATEWAY_UNIT__
+Wants=__NEMOCLAW_GATEWAY_UNIT__
+# Never give up: at boot the gateway needs time to resume the sandbox, and
+# `forward start` fails until it has.
+StartLimitIntervalSec=0
+
+[Service]
+Type=exec
+WorkingDirectory=__NEMOCLAW_REPO__
+Environment=PATH=%h/.local/bin:/snap/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=NEMOCLAW_GATEWAY_PORT=__NEMOCLAW_GATEWAY_PORT__
+Environment=NEMOCLAW_SANDBOX_GPU=0
+# Wait for the gateway to answer before touching anything (bounded — on
+# timeout the unit fails and Restart= retries the whole sequence).
+ExecStartPre=/usr/bin/timeout 90 /usr/bin/bash -c 'until (exec 3<>/dev/tcp/127.0.0.1/__NEMOCLAW_GATEWAY_PORT__) 2>/dev/null; do sleep 2; done'
+# The relay must NOT hold the port number while the forward is (re)created —
+# the interface-blind port check would silently skip the re-create.
+ExecStartPre=-/usr/bin/systemctl --user stop nemoclaw-hook-relay.service
+# Clear any stale forward record so `start` never no-ops.
+ExecStartPre=-%h/.local/bin/openshell forward stop -g __NEMOCLAW_GATEWAY__ __NEMOCLAW_HOOK_PORT__ __NEMOCLAW_SANDBOX__
+ExecStart=%h/.local/bin/openshell forward start -g __NEMOCLAW_GATEWAY__ __NEMOCLAW_HOOK_PORT__ __NEMOCLAW_SANDBOX__
+ExecStartPost=-/usr/bin/systemctl --user --no-block start nemoclaw-hook-relay.service
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

@@ -12,12 +12,30 @@
 #        make doctor-fix    (report + apply the fixes automatically)
 #        deploy/scripts/doctor.sh [--fix]
 # Exit code: 0 if everything passes (after fixing, when --fix is given),
-# 1 otherwise. The nemoclaw-doctor.timer systemd unit runs `--fix` on a
+# 1 otherwise. The nemoclaw-doctor.timer USER unit runs `--fix` on a
 # schedule so these failures self-heal before anyone hits "reconnect" —
-# see deploy/systemd/nemoclaw-doctor.{service,timer}.
+# see deploy/systemd/user/nemoclaw-doctor.{service,timer}.
 set -uo pipefail
 
 cd "$(dirname "$0")/../.."
+
+# Self-serve the environment the nemoclaw/openshell CLIs need, from .env
+# (2026-08-28 incident: the doctor timer ran with a bare PATH and no
+# NEMOCLAW_GATEWAY_PORT — the CLI targeted the DEFAULT gateway on :8080,
+# spawned a standalone one against an empty DB, and every `recover` failed
+# with "sandbox not found"; `command -v docker` also failed because docker is
+# snap-installed). Exporting here instead of in the unit means a bare
+# `make doctor-fix` from any shell gets the same fix.
+case ":$PATH:" in *:/snap/bin:*) ;; *) PATH="$PATH:/snap/bin" ;; esac
+case ":$PATH:" in *:"$HOME/.local/bin":*) ;; *) PATH="$HOME/.local/bin:$PATH" ;; esac
+export PATH
+_env_boot_get() { { grep -E "^$1=" .env 2>/dev/null || true; } | head -1 | cut -d= -f2- | sed -E 's/[[:space:]]+#.*$//'; }
+NEMOCLAW_GATEWAY_PORT_ENV="$(_env_boot_get NEMOCLAW_GATEWAY_PORT)"
+[[ -n "$NEMOCLAW_GATEWAY_PORT_ENV" ]] && export NEMOCLAW_GATEWAY_PORT="$NEMOCLAW_GATEWAY_PORT_ENV"
+NEMOCLAW_SANDBOX_GPU_ENV="$(_env_boot_get NEMOCLAW_SANDBOX_GPU)"
+[[ -n "$NEMOCLAW_SANDBOX_GPU_ENV" ]] && export NEMOCLAW_SANDBOX_GPU="$NEMOCLAW_SANDBOX_GPU_ENV"
+NEMOCLAW_TMPDIR_ENV="$(_env_boot_get NEMOCLAW_TMPDIR)"
+[[ -n "$NEMOCLAW_TMPDIR_ENV" && -d "$NEMOCLAW_TMPDIR_ENV" ]] && export TMPDIR="$NEMOCLAW_TMPDIR_ENV"
 
 FIX=0
 [[ "${1:-}" == "--fix" ]] && FIX=1
@@ -75,16 +93,37 @@ bridge_port_pid() {
 # "Active gateway set to '<name>'" when it resolves one. A bare
 # `openshell forward start` without -g targets the default gateway and dies
 # with "sandbox not found" when the sandbox lives on another gateway.
-# Empty when there is only one gateway. Cached per doctor run — `status`
-# probes the sandbox and is not free.
+# Cached per doctor run — `status` probes the sandbox and is not free.
+#
+# resolve_gateway sets globals (never call it in a $() — the cache would die
+# with the subshell). GATEWAY_OK=1 means the CLI reached the sandbox's real
+# gateway: `nemoclaw status` exited 0 OR printed an "Active gateway set to"
+# line — status legitimately exits 1 for a resolvable sandbox whose delivery
+# chain it cannot prove, and the gateway line is the part we need. GATEWAY
+# may still be empty on a single-gateway install (bare invocation is fine).
+# GATEWAY_OK=0 means resolution itself failed: the forward ops REFUSE the
+# bare default-gateway fallback (2026-08-28: that fallback is exactly what
+# ran every timer tick against a rogue standalone gateway with an empty DB,
+# and its fingerprint is status output with NO gateway line — "Sandbox ...
+# does not exist").
 GATEWAY=""
-sandbox_gateway() {
-  if [[ -z "$GATEWAY" ]]; then
-    GATEWAY="$(nemoclaw "$SANDBOX_NAME" status 2>&1 \
-      | grep -oE "Active gateway set to '[^']+'" | head -1 \
-      | sed -E "s/.*'([^']+)'.*/\1/" 2>/dev/null || true)"
+GATEWAY_OK=0
+GATEWAY_RESOLVED=0
+resolve_gateway() {
+  [[ "$GATEWAY_RESOLVED" -eq 1 ]] && return 0
+  GATEWAY_RESOLVED=1
+  local out rc
+  out="$(nemoclaw "$SANDBOX_NAME" status 2>&1)"; rc=$?
+  GATEWAY="$(printf '%s' "$out" \
+    | grep -oE "Active gateway set to '[^']+'" | head -1 \
+    | sed -E "s/.*'([^']+)'.*/\1/" 2>/dev/null || true)"
+  if [[ $rc -eq 0 || -n "$GATEWAY" ]]; then
+    GATEWAY_OK=1
+  else
+    echo "      ! nemoclaw $SANDBOX_NAME status failed with no resolvable gateway;" >&2
+    echo "        refusing the default-gateway fallback (it spawns a rogue gateway and" >&2
+    echo "        'sandbox not found's every recover). Check: nemoclaw $SANDBOX_NAME status" >&2
   fi
-  printf '%s' "$GATEWAY"
 }
 
 # Run `openshell forward stop` for the sandbox's hook port on its active
@@ -92,11 +131,13 @@ sandbox_gateway() {
 # otherwise make `recover`/`forward start` skip re-creating the forward).
 forward_stop() {
   command -v openshell >/dev/null 2>&1 || return 0
-  local gw; gw="$(sandbox_gateway)"
-  if [[ -n "$gw" ]]; then
-    openshell forward stop -g "$gw" "$HOOK_PORT" "$SANDBOX_NAME" >/dev/null 2>&1 || true
-  else
+  resolve_gateway
+  if [[ -n "$GATEWAY" ]]; then
+    openshell forward stop -g "$GATEWAY" "$HOOK_PORT" "$SANDBOX_NAME" >/dev/null 2>&1 || true
+  elif [[ "$GATEWAY_OK" -eq 1 ]]; then
     openshell forward stop "$HOOK_PORT" "$SANDBOX_NAME" >/dev/null 2>&1 || true
+  else
+    return 1
   fi
 }
 
@@ -105,15 +146,54 @@ forward_stop() {
 # run hangs until the forward dies; log to a file instead).
 forward_start() {
   command -v openshell >/dev/null 2>&1 || return 0
-  local gw; gw="$(sandbox_gateway)"
-  if [[ -n "$gw" ]]; then
-    nohup openshell forward start -g "$gw" --background "$HOOK_PORT" "$SANDBOX_NAME" \
+  resolve_gateway
+  if [[ -n "$GATEWAY" ]]; then
+    nohup openshell forward start -g "$GATEWAY" --background "$HOOK_PORT" "$SANDBOX_NAME" \
       >> "$STATE_DIR/nemoclaw-forward-start.log" 2>&1 &
-  else
+  elif [[ "$GATEWAY_OK" -eq 1 ]]; then
     nohup openshell forward start --background "$HOOK_PORT" "$SANDBOX_NAME" \
       >> "$STATE_DIR/nemoclaw-forward-start.log" 2>&1 &
+  else
+    return 1
   fi
   disown
+}
+
+# Documented escalation for a stale sandbox daemon / supervisor session
+# (docs/TROUBLESHOOTING.md, "Sandbox wake-hook dead"): a gateway restart or
+# reboot can orphan the sandbox's supervisor session; `nemoclaw recover`
+# then reports "Sandbox '<name>' does not exist" and no forward op can
+# re-create the loopback forward. A container (re)start gives it a fresh
+# daemon + session, after which recover lands. Throttled via a marker file
+# so the 5-min timer cannot turn a different root cause into a
+# container-restart loop.
+RESTART_THROTTLE_SECS=900
+sandbox_container_restart() {
+  command -v docker >/dev/null 2>&1 || return 1
+  local container marker last now health i
+  container="$(docker ps -aq --filter "label=openshell.ai/sandbox-name=${SANDBOX_NAME}" 2>/dev/null | head -1)"
+  [[ -n "$container" ]] || return 1
+  marker="$STATE_DIR/nemoclaw-sandbox-restart-at"
+  now="$(date +%s)"
+  last="$(cat "$marker" 2>/dev/null)" || last=0
+  [[ "$last" =~ ^[0-9]+$ ]] || last=0
+  if (( now - last < RESTART_THROTTLE_SECS )); then
+    return 1
+  fi
+  echo "$now" > "$marker"
+  if [[ "$(docker inspect --format '{{.State.Running}}' "$container" 2>/dev/null)" == "true" ]]; then
+    docker restart "$container" >/dev/null 2>&1 || return 1
+  else
+    docker start "$container" >/dev/null 2>&1 || return 1
+  fi
+  for i in $(seq 1 30); do
+    health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}running{{end}}' "$container" 2>/dev/null)"
+    case "$health" in
+      healthy|running) return 0 ;;
+    esac
+    sleep 2
+  done
+  return 0   # proceed anyway; the recover after this re-verifies
 }
 
 echo "NemoClaw demo preflight"
@@ -204,7 +284,34 @@ if [[ -n "$HOOK_URL" ]]; then
 
   probe_wake_hook
   if [[ ( "$CODE" != "401" || "$RELAY_CODE" != "401" ) && "$FIX" -eq 1 ]]; then
-    if systemctl is-enabled --quiet nemoclaw-hook-relay 2>/dev/null; then
+    if systemctl --user cat nemoclaw-hook-forward.service >/dev/null 2>&1; then
+      # The forward-keeper user unit (deploy/systemd/user/, installed by
+      # install-selfheal.sh) owns the whole dance — stop relay, clear the
+      # stale forward record, foreground `forward start`, hand the port back
+      # to the relay — so a restart re-runs it from scratch with the port
+      # number guaranteed free. Escalate to recover / a container restart
+      # only when a keeper round still doesn't land (the stale-supervisor-
+      # session case, docs/TROUBLESHOOTING.md "Sandbox wake-hook dead").
+      fixing "restart the forward keeper (systemctl --user restart nemoclaw-hook-forward)"
+      systemctl --user restart nemoclaw-hook-forward.service 2>/dev/null || true
+      for _attempt in 1 2 3; do
+        for _ in $(seq 1 8); do
+          sleep 3
+          probe_wake_hook
+          [[ "$CODE" == "401" && "$RELAY_CODE" == "401" ]] && break 2
+        done
+        case "$_attempt" in
+          1) fixing "escalating: nemoclaw recover, then restart the keeper"
+             nemoclaw "$SANDBOX_NAME" recover > "$STATE_DIR/nemoclaw-recover.log" 2>&1 || true
+             systemctl --user restart nemoclaw-hook-forward.service 2>/dev/null || true ;;
+          2) fixing "escalating: restart sandbox container, recover, restart the keeper"
+             if sandbox_container_restart; then
+               nemoclaw "$SANDBOX_NAME" recover >> "$STATE_DIR/nemoclaw-recover.log" 2>&1 || true
+             fi
+             systemctl --user restart nemoclaw-hook-forward.service 2>/dev/null || true ;;
+        esac
+      done
+    elif systemctl is-enabled --quiet nemoclaw-hook-relay 2>/dev/null; then
       # systemd owns the relay, but NOT its loopback forward — and a relay
       # holding $BRIDGE_IP:$HOOK_PORT blocks the forward: the openshell CLI's
       # port-in-use check is not interface-aware, so the relay's listener makes
@@ -223,6 +330,10 @@ if [[ -n "$HOOK_URL" ]]; then
       fixing "recover loopback forward (relay is systemd-managed)"
       RECOVER_LOG="$STATE_DIR/nemoclaw-recover.log"
       RELAY_STOPPED=0
+      # If this run dies mid-dance (timeout, kill), never leave the relay
+      # down until the next tick — the Gateway's wake POSTs are silently
+      # dropped while it is (router.py swallows webhook errors).
+      trap '[[ "${RELAY_STOPPED:-0}" -eq 1 ]] && sudo -n systemctl start nemoclaw-hook-relay.service >/dev/null 2>&1 || true' EXIT
       if sudo -n systemctl stop nemoclaw-hook-relay.service >/dev/null 2>&1; then
         RELAY_STOPPED=1
       fi
@@ -256,8 +367,19 @@ if [[ -n "$HOOK_URL" ]]; then
           break
         fi
         if [[ "$RELAY_STOPPED" -eq 1 ]]; then
-          # recovery just ran; the forward's bind can lag a few seconds
-          sleep 3
+          # Deterministic path: the port stays free for the whole loop, so
+          # each retry can escalate instead of just sleeping. (2026-08-28:
+          # after a reboot `nemoclaw recover` reported "Sandbox ... does
+          # not exist" every 5 min and a sleep-retry never converged.)
+          case "$_attempt" in
+            1) sleep 3 ;;   # recovery just ran; the forward's bind can lag a few seconds
+            2) forward_start; sleep 5 ;;   # direct forward on the active gateway
+            3) fixing "escalating: restart sandbox container, then recover"
+               if sandbox_container_restart; then
+                 nemoclaw "$SANDBOX_NAME" recover >> "$RECOVER_LOG" 2>&1 || true
+                 sleep 5
+               fi ;;
+          esac
           continue
         fi
         RELAY_PID="$(bridge_port_pid "$BRIDGE_IP" "$HOOK_PORT")"
@@ -270,6 +392,7 @@ if [[ -n "$HOOK_URL" ]]; then
         # Gateway's wake POSTs hit nothing, and the next doctor cycle
         # re-does the stop/recover/start dance if the forward is still dead.
         sudo -n systemctl start nemoclaw-hook-relay.service >/dev/null 2>&1 || true
+        RELAY_STOPPED=0   # the EXIT trap above becomes a no-op
       fi
     else
       fixing "recover loopback forward, then restart hook-relay"
@@ -410,7 +533,11 @@ fi
 # is what the agent actually uses — they diverge when .env is edited without a
 # repoint. (Endpoint drift is NOT detectable this way: the sandbox stores a
 # routed placeholder baseUrl, so the proxy probe above covers that hop.)
-if [[ -n "$LLM_MODEL" ]] && nemoclaw "$SANDBOX_NAME" status >/dev/null 2>&1; then
+# Gate on the cached gateway resolution, not a fresh `status` rc: status
+# exits 1 whenever it cannot prove the delivery chain, which used to silently
+# disable this check even though `download` works fine then.
+resolve_gateway
+if [[ -n "$LLM_MODEL" && "$GATEWAY_OK" -eq 1 ]]; then
   OC_JSON="$(mktemp)"
   if nemoclaw "$SANDBOX_NAME" download /sandbox/.openclaw/openclaw.json "$OC_JSON" >/dev/null 2>&1; then
     ACTIVE_MODEL="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["agents"]["defaults"]["model"]["primary"])' \
@@ -430,24 +557,38 @@ if [[ -n "$LLM_MODEL" ]] && nemoclaw "$SANDBOX_NAME" status >/dev/null 2>&1; the
 fi
 
 # ── 9. Self-heal layer (systemd units, install-selfheal.sh) ─────────────────
-# The units that make reboots self-heal: inference watchdog (60s), doctor
-# --fix timer (5 min), terminal + hook-relay services. Absence is not a
-# failure — a fresh VM is offered the install by demo-up — so `skip`.
-if systemctl is-enabled --quiet nemoclaw-doctor.timer 2>/dev/null \
+# The units that make reboots self-heal: inference watchdog (60s, system),
+# doctor --fix timer (5 min, user), gateway + forward keeper + relay user
+# units, terminal system service. Absence is not a failure — a fresh VM is
+# offered the install by demo-up — so `skip`.
+#
+# This check verifies the ACTUAL heal path, not a proxy for it: the old
+# version probed only the scoped sudo verbs and reported green for a month of
+# 5-minute heals that all failed with "sandbox not found" (2026-08-28).
+if systemctl --user is-enabled --quiet nemoclaw-doctor.timer 2>/dev/null \
    && systemctl is-enabled --quiet nemoclaw-inference-watchdog.timer 2>/dev/null; then
-  # The wake-hook self-heal stops/starts the lab-user hook-relay unit around
-  # `nemoclaw recover` — that needs the scoped passwordless sudo
-  # install-selfheal.sh writes to /etc/sudoers.d/nemoclaw-doctor. Probe it
-  # with the read-only is-active verb: with the scoped sudo the command runs
-  # as root (rc 0=active, 3=inactive/failed); a sudo denial is rc 1.
-  sudo -n systemctl is-active nemoclaw-hook-relay.service >/dev/null 2>&1
-  SCOPED_SUDO_RC=$?
-  if [[ $SCOPED_SUDO_RC -eq 0 || $SCOPED_SUDO_RC -eq 3 ]]; then
-    pass "self-heal layer" "watchdog + doctor timer + relay stop/start sudo"
+  SELF_HEAL_MISSING=""
+  systemctl --user is-enabled --quiet nemoclaw-hook-forward.service 2>/dev/null \
+    || SELF_HEAL_MISSING="forward keeper unit"
+  systemctl --user is-enabled --quiet nemoclaw-hook-relay.service 2>/dev/null \
+    || SELF_HEAL_MISSING="${SELF_HEAL_MISSING:+$SELF_HEAL_MISSING, }relay user unit"
+  # The exact command whose silent failure broke every heal: the CLI must be
+  # able to reach the sandbox's gateway from THIS context (PATH, gateway
+  # port, user session — all the things the old system unit got wrong).
+  resolve_gateway
+  [[ "$GATEWAY_OK" -eq 1 ]] \
+    || SELF_HEAL_MISSING="${SELF_HEAL_MISSING:+$SELF_HEAL_MISSING, }CLI gateway access (nemoclaw $SANDBOX_NAME status fails)"
+  if [[ -z "$SELF_HEAL_MISSING" ]]; then
+    pass "self-heal layer" "watchdog + user doctor timer + forward keeper + relay + CLI gateway access"
   else
-    fail "self-heal layer" "relay stop/start sudo missing — reboot wake-hook self-heal degraded" \
-      "sudo make install-selfheal   (writes /etc/sudoers.d/nemoclaw-doctor)"
+    fail "self-heal layer" "degraded: $SELF_HEAL_MISSING" \
+      "sudo make install-selfheal   (installs the user-unit chain), then: nemoclaw $SANDBOX_NAME status"
   fi
+elif systemctl is-enabled --quiet nemoclaw-doctor.timer 2>/dev/null; then
+  # Legacy layout: doctor as a SYSTEM unit has no user session/D-Bus, so the
+  # CLI falls back to a rogue standalone gateway and no heal ever lands.
+  fail "self-heal layer" "legacy system-unit doctor (cannot reach the user-session gateway)" \
+    "sudo make install-selfheal   (migrates doctor/relay to user units)"
 else
   skip "self-heal layer" "not fully installed — sudo make install-selfheal (reboots won't self-heal)"
 fi

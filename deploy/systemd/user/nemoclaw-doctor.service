@@ -1,0 +1,29 @@
+# Self-healing preflight (ADR-011/012/013) — a USER timer unit that runs
+# `doctor.sh --fix` every 5 minutes, so a dead terminal daemon, hook-relay,
+# or wake-hook forward recovers on its own within one timer interval.
+# Installed by deploy/scripts/install-selfheal.sh:
+#
+#   sudo ./deploy/scripts/install-selfheal.sh      (or: sudo make install-selfheal)
+#
+# A USER unit, not a system one (2026-08-28 incident): the nemoclaw CLI needs
+# the user session's D-Bus to drive the gateway unit — under a system unit it
+# fell back to a standalone gateway with an empty DB and every `recover`
+# failed with "sandbox not found". doctor.sh self-exports the rest of the CLI
+# env (NEMOCLAW_GATEWAY_PORT, NEMOCLAW_SANDBOX_GPU, TMPDIR) from .env; the
+# PATH here just has to reach the CLI shims and snap docker.
+#
+# A run that still fails after attempting fixes exits 1 — check with:
+#   systemctl --user status nemoclaw-doctor
+#   journalctl --user -u nemoclaw-doctor -e
+[Unit]
+Description=NemoClaw demo preflight (self-healing)
+
+[Service]
+Type=oneshot
+# The wake-hook escalation ladder (recover -> container restart -> recover)
+# can legitimately take a few minutes; the 90s oneshot default would kill it
+# mid-dance.
+TimeoutStartSec=15min
+WorkingDirectory=__NEMOCLAW_REPO__
+Environment=PATH=%h/.local/bin:/snap/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=__NEMOCLAW_REPO__/deploy/scripts/doctor.sh --fix

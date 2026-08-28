@@ -9,9 +9,14 @@
 # Requires TERMINAL_TOKEN/TERMINAL_BIND in the repo's .env (run-terminal.sh
 # reads them). While a nohup'd demo instance holds port 8005, the installer
 # enables the unit without starting it — the unit takes over at next boot.
+# Ordering lists BOTH docker unit names: deb installs ship docker.service,
+# snap installs ship snap.docker.dockerd.service, and a name missing from
+# After= is silently ignored — on the snap host `After=docker.service` alone
+# was a no-op and this unit raced the docker bridge at every boot.
 [Unit]
 Description=NemoClaw embedded-terminal daemon (restricted console)
-After=network-online.target docker.service
+Wants=network-online.target
+After=network-online.target docker.service snap.docker.dockerd.service
 
 [Service]
 Type=simple

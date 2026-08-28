@@ -331,14 +331,45 @@ HOOK_RELAY_PORT=<port> make hook-relay      # re-bridge onto the docker bridge
 #     instead — never nohup a second instance against the unit)
 ```
 
-`make doctor-fix` (run by `nemoclaw-doctor.timer` every 5 min when installed,
-see `deploy/systemd/`) now performs the relay dance automatically (SIGKILL
-the relay, `forward stop`, `forward start --background`, `recover`) —
-verified 2026-08-28 against a simulated reboot (forward dead, relay running):
-converged in ~15s without a human. The manual sequence above remains the
-escalation path when the sandbox container's own daemon is stale (the
-`docker restart` step). Upstream fix pending: the sandbox forward client
-should reconnect after a gateway restart.
+Since 2026-08-28 the whole wake-hook chain is owned by USER systemd units
+(`deploy/systemd/user/`, installed by `sudo make install-selfheal`, linger
+enabled), ordered `nemoclaw-gateway-<port>` → `nemoclaw-hook-forward` (the
+forward keeper) → `nemoclaw-hook-relay`:
+
+- **The keeper is the primary fix.** It runs the forward in the foreground —
+  systemd sees it die and re-runs the whole dance (stop relay → `forward
+  stop` to clear the stale record → `forward start` → start relay), with the
+  port number guaranteed free so the interface-blind port-in-use check can
+  never skip the re-create. Manual recovery is now just:
+  `systemctl --user restart nemoclaw-hook-forward`.
+- `make doctor-fix` (the `nemoclaw-doctor.timer` USER unit, every 5 min) is
+  the safety net: it restarts the keeper, then escalates if the probe still
+  fails — `nemoclaw recover`, then the `docker restart`/`recover` step above,
+  throttled to one container restart per 15 min via
+  `~/.local/state/nemoclaw-sandbox-restart-at`. The escalation was added
+  2026-08-28 after a host reboot left the sandbox's supervisor session stale
+  and `nemoclaw recover` reported "Sandbox 'infra-sentinel' does not exist"
+  on every 5-min timer run without converging.
+- The chain lives in the user manager because the nemoclaw CLI needs the
+  user session's D-Bus: as a SYSTEM unit the doctor fell back to a rogue
+  standalone gateway (empty DB, `:8080`) and every recover failed — while
+  the old "self-heal layer ✓" check stayed green. The doctor now runs with
+  `NEMOCLAW_GATEWAY_PORT`/`/snap/bin`/`TMPDIR` exported from `.env`
+  (doctor.sh self-serves them) and its self-heal check verifies
+  `nemoclaw <sandbox> status` actually works from the timer's context.
+
+Watch the chain:
+
+```bash
+systemctl --user status nemoclaw-gateway-18080 nemoclaw-hook-forward nemoclaw-hook-relay
+journalctl --user -u nemoclaw-hook-forward -u nemoclaw-doctor -e
+curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1:<port>/hooks/wake \
+  -H 'Authorization: Bearer probe'      # 401 = healthy (auth wired, forward alive)
+```
+
+The manual sequence above remains the last-resort path when the auto-fix
+still can't land. Upstream fix pending: the sandbox forward client should
+reconnect after a gateway restart.
 
 ## NemoClaw LKG (v0.0.109) onboarding contract walls
 
