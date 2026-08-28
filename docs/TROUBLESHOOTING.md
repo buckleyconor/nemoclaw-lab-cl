@@ -5,13 +5,18 @@ for almost everything: **`make doctor`** — it checks every dependency and
 prints the fix for whatever is down. `make doctor-fix` applies those fixes
 instead of just printing them.
 
-**Self-healing:** install `deploy/systemd/nemoclaw-doctor.timer` to run
-`doctor.sh --fix` every 5 minutes, so a dead terminal daemon, hook-relay, or
-wake-hook forward recovers on its own before anyone notices "reconnect does
-nothing" — see the header comment in `nemoclaw-doctor.service` for install
-steps. A run that's still red after fixing shows up as a failed systemd
-unit: `systemctl --user status nemoclaw-doctor` / `journalctl --user -u
-nemoclaw-doctor -e`.
+**Self-healing:** install the self-heal layer (`sudo make install-selfheal` —
+`make demo-up` offers it with one prompt) to run `doctor.sh --fix` every 5
+minutes, so a dead terminal daemon, hook-relay, or wake-hook forward recovers
+on its own before anyone notices "reconnect does nothing". The timer runs as
+the lab user; the one root capability it needs — stopping/starting the
+hook-relay unit around `nemoclaw recover`, because the openshell forward
+CLI's port-in-use check is not interface-aware — comes from the scoped
+passwordless sudo in `/etc/sudoers.d/nemoclaw-doctor` (stop/start/is-active
+on that unit only). A run that's still red after fixing shows up as a failed
+systemd unit: `systemctl status nemoclaw-doctor` /
+`journalctl -u nemoclaw-doctor -e` (and `~/.local/state/nemoclaw-recover.log`
+for the last `nemoclaw recover` attempt).
 
 ## "I inject a fault and it's never detected"
 
@@ -20,11 +25,16 @@ Check in this order:
 
 1. **`make doctor`.** If the *sandbox wake-hook* line is red, openshell's
    SSH port-forward died (it does not survive reboots or openshell
-   restarts, and `nemoclaw <sandbox> status` will show `Connected: no`):
+   restarts, and `nemoclaw <sandbox> status` will show `Connected: no`).
+   With the self-heal layer installed, `make doctor-fix` (or the 5-min
+   timer) handles this on its own — the manual recipe is for hosts without
+   the scoped sudo, or when the timer run is still red:
 
    ```bash
-   nemoclaw infra-sentinel recover
-   make hook-relay        # the relay dials the forward per-connection, restart it too
+   sudo systemctl stop nemoclaw-hook-relay   # stop the relay FIRST — its bridge
+   nemoclaw infra-sentinel recover           # listener blocks the forward's port check
+   sudo systemctl start nemoclaw-hook-relay  # the relay dials the forward per-connection
+   make doctor                               # both hook lines green again
    ```
 
 2. If the *hook-relay bridge* line is red, only the relay is down:
@@ -205,9 +215,13 @@ demo-up` offers it with one prompt), a reboot self-heals: compose services
 return via `restart: unless-stopped`; the terminal daemon and hook-relay run
 as systemd services with `Restart=on-failure`; the inference watchdog
 restarts nginx within 60s if it lost the boot race; and
-`nemoclaw-doctor.timer` (5 min) runs `doctor.sh --fix`, which re-establishes
-the openshell wake-hook forward that does not survive reboots. `make doctor`
-reports the layer's own state on a *self-heal layer* line.
+`nemoclaw-doctor.timer` (5 min, first run 2 min after boot) runs
+`doctor.sh --fix`, which re-establishes the openshell wake-hook forward that
+does not survive reboots — stopping the hook-relay unit around
+`nemoclaw recover` via the scoped sudo, because the relay's bridge listener
+would otherwise block the forward's port-in-use check. `make doctor`
+reports the layer's own state on a *self-heal layer* line (a red
+*self-heal layer* line = the scoped sudo is missing: re-run the install).
 
 Without it, only the compose services come back — the host processes are
 gone and nothing notices (the dashboard shows a healthy fleet and an idle
@@ -220,7 +234,11 @@ strip instead of the green scanning ticker until the wake hook answers again
 ```bash
 sudo make install-selfheal    # recommended: one sudo prompt, idempotent
 make demo-up            # restarts anything that's down, then verifies
-nemoclaw infra-sentinel recover   # if doctor still flags the wake-hook
+# if doctor still flags the wake-hook (stop the relay first — its bridge
+# listener blocks the forward's port-in-use check):
+sudo systemctl stop nemoclaw-hook-relay && \
+  nemoclaw infra-sentinel recover && \
+  sudo systemctl start nemoclaw-hook-relay
 ```
 
 If `make doctor` flags the **inference proxy** line red after a reboot,

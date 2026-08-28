@@ -11,6 +11,12 @@
 #     compose services, wake-hook forward (nemoclaw recover), model drift
 #   - nemoclaw-terminal.service (lab user, Restart=on-failure)
 #   - nemoclaw-hook-relay.service (lab user, Restart=on-failure)
+#   - /etc/sudoers.d/nemoclaw-doctor — scoped passwordless systemctl
+#     (stop/start/is-active on the hook-relay unit ONLY). doctor --fix runs
+#     as the lab user but must stop the relay around `nemoclaw recover`:
+#     the openshell forward CLI's port-in-use check is not interface-aware,
+#     so a running relay blocks the loopback wake-hook forward (2026-08-28
+#     reboot self-heal incident).
 #
 # Idempotent — safe to re-run after a repo move (placeholders re-substitute).
 # Existing nohup'd daemons (from `make demo-up`) are left alone: if their
@@ -58,6 +64,30 @@ for u in "${UNITS[@]}"; do
 done
 
 systemctl daemon-reload
+
+# Scoped passwordless sudo for the unprivileged doctor --fix (see header).
+# Exactly three verbs on exactly one unit; validated with visudo before
+# installation — an invalid draft is refused, never installed.
+SUDOERS_DROPIN="/etc/sudoers.d/nemoclaw-doctor"
+SYSTEMCTL_BIN="$(command -v systemctl)"
+SUDOERS_TMP="$(mktemp)"
+{
+  echo "# Written by deploy/scripts/install-selfheal.sh (idempotent — re-run"
+  echo "# after a repo move). Scoped passwordless systemctl for the NemoClaw"
+  echo "# doctor --fix self-heal: it stops/starts the lab-user hook-relay unit"
+  echo "# around 'nemoclaw <sandbox> recover', because the openshell forward"
+  echo "# CLI's port-in-use check is not interface-aware and a running relay"
+  echo "# blocks the loopback wake-hook forward from being re-created."
+  echo "${LAB_USER} ALL=(root) NOPASSWD: ${SYSTEMCTL_BIN} stop nemoclaw-hook-relay.service, ${SYSTEMCTL_BIN} start nemoclaw-hook-relay.service, ${SYSTEMCTL_BIN} is-active nemoclaw-hook-relay.service"
+} > "$SUDOERS_TMP"
+if visudo -cf "$SUDOERS_TMP" >/dev/null 2>&1; then
+  mkdir -p /etc/sudoers.d
+  install -m 0440 -o root -g root "$SUDOERS_TMP" "$SUDOERS_DROPIN"
+  echo "✓ scoped sudo for doctor --fix: ${SUDOERS_DROPIN}"
+else
+  echo "✗ refused to install invalid sudoers drop-in — doctor's relay stop/start will fall back to best-effort" >&2
+fi
+rm -f "$SUDOERS_TMP"
 
 # Timers: no port conflicts possible — enable + start unconditionally.
 systemctl enable --now nemoclaw-inference-watchdog.timer

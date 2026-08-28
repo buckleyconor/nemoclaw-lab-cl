@@ -170,8 +170,10 @@ install-inference-watchdog:
 
 # Install + enable the FULL self-heal layer as system units: inference
 # watchdog (60s, root), doctor --fix timer (5 min, lab user), terminal +
-# hook-relay services (lab user, Restart=on-failure). Idempotent. Must run
-# as root: sudo make install-selfheal   (demo-up offers this with one prompt)
+# hook-relay services (lab user, Restart=on-failure), and the scoped
+# passwordless systemctl (stop/start/is-active on the hook-relay unit only)
+# doctor --fix needs to stop the relay around `nemoclaw recover`. Idempotent.
+# Must run as root: sudo make install-selfheal   (demo-up offers this with one prompt)
 install-selfheal:
 	./deploy/scripts/install-selfheal.sh
 
