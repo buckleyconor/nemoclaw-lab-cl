@@ -49,9 +49,8 @@ SANDBOX_NAME="$(env_get SANDBOX_NAME)"; SANDBOX_NAME="${SANDBOX_NAME:-infra-sent
 HOOK_URL="$(env_get OPENCLAW_HOOK_URL)"
 HOOK_PORT="${HOOK_URL##*:}"; HOOK_PORT="${HOOK_PORT%%/*}"; HOOK_PORT="${HOOK_PORT:-18790}"
 TERMINAL_PORT="$(env_get TERMINAL_PORT)"; TERMINAL_PORT="${TERMINAL_PORT:-8005}"
-GATEWAY_PORT="$(env_get NEMOCLAW_GATEWAY_PORT)"; GATEWAY_PORT="${GATEWAY_PORT:-18080}"
-GATEWAY_NAME="nemoclaw-${GATEWAY_PORT}"
-GATEWAY_UNIT="nemoclaw-gateway-${GATEWAY_PORT}.service"
+# GATEWAY_NAME/PORT/UNIT come from the live CLI registry — derived below,
+# where as_user exists.
 
 sed_sub() { # $1=template, $2=output — substitute the __NEMOCLAW_*__ placeholders
   sed -e "s|__NEMOCLAW_REPO__|${REPO}|g" \
@@ -71,6 +70,36 @@ as_user() {
   runuser -u "$LAB_USER" -- env "XDG_RUNTIME_DIR=/run/user/${LAB_UID}" \
     "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${LAB_UID}/bus" "$@"
 }
+
+# ── Gateway identity (name + port) ───────────────────────────────────────────
+# Read it from the CLI's own registry, never construct it: `nemoclaw onboard`
+# passes no gateway name, so the CLI registers its default (plain `nemoclaw`)
+# on whatever port it chose. Deriving `nemoclaw-<port>` here made every unit
+# reference a gateway that does not exist — the keeper died with "Unknown
+# gateway 'nemoclaw-18080'" and its Wants= dragged the takeover unit into an
+# address-in-use crash-loop (2026-08-31). Prefer the row the CLI marks active
+# with `*`; fall back to the first registered gateway.
+GATEWAY_LIST="$(as_user "${LAB_HOME}/.local/bin/openshell" gateway list 2>/dev/null \
+  | sed -E 's/\x1b\[[0-9;]*m//g' || true)"
+# Every grep here is `|| true`: no match is an expected outcome (no gateway
+# registered yet) that must reach the fallback below, not trip set -o pipefail.
+GATEWAY_ROW="$(grep -E '^[[:space:]]*\*' <<<"$GATEWAY_LIST" | head -1 || true)"
+[[ -n "$GATEWAY_ROW" ]] || GATEWAY_ROW="$(grep -E '://' <<<"$GATEWAY_LIST" | head -1 || true)"
+GATEWAY_ROW="$(sed -E 's/^[[:space:]]*\*?[[:space:]]*//' <<<"$GATEWAY_ROW")"
+GATEWAY_NAME="$(awk '{print $1}' <<<"$GATEWAY_ROW")"
+GATEWAY_PORT="$(grep -oE '://[^[:space:]]+' <<<"$GATEWAY_ROW" | grep -oE ':[0-9]+$' | tr -d ':' || true)"
+
+if [[ -n "$GATEWAY_NAME" && -n "$GATEWAY_PORT" ]]; then
+  echo "✓ gateway from registry: ${GATEWAY_NAME} (port ${GATEWAY_PORT})"
+else
+  GATEWAY_NAME="${GATEWAY_NAME:-nemoclaw}"
+  GATEWAY_PORT="${GATEWAY_PORT:-$(env_get NEMOCLAW_GATEWAY_PORT)}"
+  GATEWAY_PORT="${GATEWAY_PORT:-8080}"
+  echo "! could not read the gateway registry — assuming '${GATEWAY_NAME}' on ${GATEWAY_PORT}." >&2
+  echo "  If the wake-hook keeper later logs \"Unknown gateway\", re-run this" >&2
+  echo "  script once the gateway is up: openshell gateway list" >&2
+fi
+GATEWAY_UNIT="nemoclaw-gateway-${GATEWAY_PORT}.service"
 
 # ── System units ─────────────────────────────────────────────────────────────
 SYSTEM_UNITS=(
