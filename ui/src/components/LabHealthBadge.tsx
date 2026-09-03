@@ -6,7 +6,7 @@ import type { LabHealth } from "../types";
 // terminal daemon), probed by the Gateway container every POLL_MS. The
 // "agent idle" failure class used to be invisible — a dead lab looked exactly
 // like "no faults right now" (2026-08-28 incident).
-const POLL_MS = 20_000;
+const POLL_MS = 30_000;
 
 export function LabHealthBadge() {
   const [health, setHealth] = useState<LabHealth | null>(null);

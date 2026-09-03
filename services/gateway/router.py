@@ -144,6 +144,12 @@ async def lab_health() -> dict:
         # port — probing it would paint the chip red on a correctly
         # configured host. The endpoint itself is not reachable from this
         # container by design; `make doctor` covers it host-side.
+        #
+        # A 4xx (e.g. 429 rate limit) is not a failure — the proxy is alive,
+        # just throttling.  We only fail on 5xx or connection errors.
+        # If we hit a 429, wait and retry once (Kong rate limits are per-key
+        # with a short sliding window; a transient 429 likely means the
+        # health probe arrived during a burst from another consumer).
         probe = f"http://host.docker.internal:{llm_port}/v1/models"
         headers = {"Authorization": f"Bearer {llm_key}"} if llm_key else None
         if llm_direct:
@@ -154,32 +160,43 @@ async def lab_health() -> dict:
                 "LLM_DIRECT=1 — sandbox talks to the endpoint directly; "
                 "check it with `make doctor` on the host",
             )
+        elif llm_key:
+            r = None
+            last_ex = None
+            for attempt in (1, 2):
+                try:
+                    r = await client.get(probe, headers=headers)
+                    if r.status_code == 429 and attempt == 1:
+                        wait = int(r.headers.get("Retry-After", 2))
+                        await asyncio.sleep(min(wait, 5))  # cap at 5s
+                        continue
+                    break
+                except httpx.HTTPError as e:
+                    last_ex = e
+                    continue
+            if r is not None:
+                is_fail = r.status_code >= 500
+                status = "fail" if is_fail else "ok"
+                detail = f"{probe} -> {r.status_code}"
+                if r.status_code == 429:
+                    detail += " (rate-limited, but proxy is alive)"
+                elif r.status_code == 200 and attempt > 1:
+                    detail += " (retried after 429)"
+                add("inference-proxy", "Agent LLM route (inference proxy)",
+                    status, detail)
+            else:
+                add("inference-proxy", "Agent LLM route (inference proxy)", "fail",
+                    f"{probe} unreachable ({type(last_ex).__name__}) after retry — `sudo systemctl restart nginx` / `make doctor`")
         else:
             try:
                 r = await client.get(probe, headers=headers)
-                if llm_key:
-                    add(
-                        "inference-proxy",
-                        "Agent LLM route (inference proxy)",
-                        "ok" if r.status_code == 200 else "fail",
-                        f"{probe} -> {r.status_code}",
-                    )
-                else:
-                    add(
-                        "inference-proxy",
-                        "Agent LLM route (inference proxy)",
-                        "skip",
-                        f"{probe} -> {r.status_code} — LLM_API_KEY unset in the gateway; "
-                        "run `make doctor` on the host",
-                    )
+                add("inference-proxy", "Agent LLM route (inference proxy)",
+                    "skip",
+                    f"{probe} -> {r.status_code} — LLM_API_KEY unset in the gateway; "
+                    "run `make doctor` on the host")
             except httpx.HTTPError as e:
-                add(
-                    "inference-proxy",
-                    "Agent LLM route (inference proxy)",
-                    "fail",
-                    f"{probe} unreachable ({type(e).__name__}) — "
-                    "`sudo systemctl restart nginx` / `make doctor`",
-                )
+                add("inference-proxy", "Agent LLM route (inference proxy)", "fail",
+                    f"{probe} unreachable ({type(e).__name__}) — `sudo systemctl restart nginx` / `make doctor`")
 
         # Wake hook — a bad token must 401: forward alive AND auth wired.
         if hook_url:
