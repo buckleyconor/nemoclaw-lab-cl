@@ -111,6 +111,9 @@ services:
       # commented out in .env by default, so the 18100 default applies.
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_PROXY_PORT: ${LLM_PROXY_PORT:-18100}
+      # LLM_DIRECT=1 means the sandbox bypasses the proxy, so nothing listens
+      # on LLM_PROXY_PORT — the chip reports "skip" instead of a false red.
+      LLM_DIRECT: ${LLM_DIRECT:-}
       # Embedded operator terminal (ADR-012). The terminal daemon runs on the
       # host (`make terminal`); from this container it is
       # ws://host.docker.internal:8005/ws. Off unless URL + token are set.

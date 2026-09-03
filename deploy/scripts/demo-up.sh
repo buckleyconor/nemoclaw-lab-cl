@@ -22,11 +22,9 @@ if [[ ! -f .env ]]; then
 fi
 
 # shellcheck source=deploy/scripts/lib/envfile.sh
-source deploy/scripts/lib/envfile.sh   # for bridge_ip
+source deploy/scripts/lib/envfile.sh   # bridge_ip + env_get
 BRIDGE_IP="$(bridge_ip)"
 
-# `|| true`: a missing var must yield "", not kill the script under set -e.
-env_get() { { grep -E "^$1=" .env 2>/dev/null || true; } | head -1 | cut -d= -f2-; }
 SANDBOX_NAME="$(env_get SANDBOX_NAME)"; SANDBOX_NAME="${SANDBOX_NAME:-infra-sentinel}"
 TERMINAL_BIND="$(env_get TERMINAL_BIND)"; TERMINAL_BIND="${TERMINAL_BIND:-127.0.0.1}"
 TERMINAL_WS_URL="$(env_get TERMINAL_WS_URL)"

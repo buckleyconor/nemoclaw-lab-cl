@@ -7,6 +7,11 @@
 # Idempotent — safe to re-run after a repo move (re-substitutes the path).
 set -euo pipefail
 
+# Writes to /etc/systemd/system — fail in one line with the exact command
+# rather than partway through with raw permission errors.
+[[ "${EUID:-$(id -u)}" -eq 0 ]] \
+  || { echo "must run as root: sudo make install-inference-watchdog" >&2; exit 1; }
+
 cd "$(dirname "$0")/../.."
 REPO="$(pwd)"
 for u in nemoclaw-inference-watchdog.service nemoclaw-inference-watchdog.timer; do

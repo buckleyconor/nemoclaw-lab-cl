@@ -46,6 +46,8 @@ RENDERED="$(mktemp)"
 trap 'rm -f "$RENDERED"' EXIT
 
 # Restrict envsubst to our variables so nginx's own $vars survive untouched.
+# shellcheck disable=SC2016  # literal on purpose: this is envsubst's
+# allowlist of names to substitute, not a string to expand here.
 envsubst '${LAB_INGRESS_HOST} ${MCP_PROXY_PORT} ${GW_PROXY_PORT} ${PROXY_SSL_CONF}' \
   < "$TEMPLATE" > "$RENDERED"
 

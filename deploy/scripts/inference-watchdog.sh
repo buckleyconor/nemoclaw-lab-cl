@@ -22,7 +22,7 @@
 # All output goes to the journal: journalctl -u nemoclaw-inference-watchdog
 set -uo pipefail
 
-cd "$(dirname "$0")/../.."
+cd "$(dirname "$0")/../.." || { echo "cannot cd to the repo root" >&2; exit 1; }
 
 # shellcheck source=deploy/scripts/lib/envfile.sh
 source deploy/scripts/lib/envfile.sh

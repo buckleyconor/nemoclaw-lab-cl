@@ -17,7 +17,15 @@
 # see deploy/systemd/user/nemoclaw-doctor.{service,timer}.
 set -uo pipefail
 
-cd "$(dirname "$0")/../.."
+cd "$(dirname "$0")/../.." || { echo "cannot cd to the repo root" >&2; exit 1; }
+
+# Sourced up here because the CLI environment below already needs env_get.
+# One implementation only: the library strips trailing inline comments, which
+# .env.example relies on (`LLM_API_KEY=<key>   # REQUIRED — ...`). Local
+# re-definitions used to drop that and made doctor disagree with bootstrap
+# about the same .env — the endpoint read green in one and 401 in the other.
+# shellcheck source=deploy/scripts/lib/envfile.sh
+source deploy/scripts/lib/envfile.sh
 
 # Self-serve the environment the nemoclaw/openshell CLIs need, from .env
 # (2026-08-28 incident: the doctor timer ran with a bare PATH and no
@@ -29,12 +37,11 @@ cd "$(dirname "$0")/../.."
 case ":$PATH:" in *:/snap/bin:*) ;; *) PATH="$PATH:/snap/bin" ;; esac
 case ":$PATH:" in *:"$HOME/.local/bin":*) ;; *) PATH="$HOME/.local/bin:$PATH" ;; esac
 export PATH
-_env_boot_get() { { grep -E "^$1=" .env 2>/dev/null || true; } | head -1 | cut -d= -f2- | sed -E 's/[[:space:]]+#.*$//'; }
-NEMOCLAW_GATEWAY_PORT_ENV="$(_env_boot_get NEMOCLAW_GATEWAY_PORT)"
+NEMOCLAW_GATEWAY_PORT_ENV="$(env_get NEMOCLAW_GATEWAY_PORT)"
 [[ -n "$NEMOCLAW_GATEWAY_PORT_ENV" ]] && export NEMOCLAW_GATEWAY_PORT="$NEMOCLAW_GATEWAY_PORT_ENV"
-NEMOCLAW_SANDBOX_GPU_ENV="$(_env_boot_get NEMOCLAW_SANDBOX_GPU)"
+NEMOCLAW_SANDBOX_GPU_ENV="$(env_get NEMOCLAW_SANDBOX_GPU)"
 [[ -n "$NEMOCLAW_SANDBOX_GPU_ENV" ]] && export NEMOCLAW_SANDBOX_GPU="$NEMOCLAW_SANDBOX_GPU_ENV"
-NEMOCLAW_TMPDIR_ENV="$(_env_boot_get NEMOCLAW_TMPDIR)"
+NEMOCLAW_TMPDIR_ENV="$(env_get NEMOCLAW_TMPDIR)"
 [[ -n "$NEMOCLAW_TMPDIR_ENV" && -d "$NEMOCLAW_TMPDIR_ENV" ]] && export TMPDIR="$NEMOCLAW_TMPDIR_ENV"
 
 FIX=0
@@ -51,12 +58,9 @@ FAILURES=0
 STATE_DIR="${HOME}/.local/state"
 mkdir -p "$STATE_DIR"
 
-# shellcheck source=deploy/scripts/lib/envfile.sh
-source deploy/scripts/lib/envfile.sh   # for bridge_ip (env_get is redefined below)
 BRIDGE_IP="$(bridge_ip)"
 
 # Pull the vars we probe with from .env (never exported — read-only probe).
-env_get() { grep -E "^$1=" .env 2>/dev/null | head -1 | cut -d= -f2-; }
 HOOK_URL="$(env_get OPENCLAW_HOOK_URL)"
 TERMINAL_WS_URL="$(env_get TERMINAL_WS_URL)"
 TERMINAL_BIND="$(env_get TERMINAL_BIND)"; TERMINAL_BIND="${TERMINAL_BIND:-127.0.0.1}"
@@ -170,7 +174,7 @@ forward_start() {
 RESTART_THROTTLE_SECS=900
 sandbox_container_restart() {
   command -v docker >/dev/null 2>&1 || return 1
-  local container marker last now health i
+  local container marker last now health
   container="$(docker ps -aq --filter "label=openshell.ai/sandbox-name=${SANDBOX_NAME}" 2>/dev/null | head -1)"
   [[ -n "$container" ]] || return 1
   marker="$STATE_DIR/nemoclaw-sandbox-restart-at"
@@ -186,7 +190,7 @@ sandbox_container_restart() {
   else
     docker start "$container" >/dev/null 2>&1 || return 1
   fi
-  for i in $(seq 1 30); do
+  for _ in $(seq 1 30); do
     health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}running{{end}}' "$container" 2>/dev/null)"
     case "$health" in
       healthy|running) return 0 ;;

@@ -30,6 +30,8 @@ cd "$(dirname "$0")/../.."
 
 # shellcheck source=deploy/scripts/lib/envfile.sh
 source deploy/scripts/lib/envfile.sh
+# shellcheck source=deploy/scripts/lib/nemoclaw.sh
+source deploy/scripts/lib/nemoclaw.sh
 
 FORCE="${FORCE:-0}"
 [[ "${1:-}" == "--force" ]] && FORCE=1
@@ -51,6 +53,11 @@ command -v nemoclaw >/dev/null \
 for tool in python3 openssl curl; do
   command -v "$tool" >/dev/null || die "$tool not found. Install: sudo apt-get install -y $tool"
 done
+# uv runs the terminal daemon (run-terminal.sh execs `uv run uvicorn`). Not
+# fatal — the terminal is an optional feature — but finding out here beats
+# finding out when the panel silently never connects.
+command -v uv >/dev/null \
+  || echo "  ! uv not found — the embedded terminal (ADR-012) will not start. Install: curl -LsSf https://astral.sh/uv/install.sh | sh"
 
 if [[ ! -f .env ]]; then
   die ".env not found. Run: cp .env.example .env — then set LLM_BASE_URL and LLM_MODEL."
@@ -80,18 +87,50 @@ case "$LLM_CODE" in
 esac
 
 # The sandbox reaches the LLM through the host inference proxy (ADR-014);
-# onboarding bakes that URL in, so the proxy must be live first.
+# onboarding bakes that URL in, so the proxy must be live first. On a genuinely
+# fresh host it never is — so bring it up rather than sending the operator away
+# and making them re-run the whole script (same offer-once posture demo-up.sh
+# uses for the self-heal install).
+proxy_code() {
+  curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
+    -H "Authorization: Bearer ${LLM_API_KEY}" \
+    "http://127.0.0.1:${LLM_PROXY_PORT}/v1/models" || true
+}
 if [[ "${LLM_DIRECT:-0}" != "1" ]]; then
-  PROXY_CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
-    -H "Authorization: Bearer ${LLM_API_KEY}" "http://127.0.0.1:${LLM_PROXY_PORT}/v1/models" || true)"
+  # /usr/sbin is not on every user's PATH even when the binary is there
+  # (sudo's secure_path has it) — accept either, as run-inference-proxy.sh does.
+  command -v nginx >/dev/null || [[ -x /usr/sbin/nginx ]] \
+    || die "nginx not found — it carries the agent's LLM route (ADR-014).
+    Install: sudo apt-get install -y nginx     (or set LLM_DIRECT=1 for a genuinely public endpoint)"
+
+  PROXY_CODE="$(proxy_code)"
+  if [[ "$PROXY_CODE" != "200" ]] && [[ -t 0 ]]; then
+    echo "  ! inference proxy on :${LLM_PROXY_PORT} is not answering (got '${PROXY_CODE:-nothing}')."
+    echo "    It must be live before onboarding — the URL is baked into the sandbox."
+    read -r -p "    Bring it up now with run-inference-proxy.sh? (one sudo prompt) [Y/n] " REPLY
+    case "${REPLY:-Y}" in
+      [Nn]*) : ;;
+      *) ./deploy/scripts/run-inference-proxy.sh || true   # it prints its own
+         PROXY_CODE="$(proxy_code)" ;;                      # diagnosis; die below
+    esac
+  fi
   [[ "$PROXY_CODE" == "200" ]] \
     || die "inference proxy on :${LLM_PROXY_PORT} is not answering (got '${PROXY_CODE:-nothing}'). Bring it up first:
-    sudo apt-get install -y nginx     (if nginx is missing)
     deploy/scripts/run-inference-proxy.sh"
 fi
-echo "  ✓ docker (+compose), nemoclaw, .env"
+# The sandbox image is built FROM the managed OpenClaw image for the CLI
+# release driving the onboard. Surface the pairing here — a skew fails ~10
+# minutes into the image build with a base_only_image / exit-127 symptom that
+# reads like a code bug (docs/TROUBLESHOOTING.md, "onboarding contract walls").
+BOOT_CLI_VERSION="$(cli_version)"
+[[ -n "$BOOT_CLI_VERSION" ]] \
+  || echo "  ! could not parse 'nemoclaw --version'; the sandbox base image will fall back to
+    ${NEMOCLAW_SANDBOX_BASE_FALLBACK}. Set SANDBOX_BASE if onboarding fails on the base image."
+
+echo "  ✓ docker (+compose), nemoclaw${BOOT_CLI_VERSION:+ v$BOOT_CLI_VERSION}, .env"
 echo "  ✓ LLM endpoint  ${LLM_BASE_URL}  (${LLM_MODEL})"
 [[ "${LLM_DIRECT:-0}" == "1" ]] || echo "  ✓ inference proxy  :${LLM_PROXY_PORT}"
+echo "  ✓ sandbox base   $(sandbox_base)"
 
 echo
 echo "── 2/5 terminal bind address ─────────────────────────────────────"
@@ -140,14 +179,15 @@ if command -v ufw >/dev/null && systemctl is-active --quiet ufw 2>/dev/null; the
   echo "shows disconnected, the wake hook never fires (faults look undetected),"
   echo "and the agent cannot reach the LLM. Run these yourself (they need sudo):"
   echo
-  echo "  sudo ufw allow from ${COMPOSE_NET:-172.23.0.0/16} to ${BRIDGE_IP:-172.17.0.1} port 8005 proto tcp comment 'nemoclaw terminal daemon (ADR-012)'"
+  echo "  sudo ufw allow from ${COMPOSE_NET:-172.28.100.0/24} to ${BRIDGE_IP:-172.17.0.1} port 8005 proto tcp comment 'nemoclaw terminal daemon (ADR-012)'"
   BOOT_HOOK_URL="$(env_get OPENCLAW_HOOK_URL)"
   BOOT_HOOK_PORT="${BOOT_HOOK_URL##*:}"; BOOT_HOOK_PORT="${BOOT_HOOK_PORT%%/*}"
-  echo "  sudo ufw allow from ${COMPOSE_NET:-172.23.0.0/16} to any port ${BOOT_HOOK_PORT:-18790} proto tcp comment 'openclaw wake hook (ADR-011)'"
+  echo "  sudo ufw allow from ${COMPOSE_NET:-172.28.100.0/24} to any port ${BOOT_HOOK_PORT:-18790} proto tcp comment 'openclaw wake hook (ADR-011)'"
   echo "  sudo ufw allow from 172.16.0.0/12 to any port ${LLM_PROXY_PORT} proto tcp comment 'nemoclaw inference proxy (ADR-014)'"
   echo
-  echo "(${COMPOSE_NET:-subnet} is this compose network, detected live — it is not"
-  echo " pinned in docker-compose.yaml, so re-check it if the hook ever stops firing.)"
+  echo "(${COMPOSE_NET:-172.28.100.0/24} is this compose network. It is pinned to"
+  echo " 172.28.100.0/24 in docker-compose.yaml, but the value above is the one"
+  echo " detected live — re-check it if you changed the pin and the hook stops firing.)"
 fi
 
 if ! systemctl is-enabled --quiet nemoclaw-doctor.timer 2>/dev/null; then

@@ -117,6 +117,7 @@ async def lab_health() -> dict:
     hook_url = os.environ.get("OPENCLAW_HOOK_URL", "")
     llm_key = os.environ.get("LLM_API_KEY", "")
     llm_port = os.environ.get("LLM_PROXY_PORT", "18100")
+    llm_direct = os.environ.get("LLM_DIRECT", "") == "1"
     term_ws = os.environ.get("TERMINAL_WS_URL", "")
     term_enabled = os.environ.get("TERMINAL_ENABLED", "")
 
@@ -135,20 +136,31 @@ async def lab_health() -> dict:
 
         # Inference proxy — the agent's LLM route (ADR-014). When this dies
         # the agent's cron wakes burn on 503s and the UI shows "idle".
+        #
+        # LLM_DIRECT=1 opts out of the proxy entirely (the sandbox was
+        # onboarded against a public endpoint), so nothing listens on that
+        # port — probing it would paint the chip red on a correctly
+        # configured host. The endpoint itself is not reachable from this
+        # container by design; `make doctor` covers it host-side.
         probe = f"http://host.docker.internal:{llm_port}/v1/models"
         headers = {"Authorization": f"Bearer {llm_key}"} if llm_key else None
-        try:
-            r = await client.get(probe, headers=headers)
-            if llm_key:
-                add("inference-proxy", "Agent LLM route (inference proxy)",
-                    "ok" if r.status_code == 200 else "fail", f"{probe} -> {r.status_code}")
-            else:
-                add("inference-proxy", "Agent LLM route (inference proxy)",
-                    "skip",
-                    f"{probe} -> {r.status_code} — LLM_API_KEY unset in the gateway; run `make doctor` on the host")
-        except httpx.HTTPError as e:
-            add("inference-proxy", "Agent LLM route (inference proxy)", "fail",
-                f"{probe} unreachable ({type(e).__name__}) — `sudo systemctl restart nginx` / `make doctor`")
+        if llm_direct:
+            add("inference-proxy", "Agent LLM route (inference proxy)", "skip",
+                "LLM_DIRECT=1 — sandbox talks to the endpoint directly; "
+                "check it with `make doctor` on the host")
+        else:
+            try:
+                r = await client.get(probe, headers=headers)
+                if llm_key:
+                    add("inference-proxy", "Agent LLM route (inference proxy)",
+                        "ok" if r.status_code == 200 else "fail", f"{probe} -> {r.status_code}")
+                else:
+                    add("inference-proxy", "Agent LLM route (inference proxy)",
+                        "skip",
+                        f"{probe} -> {r.status_code} — LLM_API_KEY unset in the gateway; run `make doctor` on the host")
+            except httpx.HTTPError as e:
+                add("inference-proxy", "Agent LLM route (inference proxy)", "fail",
+                    f"{probe} unreachable ({type(e).__name__}) — `sudo systemctl restart nginx` / `make doctor`")
 
         # Wake hook — a bad token must 401: forward alive AND auth wired.
         if hook_url:

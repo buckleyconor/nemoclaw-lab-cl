@@ -33,6 +33,11 @@
 # and it migrates a host off the legacy all-system layout in place.
 set -euo pipefail
 
+# Writes to /etc/systemd/system — fail in one line with the exact command
+# rather than partway through with raw permission errors.
+[[ "${EUID:-$(id -u)}" -eq 0 ]] \
+  || { echo "must run as root: sudo make install-selfheal" >&2; exit 1; }
+
 cd "$(dirname "$0")/../.."
 REPO="$(pwd)"
 
@@ -43,8 +48,12 @@ LAB_HOME="$(getent passwd "$LAB_USER" | cut -d: -f6)"
 [[ -n "$LAB_HOME" ]] || { echo "cannot resolve home for '$LAB_USER'" >&2; exit 1; }
 LAB_UID="$(id -u "$LAB_USER")"
 
-# Values the units need — same .env, same defaults the run scripts use.
-env_get() { { grep -E "^$1=" .env 2>/dev/null || true; } | head -1 | cut -d= -f2- | sed -E 's/[[:space:]]+#.*$//'; }
+# Values the units need — same .env, same reader, same defaults the run
+# scripts use. One env_get implementation only (tests/unit/test_envfile.py
+# enforces it): local copies have twice drifted from the library and made
+# scripts disagree about the same .env.
+# shellcheck source=deploy/scripts/lib/envfile.sh
+source deploy/scripts/lib/envfile.sh
 SANDBOX_NAME="$(env_get SANDBOX_NAME)"; SANDBOX_NAME="${SANDBOX_NAME:-infra-sentinel}"
 HOOK_URL="$(env_get OPENCLAW_HOOK_URL)"
 HOOK_PORT="${HOOK_URL##*:}"; HOOK_PORT="${HOOK_PORT%%/*}"; HOOK_PORT="${HOOK_PORT:-18790}"

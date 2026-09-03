@@ -45,6 +45,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 # shellcheck source=deploy/scripts/lib/envfile.sh
 source "${REPO_ROOT}/deploy/scripts/lib/envfile.sh"
+# shellcheck source=deploy/scripts/lib/nemoclaw.sh
+source "${REPO_ROOT}/deploy/scripts/lib/nemoclaw.sh"
 cd "$REPO_ROOT"  # env_upsert writes ./.env
 
 SANDBOX_NAME="${SANDBOX_NAME:-infra-sentinel}"
@@ -82,6 +84,16 @@ command -v nemoclaw >/dev/null || {
   exit 1
 }
 
+# The sandbox base image tag tracks the installed CLI release (see
+# lib/nemoclaw.sh for why a hardcoded tag rots). SANDBOX_BASE overrides.
+SANDBOX_BASE="$(sandbox_base)"
+CLI_VERSION="$(cli_version)"
+if [[ -z "$CLI_VERSION" ]]; then
+  echo "! could not parse 'nemoclaw --version' — falling back to ${SANDBOX_BASE}." >&2
+  echo "  If onboarding fails on the base image, set SANDBOX_BASE explicitly." >&2
+fi
+echo "Sandbox base image: ${SANDBOX_BASE}${CLI_VERSION:+  (nemoclaw CLI v${CLI_VERSION})}"
+
 # ── 1. Stage the sandbox image build context ─────────────────────────────────
 BUILD_DIR="$(mktemp -d)"
 trap 'rm -rf "$BUILD_DIR"' EXIT
@@ -89,16 +101,26 @@ trap 'rm -rf "$BUILD_DIR"' EXIT
 cp -R "$REPO_ROOT/openclaw/plugins/nemoclaw-infra-tools" "$BUILD_DIR/nemoclaw-infra-tools"
 rm -rf "$BUILD_DIR/nemoclaw-infra-tools/node_modules" "$BUILD_DIR/nemoclaw-infra-tools/dist"
 
-cat > "$BUILD_DIR/Dockerfile" <<'DOCKERFILE'
+# Only the ARG default is interpolated (it tracks the installed CLI). It is
+# emitted by its own `printf` rather than an unquoted heredoc: the comment
+# prose below contains backticks and ${...}, which an unquoted heredoc would
+# run as command substitution / expand away.
+cat > "$BUILD_DIR/Dockerfile" <<'DOCKERFILE_HEADER'
 # `nemoclaw onboard --from` uses this Dockerfile as the COMPLETE sandbox
 # image — the CLI does not layer it over the managed runtime. Basing it on
 # ghcr.io/nvidia/nemoclaw/sandbox-base is the documented "base_only_image"
 # failure: /usr/local/bin/nemoclaw-start and the baked
 # /sandbox/.openclaw/openclaw.json are missing, so the restart-safe startup
 # clone exits 127. The full managed OpenClaw image for the installed CLI
-# release (v0.0.109) carries the managed runtime (nemoclaw-start entrypoint,
-# baked openclaw config + .config-hash, the managed nemoclaw extension).
-ARG SANDBOX_BASE=ghcr.io/nvidia/nemoclaw/openclaw-sandbox:v0.0.109
+# release carries the managed runtime (nemoclaw-start entrypoint, baked
+# openclaw config + .config-hash, the managed nemoclaw extension) — so this
+# tag MUST match the CLI driving the onboard, and is derived from it
+# (deploy/scripts/lib/nemoclaw.sh; SANDBOX_BASE overrides).
+DOCKERFILE_HEADER
+
+printf 'ARG SANDBOX_BASE=%s\n' "$SANDBOX_BASE" >> "$BUILD_DIR/Dockerfile"
+
+cat >> "$BUILD_DIR/Dockerfile" <<'DOCKERFILE'
 FROM ${SANDBOX_BASE}
 
 # NemoClaw >= v0.0.10x tool-disclosure contract: a custom Dockerfile must
@@ -243,7 +265,7 @@ nemoclaw "$SANDBOX_NAME" exec -- openclaw cron add \
 # host-side action that restarts the sandbox's gateway/dashboard.
 nemoclaw "$SANDBOX_NAME" recover
 
-# ── 7. Resolve the real webhook port and record it in .env ───────────────────
+# ── 6. Resolve the real webhook port and record it in .env ───────────────────
 # 18789 is only the default: openclaw silently self-reassigns if it is taken
 # (the reference GB10 host landed on 18790), and `nemoclaw <name> status` does
 # NOT report the chosen port. The sandbox's own config is the only authority,

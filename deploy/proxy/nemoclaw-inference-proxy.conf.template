@@ -14,10 +14,22 @@
 # so the sandbox-facing URL stays stable when the lab endpoint moves (that is
 # what makes `make repoint-llm` a reload instead of a re-onboard).
 #
-# Listeners bind loopback (host-side probes) and the docker bridge (the
-# sandbox) only — never all interfaces. The API key is NOT injected here; the
-# sandbox sends it via its COMPATIBLE_API_KEY credential. Buffering stays off:
-# chat completions stream as long-lived SSE responses.
+# Listeners bind loopback (host-side probes) plus ${BRIDGE_IP}, which
+# run-inference-proxy.sh defaults to 0.0.0.0 — i.e. ALL interfaces. That is
+# deliberate: OpenShell puts the sandbox on its own bridge network (not
+# docker0), so host.openshell.internal resolves to an address that is not
+# known ahead of time, and a specific-IP bind also fails at boot before Docker
+# has assigned it. Set BRIDGE_IP=<ip> when you know the address and want a
+# single-interface bind.
+#
+# Consequence to be aware of on a host with a public NIC: this listener has NO
+# auth of its own — it forwards whatever Authorization header it is given, and
+# the API key is NOT injected here (the sandbox sends its own
+# COMPATIBLE_API_KEY credential). What keeps the outside world out is the
+# firewall: run-inference-proxy.sh prints the ufw rule that limits :PORT to
+# the docker/OpenShell bridge ranges. Apply it, or bind a specific interface.
+#
+# Buffering stays off: chat completions stream as long-lived SSE responses.
 
 server {
     listen 127.0.0.1:${LLM_PROXY_PORT};

@@ -73,6 +73,8 @@ RENDERED="$(mktemp)"
 trap 'rm -f "$RENDERED"' EXIT
 
 # Restrict envsubst to our variables so nginx's own $vars survive untouched.
+# shellcheck disable=SC2016  # literal on purpose: this is envsubst's
+# allowlist of names to substitute, not a string to expand here.
 envsubst '${LLM_BASE_URL} ${LLM_PROXY_PORT} ${BRIDGE_IP} ${PROXY_SSL_CONF}' \
   < "$TEMPLATE" > "$RENDERED"
 
@@ -125,10 +127,25 @@ if [[ -n "$LLM_MODEL" ]] && ! grep -qF "$LLM_MODEL" "$BODY"; then
 fi
 echo "✓ proxy live: http://host.openshell.internal:${LLM_PROXY_PORT}/v1 -> ${LLM_BASE_URL}"
 
-cat <<EOF
+if [[ "$BRIDGE_IP" == "0.0.0.0" ]]; then
+  cat <<EOF
 
-If ufw is active, allow the docker bridge through (the listener itself only
-binds ${BRIDGE_IP} + loopback):
+This listener binds ALL interfaces (BRIDGE_IP=0.0.0.0, the default — the
+OpenShell sandbox is not on docker0, so its address is not known ahead of
+time) and it adds no auth of its own. On a host with a public NIC the firewall
+is what keeps :${LLM_PROXY_PORT} private. If ufw is active, allow only the
+bridge ranges:
+
+  sudo ufw allow from 172.16.0.0/12 to any port ${LLM_PROXY_PORT} proto tcp comment "nemoclaw inference proxy (docker bridge)"
+
+(Or re-run with BRIDGE_IP=<addr> to bind a single interface.)
+EOF
+else
+  cat <<EOF
+
+If ufw is active, allow the docker bridge through (this listener binds
+${BRIDGE_IP} + loopback):
 
   sudo ufw allow from 172.16.0.0/12 to any port ${LLM_PROXY_PORT} proto tcp comment "nemoclaw inference proxy (docker bridge)"
 EOF
+fi
