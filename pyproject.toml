@@ -24,7 +24,10 @@ dependencies = [
 dev = [
     "pytest>=8.3.0",
     "pytest-asyncio>=0.23.0",
-    "ruff>=0.8.0",
+    # Pinned exactly: an unbounded linter floats to whatever is newest at
+    # CI time, so a release that adds a rule turns main red with no code
+    # change. Bump deliberately, with the formatting sweep in the same commit.
+    "ruff==0.15.20",
     "mypy>=1.13.0",
     "types-pyyaml>=6.0.12",
     "types-redis>=4.6.0",
@@ -49,10 +52,23 @@ target-version = "py311"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "TCH"]
+# TCH/TC (type-checking-block imports) is deliberately NOT selected. Its whole
+# value is deferring import cost and breaking cycles, neither of which applies
+# to a long-running server whose imports are all loaded anyway — while Pydantic,
+# FastAPI and the MCP server all resolve annotations at RUNTIME to build models,
+# inject dependencies and generate tool schemas. Every fix the rule offers here
+# is marked unsafe for exactly that reason: moving e.g. RemediationStep out of
+# services/orchestrator/router.py's imports raises PydanticUndefinedAnnotation
+# at import time.
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM"]
 ignore = [
     "N999",   # module name may clash with class name in services
     "B008",   # FastAPI Depends() calls in function defaults
+    # `class X(str, Enum)` is deliberate. These values are persisted (Redis /
+    # SQLite) and cross the API boundary; StrEnum changes what str() and
+    # f-strings produce, which is a real behaviour change for no functional
+    # gain. Revisit only with serialization coverage in place.
+    "UP042",
 ]
 
 [tool.ruff.lint.isort]

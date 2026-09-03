@@ -95,9 +95,12 @@ def test_pack_kb_articles_not_placeholder(loaded: LoadedPack) -> None:
     for kb_id, article in loaded.kb_articles.items():
         assert article.body_md.strip(), f"KB article {kb_id} is empty"
         assert len(article.body_md) > 500, (
-            f"KB article {kb_id} body too short ({len(article.body_md)} chars) — looks like a placeholder"
+            f"KB article {kb_id} body too short ({len(article.body_md)} chars) "
+            "— looks like a placeholder"
         )
-        assert "PLACEHOLDER" not in article.body_md, f"KB article {kb_id} still has PLACEHOLDER text"
+        assert "PLACEHOLDER" not in article.body_md, (
+            f"KB article {kb_id} still has PLACEHOLDER text"
+        )
 
 
 def test_pack_kb_articles_have_remediation_steps(loaded: LoadedPack) -> None:

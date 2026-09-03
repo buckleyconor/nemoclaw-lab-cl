@@ -39,6 +39,7 @@ def _require_asset(asset_id: str, engine: SimulatorEngine) -> None:
 # Service root
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 @router.get("/redfish/v1/")
 async def service_root() -> dict:
     return {
@@ -56,6 +57,7 @@ async def service_root() -> dict:
 # ──────────────────────────────────────────────────────────────────────────────
 # Systems  (each pack asset is one Redfish System)
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 @router.get("/redfish/v1/Systems")
 async def systems_collection(engine: SimulatorEngine = Depends(_engine)) -> dict:
@@ -93,16 +95,17 @@ async def get_system(asset_id: str, engine: SimulatorEngine = Depends(_engine)) 
 # LogServices  (DCGM log service surfaces GPU/system faults)
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 @router.get("/redfish/v1/Systems/{asset_id}/LogServices")
-async def log_services_collection(asset_id: str, engine: SimulatorEngine = Depends(_engine)) -> dict:
+async def log_services_collection(
+    asset_id: str, engine: SimulatorEngine = Depends(_engine)
+) -> dict:
     _require_asset(asset_id, engine)
     return {
         "@odata.type": "#LogServiceCollection.LogServiceCollection",
         "@odata.id": f"/redfish/v1/Systems/{asset_id}/LogServices",
         "Name": "Log Service Collection",
-        "Members": [
-            {"@odata.id": f"/redfish/v1/Systems/{asset_id}/LogServices/DCGM"}
-        ],
+        "Members": [{"@odata.id": f"/redfish/v1/Systems/{asset_id}/LogServices/DCGM"}],
         "Members@odata.count": 1,
     }
 
@@ -140,23 +143,26 @@ def _build_log_entry_members(asset_id: str, fault: InjectedFault | None) -> list
     ts = fault.injected_at.isoformat()
     entries = []
     for idx, (severity, message) in enumerate(fault.log_entries):
-        entries.append({
-            "@odata.type": "#LogEntry.v1_9_0.LogEntry",
-            "@odata.id": f"/redfish/v1/Systems/{asset_id}/LogServices/DCGM/Entries/{idx + 1}",
-            "Id": str(idx + 1),
-            "Name": "Log Entry",
-            "EntryType": "Event",
-            "Severity": severity,
-            "Message": message,
-            "MessageId": fault.event_message_id,
-            "Created": ts,
-        })
+        entries.append(
+            {
+                "@odata.type": "#LogEntry.v1_9_0.LogEntry",
+                "@odata.id": f"/redfish/v1/Systems/{asset_id}/LogServices/DCGM/Entries/{idx + 1}",
+                "Id": str(idx + 1),
+                "Name": "Log Entry",
+                "EntryType": "Event",
+                "Severity": severity,
+                "Message": message,
+                "MessageId": fault.event_message_id,
+                "Created": ts,
+            }
+        )
     return entries
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Chassis  (PSU status — relevant for psu_failure fault type)
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 @router.get("/redfish/v1/Chassis")
 async def chassis_collection(engine: SimulatorEngine = Depends(_engine)) -> dict:
@@ -206,22 +212,25 @@ def _build_psu_members(asset_id: str, fault: InjectedFault | None) -> list[dict]
     for idx, name in enumerate(psu_names):
         # PSU 2 (index 1) fails on a psu_failure fault
         failed = fault is not None and fault.fault_type == "psu_failure" and idx == 1
-        psu_list.append({
-            "@odata.id": f"/redfish/v1/Chassis/{asset_id}/Power#/PowerSupplies/{idx}",
-            "MemberId": str(idx),
-            "Name": name,
-            "PowerSupplyType": "AC",
-            "Status": {
-                "State": "Absent" if failed else "Enabled",
-                "Health": "Critical" if failed else "OK",
-            },
-        })
+        psu_list.append(
+            {
+                "@odata.id": f"/redfish/v1/Chassis/{asset_id}/Power#/PowerSupplies/{idx}",
+                "MemberId": str(idx),
+                "Name": name,
+                "PowerSupplyType": "AC",
+                "Status": {
+                    "State": "Absent" if failed else "Enabled",
+                    "Health": "Critical" if failed else "OK",
+                },
+            }
+        )
     return psu_list
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # EventService  (all active fault events across all assets)
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 @router.get("/redfish/v1/EventService")
 async def event_service() -> dict:

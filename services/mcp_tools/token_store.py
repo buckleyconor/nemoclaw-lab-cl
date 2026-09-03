@@ -57,9 +57,7 @@ class ApprovalTokenStore:
     def consume(self, token_str: str) -> None:
         """Mark token as consumed.  No-op if token doesn't exist."""
         if token_str in self._tokens:
-            self._tokens[token_str] = self._tokens[token_str].model_copy(
-                update={"consumed": True}
-            )
+            self._tokens[token_str] = self._tokens[token_str].model_copy(update={"consumed": True})
 
     # ──────────────────────────────────────────────────────────────────────────
     # Test helpers

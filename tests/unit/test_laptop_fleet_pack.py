@@ -38,6 +38,7 @@ def loaded() -> LoadedPack:
 # PACK-05: pack loads cleanly
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_pack05_pack_id(loaded: LoadedPack) -> None:
     assert loaded.pack.id == "laptop-fleet"
 
@@ -78,6 +79,7 @@ def test_pack05_simulator_profile_matches_assets(loaded: LoadedPack) -> None:
 # PACK-06: KB articles and log bundles
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_pack06_kb_articles_present(loaded: LoadedPack) -> None:
     """PACK-06: All 3 KB articles loaded."""
     assert set(loaded.kb_articles.keys()) == EXPECTED_KB_IDS
@@ -106,14 +108,14 @@ def test_pack06_log_bundles_contain_signatures(loaded: LoadedPack) -> None:
         assert bundle_text, f"Empty log bundle for {scenario.id}"
         found = any(sig.lower() in bundle_text.lower() for sig in scenario.error_signatures)
         assert found, (
-            f"Scenario {scenario.id}: none of {scenario.error_signatures!r} "
-            f"found in log bundle"
+            f"Scenario {scenario.id}: none of {scenario.error_signatures!r} found in log bundle"
         )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PACK-07: signature index
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_pack07_signature_index_populated(loaded: LoadedPack) -> None:
     """PACK-07: All error_signatures from all scenarios appear in the index."""
@@ -134,6 +136,7 @@ def test_pack07_signature_index_maps_to_valid_kb_id(loaded: LoadedPack) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 # Scenario-specific checks
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_scn_driver_tdr_targets_laptop02(loaded: LoadedPack) -> None:
     scn = loaded.scenarios_by_id["scn-driver-tdr"]

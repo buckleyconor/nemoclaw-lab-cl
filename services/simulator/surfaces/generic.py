@@ -50,11 +50,13 @@ async def list_events(
         if fault is None:
             continue
         message = fault.log_entries[0][1] if fault.log_entries else f"Fault on {aid}"
-        events.append({
-            "asset_id": aid,
-            "severity": fault.event_severity,
-            "message": message,
-            "message_id": fault.event_message_id,
-            "ts": fault.injected_at.isoformat(),
-        })
+        events.append(
+            {
+                "asset_id": aid,
+                "severity": fault.event_severity,
+                "message": message,
+                "message_id": fault.event_message_id,
+                "ts": fault.injected_at.isoformat(),
+            }
+        )
     return events

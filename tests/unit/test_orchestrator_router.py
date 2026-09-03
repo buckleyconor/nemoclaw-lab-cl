@@ -61,6 +61,6 @@ def test_stamp_today_replaces_date_but_keeps_time() -> None:
     import datetime as dt
 
     stamped = _stamp_today("2024-01-15T09:23:40Z CRIT something happened")
-    today = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d")
+    today = dt.datetime.now(dt.UTC).strftime("%Y-%m-%d")
     assert stamped.startswith(today)
     assert stamped.endswith("T09:23:40Z CRIT something happened")

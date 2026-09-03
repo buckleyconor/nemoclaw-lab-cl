@@ -50,6 +50,7 @@ def reset_between_tests(client: TestClient, fake_sim: FakeSimulatorClient) -> No
 # Health
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_healthz(client: TestClient) -> None:
     r = client.get("/healthz")
     assert r.status_code == 200
@@ -59,6 +60,7 @@ def test_healthz(client: TestClient) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 # Scenarios listing
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_list_scenarios_returns_all_five(client: TestClient) -> None:
     r = client.get("/api/scenarios")
@@ -75,6 +77,7 @@ def test_list_scenarios_last_used_is_null_initially(client: TestClient) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 # POST /api/run — rotation
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_run_returns_scenario_details(client: TestClient) -> None:
     r = client.post("/api/run")
@@ -126,6 +129,7 @@ def test_run_updates_last_used(client: TestClient) -> None:
 # POST /api/run/{scenario_id} — presenter override
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_run_specific_injects_correct_scenario(
     client: TestClient, fake_sim: FakeSimulatorClient
 ) -> None:
@@ -157,6 +161,7 @@ def test_run_specific_next_auto_avoids_forced(client: TestClient) -> None:
 # GET /api/current
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_current_is_null_initially(client: TestClient) -> None:
     r = client.get("/api/current")
     assert r.status_code == 200
@@ -178,6 +183,7 @@ def test_current_reflects_active_scenario(client: TestClient) -> None:
 # POST /api/reset
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_reset_clears_active_scenarios(client: TestClient) -> None:
     client.post("/api/run")
     r = client.post("/api/reset")
@@ -188,9 +194,7 @@ def test_reset_clears_active_scenarios(client: TestClient) -> None:
     assert all(v is None for v in r2.json()["active"].values())
 
 
-def test_reset_calls_simulator_clear(
-    client: TestClient, fake_sim: FakeSimulatorClient
-) -> None:
+def test_reset_calls_simulator_clear(client: TestClient, fake_sim: FakeSimulatorClient) -> None:
     run_r = client.post("/api/run")
     target_asset = run_r.json()["target_asset"]
     fake_sim.reset_history()
@@ -202,6 +206,7 @@ def test_reset_calls_simulator_clear(
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /api/assets/{id}/logs
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_get_logs_returns_bundle_for_active_scenario(client: TestClient) -> None:
     run_r = client.post("/api/run/scn-gpu-xid-79")
@@ -242,13 +247,14 @@ def test_get_logs_highlight_is_stamped_with_todays_date(client: TestClient) -> N
 
     r = client.get(f"/api/assets/{target_asset}/logs")
     data = r.json()
-    today = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d")
+    today = dt.datetime.now(dt.UTC).strftime("%Y-%m-%d")
     assert today in data["log_highlight"]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /api/assets/{id}/scenario
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_get_asset_scenario_returns_remediation_steps(client: TestClient) -> None:
     run_r = client.post("/api/run/scn-gpu-xid-79")

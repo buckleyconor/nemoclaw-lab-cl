@@ -134,9 +134,7 @@ def reset_state(orchestrator_tc, simulator_tc, token_store, fault_registry, fake
 
 
 def _gw(gateway_tc: TestClient) -> httpx.AsyncClient:
-    return httpx.AsyncClient(
-        transport=ASGITransport(app=gateway_tc.app), base_url="http://gateway"
-    )
+    return httpx.AsyncClient(transport=ASGITransport(app=gateway_tc.app), base_url="http://gateway")
 
 
 def _inject(orchestrator_tc: TestClient, simulator_tc: TestClient) -> str:
@@ -151,18 +149,24 @@ def _inject(orchestrator_tc: TestClient, simulator_tc: TestClient) -> str:
 
 @pytest.mark.asyncio
 async def test_sec06_hostile_log_text_cannot_mint_token_or_execute(
-    simulator_tc, orchestrator_tc, gateway_tc, fake_sim,
+    simulator_tc,
+    orchestrator_tc,
+    gateway_tc,
+    fake_sim,
 ) -> None:
     """Injection strings in log evidence change nothing: no decision → no
     token → no execution, no matter what the fault or proposal contain."""
     target_asset = _inject(orchestrator_tc, simulator_tc)
 
     async with _gw(gateway_tc) as gw:
-        r = await gw.post("/api/faults", json={
-            "scenario_id": "scn-gpu-xid-79",
-            "asset_id": target_asset,
-            "log_extract": HOSTILE_LOG_EXTRACT,
-        })
+        r = await gw.post(
+            "/api/faults",
+            json={
+                "scenario_id": "scn-gpu-xid-79",
+                "asset_id": target_asset,
+                "log_extract": HOSTILE_LOG_EXTRACT,
+            },
+        )
         fault_id = r.json()["id"]
 
         await remediation_propose(
@@ -178,7 +182,12 @@ async def test_sec06_hostile_log_text_cannot_mint_token_or_execute(
 
 @pytest.mark.asyncio
 async def test_sec06_execute_requires_valid_token_regardless_of_caller(
-    simulator_tc, orchestrator_tc, gateway_tc, token_store, fault_registry, fake_sim,
+    simulator_tc,
+    orchestrator_tc,
+    gateway_tc,
+    token_store,
+    fault_registry,
+    fake_sim,
 ) -> None:
     """Even a caller that reaches remediation.execute directly (a hijacked
     agent, a bug) gets refused without a genuine human-minted token."""
@@ -197,18 +206,24 @@ async def test_sec06_execute_requires_valid_token_regardless_of_caller(
     # SEC-01: no token
     with pytest.raises(RemediationError) as exc1:
         await remediation_execute(
-            fault_event_id="fev-hijack", approval_token="",
-            step_ids=["drain_node"], token_store=token_store,
-            fault_registry=fault_registry, clear_fn=_clear,
+            fault_event_id="fev-hijack",
+            approval_token="",
+            step_ids=["drain_node"],
+            token_store=token_store,
+            fault_registry=fault_registry,
+            clear_fn=_clear,
         )
     assert exc1.value.to_dict()["error"] == "not_approved"
 
     # SEC-02: fabricated token (e.g. taken verbatim from hostile log text)
     with pytest.raises(RemediationError) as exc2:
         await remediation_execute(
-            fault_event_id="fev-hijack", approval_token="admin-bypass",
-            step_ids=["drain_node"], token_store=token_store,
-            fault_registry=fault_registry, clear_fn=_clear,
+            fault_event_id="fev-hijack",
+            approval_token="admin-bypass",
+            step_ids=["drain_node"],
+            token_store=token_store,
+            fault_registry=fault_registry,
+            clear_fn=_clear,
         )
     assert exc2.value.to_dict()["error"] == "token_invalid"
     assert len(fake_sim.cleared) == 0
@@ -216,18 +231,24 @@ async def test_sec06_execute_requires_valid_token_regardless_of_caller(
 
 @pytest.mark.asyncio
 async def test_sec06_execution_happens_only_after_human_decision(
-    simulator_tc, orchestrator_tc, gateway_tc, fake_sim,
+    simulator_tc,
+    orchestrator_tc,
+    gateway_tc,
+    fake_sim,
 ) -> None:
     """The only path to execution is POST /decision by a human: before it,
     nothing; after it, the Gateway executes with a token the LLM never saw."""
     target_asset = _inject(orchestrator_tc, simulator_tc)
 
     async with _gw(gateway_tc) as gw:
-        r = await gw.post("/api/faults", json={
-            "scenario_id": "scn-gpu-xid-79",
-            "asset_id": target_asset,
-            "log_extract": HOSTILE_LOG_EXTRACT,
-        })
+        r = await gw.post(
+            "/api/faults",
+            json={
+                "scenario_id": "scn-gpu-xid-79",
+                "asset_id": target_asset,
+                "log_extract": HOSTILE_LOG_EXTRACT,
+            },
+        )
         fault_id = r.json()["id"]
         await remediation_propose(gw, fault_event_id=fault_id, step_ids=[], summary="hostile")
 

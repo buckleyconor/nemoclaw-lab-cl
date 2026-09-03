@@ -17,6 +17,7 @@ FIVE_SCENARIOS = [
 # U-06 — two consecutive calls return different scenario ids
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_u06_two_consecutive_calls_differ() -> None:
     """U-06: two consecutive next() calls must return different scenario ids."""
     policy = RotationPolicy(FIVE_SCENARIOS)
@@ -31,9 +32,7 @@ def test_u06_no_immediate_repeat_over_many_calls() -> None:
     prev = policy.next()
     for _ in range(99):
         current = policy.next()
-        assert current != prev, (
-            f"Immediate repeat: got {current!r} twice in a row"
-        )
+        assert current != prev, f"Immediate repeat: got {current!r} twice in a row"
         prev = current
 
 
@@ -50,6 +49,7 @@ def test_u06_all_scenarios_eventually_selected() -> None:
 # Initial state
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_last_used_is_none_before_first_call() -> None:
     policy = RotationPolicy(FIVE_SCENARIOS)
     assert policy.last_used is None
@@ -64,6 +64,7 @@ def test_last_used_updated_after_next() -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 # Presenter override (force)
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_force_selects_exact_scenario() -> None:
     policy = RotationPolicy(FIVE_SCENARIOS)
@@ -91,6 +92,7 @@ def test_after_force_next_avoids_forced_scenario() -> None:
 # Reset
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_reset_clears_last_used() -> None:
     policy = RotationPolicy(FIVE_SCENARIOS)
     policy.next()
@@ -101,7 +103,7 @@ def test_reset_clears_last_used() -> None:
 def test_after_reset_all_scenarios_eligible() -> None:
     """After reset, the first next() could return any scenario (no excluded one)."""
     policy = RotationPolicy(FIVE_SCENARIOS)
-    forced = policy.force("scn-gpu-xid-79")
+    policy.force("scn-gpu-xid-79")
     policy.reset()
     # After 20 calls post-reset we should see scn-gpu-xid-79 at least once
     seen = {policy.next() for _ in range(20)}
@@ -111,6 +113,7 @@ def test_after_reset_all_scenarios_eligible() -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 # Edge case: single scenario
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_single_scenario_always_returns_same() -> None:
     policy = RotationPolicy(["scn-gpu-xid-79"])

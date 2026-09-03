@@ -54,7 +54,7 @@ class FakeSimulatorClient:
 
     def __init__(self) -> None:
         self.injected: list[tuple[str, str]] = []  # [(asset_id, scenario_id)]
-        self.cleared: list[str] = []               # [asset_id]
+        self.cleared: list[str] = []  # [asset_id]
 
     async def inject(self, asset_id: str, scenario_id: str) -> None:
         self.injected.append((asset_id, scenario_id))

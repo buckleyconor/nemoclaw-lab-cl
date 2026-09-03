@@ -981,7 +981,7 @@ dev = [
     { name = "pytest", specifier = ">=8.3.0" },
     { name = "pytest-asyncio", specifier = ">=0.23.0" },
     { name = "respx", specifier = ">=0.21.0" },
-    { name = "ruff", specifier = ">=0.8.0" },
+    { name = "ruff", specifier = "==0.15.20" },
     { name = "types-pyyaml", specifier = ">=6.0.12" },
     { name = "types-redis", specifier = ">=4.6.0" },
 ]

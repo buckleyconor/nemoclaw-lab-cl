@@ -45,8 +45,8 @@ _XSS_STRINGS = [
     "<img src=x onerror=alert(1)>",
     "javascript:alert(1)",
     '"><svg onload=alert(1)>',
-    "{{7*7}}",         # template injection probe
-    "${7*7}",          # template injection probe
+    "{{7*7}}",  # template injection probe
+    "${7*7}",  # template injection probe
     "<iframe src='javascript:alert(1)'>",
 ]
 

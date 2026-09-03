@@ -159,12 +159,14 @@ class RedisGatewayStore:
         return bool(await self._r.hexists(self._k("assets"), asset_id))
 
     async def set_asset(self, asset: AssetRecord) -> None:
-        payload = json.dumps({
-            "id": asset.id,
-            "type": asset.type,
-            "state": asset.state.value,
-            "active_fault_event_id": asset.active_fault_event_id,
-        })
+        payload = json.dumps(
+            {
+                "id": asset.id,
+                "type": asset.type,
+                "state": asset.state.value,
+                "active_fault_event_id": asset.active_fault_event_id,
+            }
+        )
         await self._r.hset(self._k("assets"), asset.id, payload)
 
     def _deserialize_asset(self, raw: str) -> AssetRecord:

@@ -8,9 +8,9 @@ inject a specific pack directory and/or a fake Simulator client.
 from __future__ import annotations
 
 import os
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import AsyncGenerator
 
 from fastapi import FastAPI
 
@@ -18,7 +18,6 @@ from libs.common.pack_loader import load_pack
 from services.orchestrator.rotation import RotationPolicy
 from services.orchestrator.router import router
 from services.orchestrator.simulator_client import (
-    FakeSimulatorClient,
     HttpSimulatorClient,
     SimulatorClient,
 )

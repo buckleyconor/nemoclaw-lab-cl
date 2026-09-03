@@ -40,6 +40,7 @@ def reset_assets(client: TestClient):
 # Healthz
 # ------------------------------------------------------------------
 
+
 def test_healthz(client: TestClient) -> None:
     r = client.get("/healthz")
     assert r.status_code == 200
@@ -49,6 +50,7 @@ def test_healthz(client: TestClient) -> None:
 # ------------------------------------------------------------------
 # Redfish service root
 # ------------------------------------------------------------------
+
 
 def test_service_root(client: TestClient) -> None:
     r = client.get("/redfish/v1/")
@@ -61,6 +63,7 @@ def test_service_root(client: TestClient) -> None:
 # ------------------------------------------------------------------
 # Systems  (healthy baseline)
 # ------------------------------------------------------------------
+
 
 def test_systems_collection_lists_both_assets(client: TestClient) -> None:
     r = client.get("/redfish/v1/Systems")
@@ -86,12 +89,16 @@ def test_system_404_for_unknown_asset(client: TestClient) -> None:
 # I-01: inject fault → Redfish surfaces the event
 # ------------------------------------------------------------------
 
+
 def test_i01_inject_transitions_system_health_to_critical(client: TestClient) -> None:
     """I-01: After fault injection, System health = Critical."""
-    r = client.post("/control/inject", json={
-        "asset_id": "gpu-server-02",
-        "scenario_id": "scn-gpu-xid-79",
-    })
+    r = client.post(
+        "/control/inject",
+        json={
+            "asset_id": "gpu-server-02",
+            "scenario_id": "scn-gpu-xid-79",
+        },
+    )
     assert r.status_code == 200
 
     r = client.get("/redfish/v1/Systems/gpu-server-02")
@@ -100,10 +107,13 @@ def test_i01_inject_transitions_system_health_to_critical(client: TestClient) ->
 
 def test_i01_log_entries_contain_fault_message(client: TestClient) -> None:
     """I-01: DCGM log entries contain the fault message after injection."""
-    client.post("/control/inject", json={
-        "asset_id": "gpu-server-02",
-        "scenario_id": "scn-gpu-xid-79",
-    })
+    client.post(
+        "/control/inject",
+        json={
+            "asset_id": "gpu-server-02",
+            "scenario_id": "scn-gpu-xid-79",
+        },
+    )
 
     r = client.get("/redfish/v1/Systems/gpu-server-02/LogServices/DCGM/Entries")
     assert r.status_code == 200
@@ -115,10 +125,13 @@ def test_i01_log_entries_contain_fault_message(client: TestClient) -> None:
 
 def test_i01_log_entries_have_correct_severity(client: TestClient) -> None:
     """I-01: DCGM log entries carry Critical severity."""
-    client.post("/control/inject", json={
-        "asset_id": "gpu-server-02",
-        "scenario_id": "scn-gpu-xid-79",
-    })
+    client.post(
+        "/control/inject",
+        json={
+            "asset_id": "gpu-server-02",
+            "scenario_id": "scn-gpu-xid-79",
+        },
+    )
     r = client.get("/redfish/v1/Systems/gpu-server-02/LogServices/DCGM/Entries")
     members = r.json()["Members"]
     assert members[0]["Severity"] == "Critical"
@@ -127,10 +140,13 @@ def test_i01_log_entries_have_correct_severity(client: TestClient) -> None:
 
 def test_i01_event_service_shows_active_fault(client: TestClient) -> None:
     """I-01: EventService/Events surfaces the active fault after injection."""
-    client.post("/control/inject", json={
-        "asset_id": "gpu-server-02",
-        "scenario_id": "scn-gpu-xid-79",
-    })
+    client.post(
+        "/control/inject",
+        json={
+            "asset_id": "gpu-server-02",
+            "scenario_id": "scn-gpu-xid-79",
+        },
+    )
     r = client.get("/redfish/v1/EventService/Events")
     assert r.status_code == 200
     members = r.json()["Members"]
@@ -140,10 +156,13 @@ def test_i01_event_service_shows_active_fault(client: TestClient) -> None:
 
 def test_clear_returns_system_to_healthy(client: TestClient) -> None:
     """After clear, System health returns to OK and log entries are empty."""
-    client.post("/control/inject", json={
-        "asset_id": "gpu-server-02",
-        "scenario_id": "scn-gpu-xid-79",
-    })
+    client.post(
+        "/control/inject",
+        json={
+            "asset_id": "gpu-server-02",
+            "scenario_id": "scn-gpu-xid-79",
+        },
+    )
     client.post("/control/clear", json={"asset_id": "gpu-server-02"})
 
     r = client.get("/redfish/v1/Systems/gpu-server-02")
@@ -155,10 +174,13 @@ def test_clear_returns_system_to_healthy(client: TestClient) -> None:
 
 def test_fault_only_affects_injected_asset(client: TestClient) -> None:
     """Injecting a fault on gpu-server-02 does not affect gpu-server-01."""
-    client.post("/control/inject", json={
-        "asset_id": "gpu-server-02",
-        "scenario_id": "scn-gpu-xid-79",
-    })
+    client.post(
+        "/control/inject",
+        json={
+            "asset_id": "gpu-server-02",
+            "scenario_id": "scn-gpu-xid-79",
+        },
+    )
     r = client.get("/redfish/v1/Systems/gpu-server-01")
     assert r.json()["Status"]["Health"] == "OK"
 
@@ -179,12 +201,16 @@ def test_events_empty_when_all_healthy(client: TestClient) -> None:
 # PSU fault — Chassis/Power surface
 # ------------------------------------------------------------------
 
+
 def test_chassis_power_shows_psu_failure(client: TestClient) -> None:
     """PSU 2 shows as Absent/Critical after psu_loss fault injection."""
-    client.post("/control/inject", json={
-        "asset_id": "gpu-server-01",
-        "scenario_id": "scn-psu-loss",
-    })
+    client.post(
+        "/control/inject",
+        json={
+            "asset_id": "gpu-server-01",
+            "scenario_id": "scn-psu-loss",
+        },
+    )
     r = client.get("/redfish/v1/Chassis/gpu-server-01/Power")
     assert r.status_code == 200
     psus = r.json()["PowerSupplies"]
@@ -206,6 +232,7 @@ def test_chassis_power_all_healthy_baseline(client: TestClient) -> None:
 # Control API
 # ------------------------------------------------------------------
 
+
 def test_control_state_all_healthy(client: TestClient) -> None:
     r = client.get("/control/state")
     assert r.status_code == 200
@@ -213,16 +240,22 @@ def test_control_state_all_healthy(client: TestClient) -> None:
 
 
 def test_control_inject_unknown_asset_returns_404(client: TestClient) -> None:
-    r = client.post("/control/inject", json={
-        "asset_id": "no-such-server",
-        "scenario_id": "scn-gpu-xid-79",
-    })
+    r = client.post(
+        "/control/inject",
+        json={
+            "asset_id": "no-such-server",
+            "scenario_id": "scn-gpu-xid-79",
+        },
+    )
     assert r.status_code == 404
 
 
 def test_control_inject_unknown_scenario_returns_404(client: TestClient) -> None:
-    r = client.post("/control/inject", json={
-        "asset_id": "gpu-server-01",
-        "scenario_id": "scn-no-such",
-    })
+    r = client.post(
+        "/control/inject",
+        json={
+            "asset_id": "gpu-server-01",
+            "scenario_id": "scn-no-such",
+        },
+    )
     assert r.status_code == 404

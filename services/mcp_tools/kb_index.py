@@ -97,16 +97,13 @@ class KBIndex:
 
     def _try_build_semantic(self) -> None:
         try:
-            import numpy as np
             import faiss
+            import numpy as np
             from fastembed import TextEmbedding  # type: ignore[import]
 
             self._embedder = TextEmbedding(_BGE_MODEL)
             self._article_ids = list(self._pack.kb_articles.keys())
-            texts = [
-                f"{a.title}\n{a.body_md[:500]}"
-                for a in self._pack.kb_articles.values()
-            ]
+            texts = [f"{a.title}\n{a.body_md[:500]}" for a in self._pack.kb_articles.values()]
             embeddings = np.array(list(self._embedder.embed(texts)), dtype="float32")
             faiss.normalize_L2(embeddings)
             dim = embeddings.shape[1]

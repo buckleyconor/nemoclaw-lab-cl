@@ -91,9 +91,7 @@ def test_kb02_unknown_signature_without_fallback_returns_none(
     kb_index: KBIndex,
 ) -> None:
     """KB-02: no fallback and no match → None."""
-    result = kb_index.search(
-        "completely unrelated noise signal that matches nothing"
-    )
+    result = kb_index.search("completely unrelated noise signal that matches nothing")
     # Without semantic search (dev machine) this returns None.
     # With semantic search (CI) the score may still be too low.
     # Either outcome is acceptable; we verify the return type.

@@ -2,14 +2,15 @@
 
 Three categories:
 - Authored models  (Pack, Scenario, KBArticle, SimulatorProfile) — loaded from YAML at startup.
-- Runtime entities (Asset, FaultEvent, Notification, ActivityEvent, ApprovalToken) — held in SQLite/Redis.
+- Runtime entities (Asset, FaultEvent, Notification, ActivityEvent, ApprovalToken)
+  — held in SQLite/Redis.
 - Enums            (AssetState, FaultEventStatus, ApprovalDecision, MonitoringAdapterType).
 """
 
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Literal
 
@@ -17,7 +18,7 @@ from pydantic import BaseModel, Field
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _uuid() -> str:
@@ -27,6 +28,7 @@ def _uuid() -> str:
 # ──────────────────────────────────────────────────────────────────────────────
 # Authored models  (loaded from YAML, schema-validated at pack load time)
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class MonitoringAdapterType(str, Enum):
     redfish = "redfish"
@@ -98,10 +100,10 @@ class RemediationStep(BaseModel):
 class ScenarioImpact(BaseModel):
     """Operator-facing impact assessment for a scenario's remediation plan."""
 
-    summary: str              # what the remediation will do
-    workload_impact: str      # effect on running workloads (drain, migration, …)
-    service_risk: str         # cluster/service-level risk while remediating
-    estimated_duration: str   # e.g. "~15 minutes"
+    summary: str  # what the remediation will do
+    workload_impact: str  # effect on running workloads (drain, migration, …)
+    service_risk: str  # cluster/service-level risk while remediating
+    estimated_duration: str  # e.g. "~15 minutes"
 
 
 class Scenario(BaseModel):
@@ -134,9 +136,7 @@ class SimulatorAssetHealthyState(BaseModel):
 class SimulatorAsset(BaseModel):
     id: str
     type: str
-    healthy_state: SimulatorAssetHealthyState = Field(
-        default_factory=SimulatorAssetHealthyState
-    )
+    healthy_state: SimulatorAssetHealthyState = Field(default_factory=SimulatorAssetHealthyState)
 
 
 class SimulatorProfile(BaseModel):
@@ -155,6 +155,7 @@ class KBArticle(BaseModel):
 # ──────────────────────────────────────────────────────────────────────────────
 # Runtime entities  (persisted in SQLite dev / Redis prod)
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class AssetState(str, Enum):
     healthy = "healthy"
@@ -191,7 +192,7 @@ class FaultEvent(BaseModel):
     # progresses (PATCH /api/faults/{id}/diagnosis); the Operator Dashboard
     # renders these directly.
     error_signature: str | None = None
-    analysis: str | None = None       # agent's plain-language assessment
+    analysis: str | None = None  # agent's plain-language assessment
     kb_title: str | None = None
     kb_score: float | None = None
     impact: ScenarioImpact | None = None  # set at creation from pack content

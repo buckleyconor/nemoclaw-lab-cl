@@ -32,6 +32,7 @@ def clear_all_faults(engine: SimulatorEngine):
 # Initial state
 # ------------------------------------------------------------------
 
+
 def test_all_assets_start_healthy(engine: SimulatorEngine) -> None:
     for state in engine.all_states().values():
         assert state == "healthy"
@@ -51,6 +52,7 @@ def test_asset_type_is_server(engine: SimulatorEngine) -> None:
 # ------------------------------------------------------------------
 # Inject
 # ------------------------------------------------------------------
+
 
 def test_inject_transitions_asset_to_faulted(engine: SimulatorEngine) -> None:
     engine.inject("gpu-server-02", "scn-gpu-xid-79")
@@ -102,6 +104,7 @@ def test_inject_overrides_existing_fault(engine: SimulatorEngine) -> None:
 # Clear
 # ------------------------------------------------------------------
 
+
 def test_clear_returns_asset_to_healthy(engine: SimulatorEngine) -> None:
     engine.inject("gpu-server-02", "scn-gpu-xid-79")
     engine.clear("gpu-server-02")
@@ -124,13 +127,17 @@ def test_clear_already_healthy_is_idempotent(engine: SimulatorEngine) -> None:
 # Scenario variety
 # ------------------------------------------------------------------
 
-@pytest.mark.parametrize("scenario_id,asset_id", [
-    ("scn-gpu-xid-79", "gpu-server-02"),
-    ("scn-ecc-uncorrectable", "gpu-server-01"),
-    ("scn-psu-loss", "gpu-server-01"),
-    ("scn-nvlink-down", "gpu-server-02"),
-    ("scn-thermal-throttle", "gpu-server-01"),
-])
+
+@pytest.mark.parametrize(
+    "scenario_id,asset_id",
+    [
+        ("scn-gpu-xid-79", "gpu-server-02"),
+        ("scn-ecc-uncorrectable", "gpu-server-01"),
+        ("scn-psu-loss", "gpu-server-01"),
+        ("scn-nvlink-down", "gpu-server-02"),
+        ("scn-thermal-throttle", "gpu-server-01"),
+    ],
+)
 def test_all_scenarios_inject_correctly(
     engine: SimulatorEngine, scenario_id: str, asset_id: str
 ) -> None:

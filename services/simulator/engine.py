@@ -9,7 +9,7 @@ the surface layer (Redfish / generic) reads from it.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from libs.common.pack_loader import LoadedPack
 
@@ -38,13 +38,9 @@ class SimulatorEngine:
         self._pack = pack
         self._scenarios = {s.id: s for s in pack.scenarios}
         # asset_id → InjectedFault | None
-        self._faults: dict[str, InjectedFault | None] = {
-            a.id: None for a in pack.pack.assets
-        }
+        self._faults: dict[str, InjectedFault | None] = {a.id: None for a in pack.pack.assets}
         # asset_id → asset type (e.g. "server") from the simulator profile
-        self._asset_types: dict[str, str] = {
-            a.id: a.type for a in pack.simulator_profile.assets
-        }
+        self._asset_types: dict[str, str] = {a.id: a.type for a in pack.simulator_profile.assets}
 
     # ------------------------------------------------------------------
     # Queries
@@ -65,10 +61,7 @@ class SimulatorEngine:
 
     def all_states(self) -> dict[str, str]:
         """Return {asset_id: "healthy"|"faulted"} for all assets."""
-        return {
-            aid: ("faulted" if fault else "healthy")
-            for aid, fault in self._faults.items()
-        }
+        return {aid: ("faulted" if fault else "healthy") for aid, fault in self._faults.items()}
 
     def known_scenario_ids(self) -> list[str]:
         return list(self._scenarios)
@@ -93,13 +86,10 @@ class SimulatorEngine:
             scenario_id=scenario_id,
             asset_id=asset_id,
             fault_type=scenario.fault_type,
-            injected_at=datetime.now(timezone.utc),
+            injected_at=datetime.now(UTC),
             event_severity=scenario.emit.event.severity,
             event_message_id=scenario.emit.event.message_id,
-            log_entries=[
-                (entry.severity, entry.message)
-                for entry in scenario.emit.log_entries
-            ],
+            log_entries=[(entry.severity, entry.message) for entry in scenario.emit.log_entries],
         )
         self._faults[asset_id] = fault
         return fault

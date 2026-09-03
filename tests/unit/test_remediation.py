@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-import pytest_asyncio
 
 from libs.common.models import ApprovalDecision
 from services.mcp_tools.fault_registry import FaultEventRegistry

@@ -21,7 +21,9 @@ Endpoints:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from collections.abc import AsyncGenerator
+from datetime import UTC
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
@@ -71,14 +73,10 @@ async def get_pack(request: Request) -> dict:
         "fleet_layout": pack.fleet_layout,
         # {asset_id: display_name} — only assets with an explicit display_name
         # are included; the UI falls back to the raw id for the rest.
-        "asset_display_names": {
-            a.id: a.display_name for a in pack.assets if a.display_name
-        },
+        "asset_display_names": {a.id: a.display_name for a in pack.assets if a.display_name},
         # {asset_id: image_url} — only assets with a per-asset override are
         # included; the UI falls back to pack.asset_image_url for the rest.
-        "asset_image_urls": {
-            a.id: a.image_url for a in pack.assets if a.image_url
-        },
+        "asset_image_urls": {a.id: a.image_url for a in pack.assets if a.image_url},
     }
 
 
@@ -104,7 +102,7 @@ async def lab_health() -> dict:
     surfaces.
     """
     import os
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     checks: list[dict] = []
 
@@ -129,8 +127,12 @@ async def lab_health() -> dict:
         ):
             try:
                 r = await client.get(f"{base.rstrip('/')}/healthz")
-                add(cid, name, "ok" if r.status_code == 200 else "fail",
-                    f"{base}/healthz -> {r.status_code}")
+                add(
+                    cid,
+                    name,
+                    "ok" if r.status_code == 200 else "fail",
+                    f"{base}/healthz -> {r.status_code}",
+                )
             except httpx.HTTPError as e:
                 add(cid, name, "fail", f"{base}/healthz unreachable ({type(e).__name__})")
 
@@ -145,52 +147,96 @@ async def lab_health() -> dict:
         probe = f"http://host.docker.internal:{llm_port}/v1/models"
         headers = {"Authorization": f"Bearer {llm_key}"} if llm_key else None
         if llm_direct:
-            add("inference-proxy", "Agent LLM route (inference proxy)", "skip",
+            add(
+                "inference-proxy",
+                "Agent LLM route (inference proxy)",
+                "skip",
                 "LLM_DIRECT=1 — sandbox talks to the endpoint directly; "
-                "check it with `make doctor` on the host")
+                "check it with `make doctor` on the host",
+            )
         else:
             try:
                 r = await client.get(probe, headers=headers)
                 if llm_key:
-                    add("inference-proxy", "Agent LLM route (inference proxy)",
-                        "ok" if r.status_code == 200 else "fail", f"{probe} -> {r.status_code}")
+                    add(
+                        "inference-proxy",
+                        "Agent LLM route (inference proxy)",
+                        "ok" if r.status_code == 200 else "fail",
+                        f"{probe} -> {r.status_code}",
+                    )
                 else:
-                    add("inference-proxy", "Agent LLM route (inference proxy)",
+                    add(
+                        "inference-proxy",
+                        "Agent LLM route (inference proxy)",
                         "skip",
-                        f"{probe} -> {r.status_code} — LLM_API_KEY unset in the gateway; run `make doctor` on the host")
+                        f"{probe} -> {r.status_code} — LLM_API_KEY unset in the gateway; "
+                        "run `make doctor` on the host",
+                    )
             except httpx.HTTPError as e:
-                add("inference-proxy", "Agent LLM route (inference proxy)", "fail",
-                    f"{probe} unreachable ({type(e).__name__}) — `sudo systemctl restart nginx` / `make doctor`")
+                add(
+                    "inference-proxy",
+                    "Agent LLM route (inference proxy)",
+                    "fail",
+                    f"{probe} unreachable ({type(e).__name__}) — "
+                    "`sudo systemctl restart nginx` / `make doctor`",
+                )
 
         # Wake hook — a bad token must 401: forward alive AND auth wired.
         if hook_url:
             try:
-                r = await client.post(f"{hook_url.rstrip('/')}/hooks/wake",
-                                      headers={"Authorization": "Bearer doctor-probe"})
-                add("wake-hook", "Agent wake hook", "ok" if r.status_code == 401 else "fail",
-                    f"POST /hooks/wake -> {r.status_code} (want 401)")
+                r = await client.post(
+                    f"{hook_url.rstrip('/')}/hooks/wake",
+                    headers={"Authorization": "Bearer doctor-probe"},
+                )
+                add(
+                    "wake-hook",
+                    "Agent wake hook",
+                    "ok" if r.status_code == 401 else "fail",
+                    f"POST /hooks/wake -> {r.status_code} (want 401)",
+                )
             except httpx.HTTPError as e:
-                add("wake-hook", "Agent wake hook", "fail",
-                    f"{hook_url}/hooks/wake unreachable ({type(e).__name__}) — `nemoclaw <sandbox> recover` + `make hook-relay`")
+                add(
+                    "wake-hook",
+                    "Agent wake hook",
+                    "fail",
+                    f"{hook_url}/hooks/wake unreachable ({type(e).__name__}) — "
+                    "`nemoclaw <sandbox> recover` + `make hook-relay`",
+                )
         else:
-            add("wake-hook", "Agent wake hook", "skip", "OPENCLAW_HOOK_URL unset — webhook wake-up off (cron-only)")
+            add(
+                "wake-hook",
+                "Agent wake hook",
+                "skip",
+                "OPENCLAW_HOOK_URL unset — webhook wake-up off (cron-only)",
+            )
 
         # Terminal daemon — host process (ADR-012).
         if term_ws and term_enabled != "0":
-            base_http = term_ws.replace("wss://", "https://").replace("ws://", "http://").rsplit("/", 1)[0]
+            base_http = (
+                term_ws.replace("wss://", "https://").replace("ws://", "http://").rsplit("/", 1)[0]
+            )
             try:
                 r = await client.get(f"{base_http}/healthz")
-                add("terminal", "Terminal daemon", "ok" if r.status_code == 200 else "fail",
-                    f"{base_http}/healthz -> {r.status_code}")
+                add(
+                    "terminal",
+                    "Terminal daemon",
+                    "ok" if r.status_code == 200 else "fail",
+                    f"{base_http}/healthz -> {r.status_code}",
+                )
             except httpx.HTTPError as e:
-                add("terminal", "Terminal daemon", "fail",
-                    f"{base_http}/healthz unreachable ({type(e).__name__}) — `make terminal` / `make doctor-fix`")
+                add(
+                    "terminal",
+                    "Terminal daemon",
+                    "fail",
+                    f"{base_http}/healthz unreachable ({type(e).__name__}) — "
+                    "`make terminal` / `make doctor-fix`",
+                )
         else:
             add("terminal", "Terminal daemon", "skip", "terminal feature off")
 
     return {
         "healthy": not any(c["status"] == "fail" for c in checks),
-        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "checked_at": datetime.now(UTC).isoformat(),
         "checks": checks,
     }
 
@@ -317,8 +363,9 @@ class DecisionRequest(BaseModel):
     decision: ApprovalDecision
 
 
-def _impact_for_scenario(request: Request, scenario_id: str, asset_id: str,
-                         step_count: int) -> ScenarioImpact:
+def _impact_for_scenario(
+    request: Request, scenario_id: str, asset_id: str, step_count: int
+) -> ScenarioImpact:
     """Pack-provided impact assessment, or a synthesised generic fallback."""
     loaded = request.app.state.loaded_pack
     scenario = loaded.scenarios_by_id.get(scenario_id)
@@ -354,7 +401,7 @@ def _kb_step_detail(body_md: str, step_id: str) -> str | None:
     )
     if heading_idx is None:
         return None
-    for ln in lines[heading_idx + 1:]:
+    for ln in lines[heading_idx + 1 :]:
         s = ln.strip()
         if not s:
             continue
@@ -439,20 +486,20 @@ async def create_fault(body: CreateFaultRequest, request: Request) -> dict:
         kb_article_id=body.kb_article_id,
         log_extract=body.log_extract,
         remediation_step_labels=step_labels,
-        impact=_impact_for_scenario(
-            request, body.scenario_id, body.asset_id, len(step_labels)
-        ),
+        impact=_impact_for_scenario(request, body.scenario_id, body.asset_id, len(step_labels)),
     )
 
     # Update asset state to faulted
     if await store.has_asset(body.asset_id):
         asset = await store.get_asset(body.asset_id)
-        await store.set_asset(AssetRecord(
-            id=asset.id,
-            type=asset.type,
-            state=AssetState.faulted,
-            active_fault_event_id=evt.id,
-        ))
+        await store.set_asset(
+            AssetRecord(
+                id=asset.id,
+                type=asset.type,
+                state=AssetState.faulted,
+                active_fault_event_id=evt.id,
+            )
+        )
 
     # Inbox notification
     notif = await store.create_notification(
@@ -464,11 +511,14 @@ async def create_fault(body: CreateFaultRequest, request: Request) -> dict:
     # SSE broadcast
     await store.sse.publish("fault", evt.model_dump(mode="json"))
     await store.sse.publish("notification", notif.model_dump(mode="json"))
-    await store.sse.publish("asset", {
-        "id": body.asset_id,
-        "state": "faulted",
-        "active_fault_event_id": evt.id,
-    })
+    await store.sse.publish(
+        "asset",
+        {
+            "id": body.asset_id,
+            "state": "faulted",
+            "active_fault_event_id": evt.id,
+        },
+    )
 
     return {"id": evt.id, **evt.model_dump(mode="json")}
 
@@ -482,20 +532,28 @@ async def update_fault_status(fault_id: str, body: UpdateStatusRequest, request:
         raise HTTPException(status_code=404, detail="fault_not_found")
 
     # When a fault resolves, return the asset to healthy and clear its fault link.
-    if body.status == FaultEventStatus.resolved and updated.asset_id:
-        if await store.has_asset(updated.asset_id):
-            asset = await store.get_asset(updated.asset_id)
-            await store.set_asset(AssetRecord(
+    if (
+        body.status == FaultEventStatus.resolved
+        and updated.asset_id
+        and await store.has_asset(updated.asset_id)
+    ):
+        asset = await store.get_asset(updated.asset_id)
+        await store.set_asset(
+            AssetRecord(
                 id=asset.id,
                 type=asset.type,
                 state=AssetState.healthy,
                 active_fault_event_id=None,
-            ))
-            await store.sse.publish("asset", {
+            )
+        )
+        await store.sse.publish(
+            "asset",
+            {
                 "id": updated.asset_id,
                 "state": "healthy",
                 "active_fault_event_id": None,
-            })
+            },
+        )
 
     await store.sse.publish("fault", updated.model_dump(mode="json"))
     return updated.model_dump(mode="json")
@@ -539,10 +597,13 @@ async def post_decision(fault_id: str, body: DecisionRequest, request: Request) 
     if body.decision == ApprovalDecision.denied:
         updated = await store.update_fault_status(fault_id, FaultEventStatus.denied)
         await store.sse.publish("fault", updated.model_dump(mode="json"))
-        await store.sse.publish("decision", {
-            "fault_event_id": fault_id,
-            "decision": "denied",
-        })
+        await store.sse.publish(
+            "decision",
+            {
+                "fault_event_id": fault_id,
+                "decision": "denied",
+            },
+        )
         return {"decision": "denied", "fault_event_id": fault_id}
 
     # ── Approved path ────────────────────────────────────────────────────────
@@ -555,8 +616,7 @@ async def post_decision(fault_id: str, body: DecisionRequest, request: Request) 
         scenario_data = scenario_r.json()
         allowed_step_ids = [s["id"] for s in scenario_data.get("remediation_steps", [])]
         step_labels = {
-            s["id"]: s.get("label", s["id"])
-            for s in scenario_data.get("remediation_steps", [])
+            s["id"]: s.get("label", s["id"]) for s in scenario_data.get("remediation_steps", [])
         }
     except httpx.HTTPError:
         # Fall back to empty allowlist — remediation will fail step validation
@@ -592,10 +652,13 @@ async def post_decision(fault_id: str, body: DecisionRequest, request: Request) 
     # Keep the token retrievable over the trusted path for audit/API compat.
     await store.set_pending_token(fault_id, token_str)
 
-    await store.sse.publish("decision", {
-        "fault_event_id": fault_id,
-        "decision": "approved",
-    })
+    await store.sse.publish(
+        "decision",
+        {
+            "fault_event_id": fault_id,
+            "decision": "approved",
+        },
+    )
 
     # Execute immediately (ADR-011): background task so this POST returns at
     # once; the executor narrates progress and resolves the fault over SSE.
@@ -771,21 +834,22 @@ async def presenter_reset(request: Request):
     orch_resp = await orch.post("/api/reset")
     orch_resp.raise_for_status()
 
-    # Clear mcp-tools tokens + fault registry
-    try:
+    # Clear mcp-tools tokens + fault registry (best effort)
+    with contextlib.suppress(httpx.HTTPError):
         await mcp.post("/internal/reset")
-    except httpx.HTTPError:
-        pass
 
     # Clear gateway in-memory state + broadcast reset SSE
     await store.reset()
 
     # SSE: push fresh healthy asset state for all assets
     for asset in await store.list_assets():
-        await store.sse.publish("asset", {
-            "id": asset.id,
-            "state": asset.state.value,
-            "active_fault_event_id": None,
-        })
+        await store.sse.publish(
+            "asset",
+            {
+                "id": asset.id,
+                "state": asset.state.value,
+                "active_fault_event_id": None,
+            },
+        )
 
     return {"status": "idle"}

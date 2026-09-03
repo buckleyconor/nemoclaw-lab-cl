@@ -22,13 +22,11 @@ the business-logic functions remain independently testable.
 from __future__ import annotations
 
 import json
-import os
 
 import httpx
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 
-from services.mcp_tools.adapters.redfish import RedfishAdapter
 from services.mcp_tools.tools.kb import kb_search
 from services.mcp_tools.tools.logs import logs_get_bundle
 from services.mcp_tools.tools.monitor import (
@@ -170,9 +168,7 @@ async def _notify_post_activity(fault_event_id: str, step: str, message: str) ->
 
 
 @mcp.tool(name="remediation.propose")
-async def _remediation_propose(
-    fault_event_id: str, step_ids: list[str], summary: str = ""
-) -> str:
+async def _remediation_propose(fault_event_id: str, step_ids: list[str], summary: str = "") -> str:
     """Record your recommended remediation steps and request operator approval.
 
     This is a proposal, not an action: it changes no infrastructure state and

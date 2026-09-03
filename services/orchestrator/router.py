@@ -12,7 +12,7 @@ GET  /api/assets/{id}/scenario Full scenario data for the active scenario on thi
 from __future__ import annotations
 
 import re
-from datetime import date, datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -28,6 +28,7 @@ router = APIRouter(prefix="/api", tags=["orchestrator"])
 # ─────────────────────────────────────────────────────────────────────────────
 # Response schemas
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class RunResponse(BaseModel):
     scenario_id: str
@@ -73,6 +74,7 @@ class LogsResponse(BaseModel):
 # Dependency helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _rotation(request: Request) -> RotationPolicy:
     return request.app.state.rotation  # type: ignore[no-any-return]
 
@@ -96,14 +98,16 @@ def _active(request: Request) -> dict[str, str | None]:
 
 _DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}(?=T)")
 
+
 def _stamp_today(log_text: str) -> str:
     """Replace every ISO-8601 date in log_text with today's UTC date."""
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
     return _DATE_RE.sub(today, log_text)
 
 
 _HIGHLIGHT_CONTEXT_LINES = 2  # lines of context on each side of the matched cluster
 _HIGHLIGHT_CLUSTER_GAP = 6  # max line-gap between matches still counted as the same fault block
+
 
 def _extract_highlight(log_text: str, error_signatures: list[str]) -> str | None:
     """A short window of real log lines spanning the signature match cluster.
@@ -178,6 +182,7 @@ async def _inject(
 # ─────────────────────────────────────────────────────────────────────────────
 # Routes
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.post("/run", response_model=RunResponse)
 async def run_next(request: Request) -> RunResponse:

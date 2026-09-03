@@ -13,12 +13,10 @@ from pathlib import Path
 
 import httpx
 import pytest
-import pytest_asyncio
 from fastapi.testclient import TestClient
 from httpx import ASGITransport
 
 from libs.common.pack_loader import load_pack
-from services.mcp_tools.adapters.base import MonitoringAdapter
 from services.mcp_tools.adapters.generic import GenericAdapter
 from services.mcp_tools.adapters.redfish import RedfishAdapter
 from services.mcp_tools.kb_index import KBIndex
@@ -102,6 +100,7 @@ async def test_i01_redfish_adapter_list_events_after_inject(
 
             async def list_events(self, asset_id=None):
                 from services.mcp_tools.adapters.base import MonitorEvent
+
                 if asset_id:
                     url = f"/redfish/v1/Systems/{asset_id}/LogServices/DCGM/Entries"
                     r = await client.get(url)
@@ -124,13 +123,16 @@ async def test_i01_redfish_adapter_list_events_after_inject(
                     aid = member["Id"]
                     for evt in member.get("Events", []):
                         from services.mcp_tools.adapters.base import MonitorEvent
-                        events.append(MonitorEvent(
-                            asset_id=aid,
-                            severity=evt.get("Severity", "Unknown"),
-                            message=evt.get("Message", ""),
-                            message_id=evt.get("MessageId", ""),
-                            ts=evt.get("EventTimestamp", ""),
-                        ))
+
+                        events.append(
+                            MonitorEvent(
+                                asset_id=aid,
+                                severity=evt.get("Severity", "Unknown"),
+                                message=evt.get("Message", ""),
+                                message_id=evt.get("MessageId", ""),
+                                ts=evt.get("EventTimestamp", ""),
+                            )
+                        )
                 return events
 
         adapter = _TestRedfishAdapter()

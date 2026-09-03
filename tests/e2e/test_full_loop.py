@@ -154,38 +154,42 @@ def reset_state(
 
 
 def _gw(gateway_tc: TestClient) -> httpx.AsyncClient:
-    return httpx.AsyncClient(
-        transport=ASGITransport(app=gateway_tc.app), base_url="http://gateway"
-    )
+    return httpx.AsyncClient(transport=ASGITransport(app=gateway_tc.app), base_url="http://gateway")
 
 
 async def _register_and_propose(gw: httpx.AsyncClient, scenario_id: str, asset_id: str) -> str:
     """The plugin's deterministic side-work: register the fault on first log
     evidence, mark diagnosing, record the diagnosis, then propose (which the
     LLM triggers via the remediation_propose tool)."""
-    r = await gw.post("/api/faults", json={
-        "scenario_id": scenario_id,
-        "asset_id": asset_id,
-        "log_extract": "iDRAC: GPU3 has fallen off the bus (Xid 79)",
-    })
+    r = await gw.post(
+        "/api/faults",
+        json={
+            "scenario_id": scenario_id,
+            "asset_id": asset_id,
+            "log_extract": "iDRAC: GPU3 has fallen off the bus (Xid 79)",
+        },
+    )
     assert r.status_code == 201
     fault_id = r.json()["id"]
 
     await gw.patch(f"/api/faults/{fault_id}/status", json={"status": "diagnosing"})
-    await gw.patch(f"/api/faults/{fault_id}/diagnosis", json={
-        "error_signature": "Xid 79",
-        "kb_article_id": "KB000123",
-        "kb_title": "GPU Xid 79: GPU Has Fallen Off the Bus",
-        "kb_score": 0.92,
-    })
+    await gw.patch(
+        f"/api/faults/{fault_id}/diagnosis",
+        json={
+            "error_signature": "Xid 79",
+            "kb_article_id": "KB000123",
+            "kb_title": "GPU Xid 79: GPU Has Fallen Off the Bus",
+            "kb_score": 0.92,
+        },
+    )
 
     result = await remediation_propose(
         gw,
         fault_event_id=fault_id,
         step_ids=[],
         summary="GPU3 on the asset has fallen off the bus (Xid 79); a drain, "
-                "reset and health-check cycle is the validated KB remediation. "
-                "Workloads on the node will be interrupted during the reset.",
+        "reset and health-check cycle is the validated KB remediation. "
+        "Workloads on the node will be interrupted during the reset.",
     )
     assert result["status"] == "proposal_recorded"
     return fault_id
@@ -222,7 +226,10 @@ def _inject(orchestrator_tc: TestClient, simulator_tc: TestClient) -> tuple[str,
 
 @pytest.mark.asyncio
 async def test_e01_full_happy_path_resolves(
-    simulator_tc, orchestrator_tc, gateway_tc, fake_sim,
+    simulator_tc,
+    orchestrator_tc,
+    gateway_tc,
+    fake_sim,
 ) -> None:
     """E-01 (SC2): inject → register → propose → human approves → Gateway
     executes immediately → resolved, asset healthy, feed narrated."""
@@ -265,7 +272,10 @@ async def test_e01_full_happy_path_resolves(
 
 @pytest.mark.asyncio
 async def test_e01_sc1_no_decision_no_execution(
-    simulator_tc, orchestrator_tc, gateway_tc, fake_sim,
+    simulator_tc,
+    orchestrator_tc,
+    gateway_tc,
+    fake_sim,
 ) -> None:
     """SC1: without a human decision nothing executes and no token exists."""
     scenario_id, target_asset = _inject(orchestrator_tc, simulator_tc)
@@ -285,7 +295,10 @@ async def test_e01_sc1_no_decision_no_execution(
 
 @pytest.mark.asyncio
 async def test_e01_deny_flow(
-    simulator_tc, orchestrator_tc, gateway_tc, fake_sim,
+    simulator_tc,
+    orchestrator_tc,
+    gateway_tc,
+    fake_sim,
 ) -> None:
     """E-01: human denies → fault marked denied, no remediation executes."""
     scenario_id, target_asset = _inject(orchestrator_tc, simulator_tc)
@@ -305,7 +318,9 @@ async def test_e01_deny_flow(
 
 @pytest.mark.asyncio
 async def test_e01_approval_token_retrievable_for_audit(
-    simulator_tc, orchestrator_tc, gateway_tc,
+    simulator_tc,
+    orchestrator_tc,
+    gateway_tc,
 ) -> None:
     """The trusted token endpoint still serves the minted token (audit/API
     compat) even though nothing polls it anymore."""

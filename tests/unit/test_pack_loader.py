@@ -7,7 +7,6 @@ import yaml
 
 from libs.common.pack_loader import LoadedPack, PackLoadError, load_pack
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -21,28 +20,34 @@ def _write_pack(tmp_path: Path, pack_yaml: dict, include_extras: bool = True) ->
     if include_extras:
         # simulator profile
         (tmp_path / "simulator-profile.yaml").write_text(
-            yaml.dump({
-                "pack_id": pack_yaml.get("id", "test-pack"),
-                "assets": [{"id": "asset-01", "type": "server"}],
-            })
+            yaml.dump(
+                {
+                    "pack_id": pack_yaml.get("id", "test-pack"),
+                    "assets": [{"id": "asset-01", "type": "server"}],
+                }
+            )
         )
         # scenario dir + one valid scenario
         scn_dir = tmp_path / "scenarios"
         scn_dir.mkdir()
-        (scn_dir / "scn-test.yaml").write_text(yaml.dump({
-            "id": "scn-test",
-            "pack_id": pack_yaml.get("id", "test-pack"),
-            "target_asset": "asset-01",
-            "fault_type": "test_fault",
-            "emit": {
-                "event": {"severity": "Critical", "message_id": "TEST.1.0.Fault"},
-                "log_entries": [{"severity": "Critical", "message": "Test fault message"}],
-            },
-            "log_bundle_ref": "bundles/scn-test.log",
-            "error_signatures": ["test fault"],
-            "kb_article_ref": "kb/KB-TEST.md",
-            "remediation_steps": [{"id": "fix_it", "label": "Fix it"}],
-        }))
+        (scn_dir / "scn-test.yaml").write_text(
+            yaml.dump(
+                {
+                    "id": "scn-test",
+                    "pack_id": pack_yaml.get("id", "test-pack"),
+                    "target_asset": "asset-01",
+                    "fault_type": "test_fault",
+                    "emit": {
+                        "event": {"severity": "Critical", "message_id": "TEST.1.0.Fault"},
+                        "log_entries": [{"severity": "Critical", "message": "Test fault message"}],
+                    },
+                    "log_bundle_ref": "bundles/scn-test.log",
+                    "error_signatures": ["test fault"],
+                    "kb_article_ref": "kb/KB-TEST.md",
+                    "remediation_steps": [{"id": "fix_it", "label": "Fix it"}],
+                }
+            )
+        )
         # kb dir + article
         kb_dir = tmp_path / "kb"
         kb_dir.mkdir()
@@ -57,6 +62,7 @@ def _write_pack(tmp_path: Path, pack_yaml: dict, include_extras: bool = True) ->
 # ---------------------------------------------------------------------------
 # PACK-01 — malformed pack.yaml is rejected at load with a clear error
 # ---------------------------------------------------------------------------
+
 
 def test_pack01_missing_monitoring_adapter(tmp_path: Path) -> None:
     """PACK-01: pack.yaml missing monitoring_adapter must raise PackLoadError."""
@@ -144,6 +150,7 @@ def test_pack01_missing_kb_article_file(tmp_path: Path) -> None:
 # PACK-01 — happy path: minimal valid pack loads correctly
 # ---------------------------------------------------------------------------
 
+
 def test_valid_pack_loads(tmp_path: Path) -> None:
     """A well-formed pack loads without error."""
     pack_yaml = {
@@ -165,6 +172,7 @@ def test_valid_pack_loads(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # U-07 — signature index built from flagship pack; "Xid 79" → KB000123
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.skipif(
     not FLAGSHIP_PACK_DIR.is_dir(),

@@ -6,6 +6,7 @@ immediately, so services refuse to start with a bad pack (PACK-01 invariant).
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -23,8 +24,8 @@ class PackLoadError(Exception):
 class LoadedPack:
     pack: Pack
     scenarios: list[Scenario]
-    kb_articles: dict[str, KBArticle]       # article_id → article
-    log_bundles: dict[str, str]             # bundle_ref (pack-relative) → text
+    kb_articles: dict[str, KBArticle]  # article_id → article
+    log_bundles: dict[str, str]  # bundle_ref (pack-relative) → text
     simulator_profile: SimulatorProfile
     # signature → kb_article_id — the deterministic fallback index used by kb.search
     # when the semantic similarity score is below the confidence threshold.
@@ -71,6 +72,7 @@ def load_pack(pack_dir: Path) -> LoadedPack:
 # Internal helpers
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def _load_pack_yaml(pack_dir: Path) -> Pack:
     path = pack_dir / "pack.yaml"
     if not path.exists():
@@ -93,8 +95,7 @@ def _load_simulator_profile(pack_dir: Path, pack_id: str) -> SimulatorProfile:
         raise PackLoadError(f"simulator-profile.yaml schema error:\n{exc}") from exc
     if profile.pack_id != pack_id:
         raise PackLoadError(
-            f"simulator-profile.yaml pack_id '{profile.pack_id}' "
-            f"does not match pack id '{pack_id}'"
+            f"simulator-profile.yaml pack_id '{profile.pack_id}' does not match pack id '{pack_id}'"
         )
     return profile
 
@@ -116,8 +117,7 @@ def _load_scenarios(pack_dir: Path, pack: Pack) -> list[Scenario]:
 
         if scenario.pack_id != pack.id:
             raise PackLoadError(
-                f"{yaml_path.name}: pack_id '{scenario.pack_id}' "
-                f"does not match pack '{pack.id}'"
+                f"{yaml_path.name}: pack_id '{scenario.pack_id}' does not match pack '{pack.id}'"
             )
         if scenario.target_asset not in asset_ids:
             raise PackLoadError(
@@ -156,10 +156,9 @@ def _parse_kb_article(path: Path, pack_id: str) -> KBArticle:
     if text.startswith("---"):
         parts = text.split("---", 2)
         if len(parts) >= 3:
-            try:
+            # bad frontmatter; fall back to defaults
+            with contextlib.suppress(yaml.YAMLError):
                 metadata = yaml.safe_load(parts[1]) or {}
-            except yaml.YAMLError:
-                pass  # bad frontmatter; fall back to defaults
             body_md = parts[2].strip()
 
     title = metadata.get("title") or _extract_h1(body_md) or path.stem
@@ -191,8 +190,7 @@ def _check_kb_refs(
         kb_path = (pack_dir / ref).resolve()
         if not kb_path.exists():
             raise PackLoadError(
-                f"Scenario '{scenario.id}': kb_article_ref '{ref}' "
-                f"not found at {kb_path}"
+                f"Scenario '{scenario.id}': kb_article_ref '{ref}' not found at {kb_path}"
             )
         article_id = kb_path.stem
         if article_id not in kb_articles:
@@ -209,8 +207,7 @@ def _load_log_bundles(pack_dir: Path, scenarios: list[Scenario]) -> dict[str, st
         bundle_path = (pack_dir / ref).resolve()
         if not bundle_path.exists():
             raise PackLoadError(
-                f"Scenario '{scenario.id}': log_bundle_ref '{ref}' "
-                f"not found at {bundle_path}"
+                f"Scenario '{scenario.id}': log_bundle_ref '{ref}' not found at {bundle_path}"
             )
         bundles[ref] = bundle_path.read_text()
     return bundles

@@ -45,7 +45,9 @@ def bridge_addr() -> str:
     try:
         out = subprocess.run(
             ["ip", "-4", "-o", "addr", "show", "docker0"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         ).stdout.split()
         return out[out.index("inet") + 1].split("/")[0]
     except (ValueError, IndexError, OSError, subprocess.TimeoutExpired):

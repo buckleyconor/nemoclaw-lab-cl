@@ -43,8 +43,7 @@ def test_scaffold_pack_has_scaffold_scenarios(pack_id: str) -> None:
     loaded = load_pack(PACKS_DIR / pack_id)
     scaffold_scenarios = [s for s in loaded.scenarios if s.status == "scaffold"]
     assert scaffold_scenarios, (
-        f"Pack {pack_id!r} has no scaffold scenarios — "
-        "mark scenarios with 'status: scaffold'"
+        f"Pack {pack_id!r} has no scaffold scenarios — mark scenarios with 'status: scaffold'"
     )
 
 
@@ -64,8 +63,7 @@ def test_scaffold_pack_uses_generic_adapter(pack_id: str) -> None:
     """Scaffold packs all use the generic monitoring adapter."""
     loaded = load_pack(PACKS_DIR / pack_id)
     assert loaded.pack.monitoring_adapter == MonitoringAdapterType.generic, (
-        f"Pack {pack_id!r} declares adapter {loaded.pack.monitoring_adapter!r}, "
-        "expected generic"
+        f"Pack {pack_id!r} declares adapter {loaded.pack.monitoring_adapter!r}, expected generic"
     )
 
 

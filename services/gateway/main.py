@@ -10,9 +10,9 @@ deployments). When unset, state lives in process memory (single-process dev mode
 from __future__ import annotations
 
 import os
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import AsyncGenerator
 
 import httpx
 from fastapi import FastAPI
@@ -68,17 +68,20 @@ def create_app(
 
         if redis_url:
             from services.gateway.redis_store import RedisGatewayStore
+
             store = RedisGatewayStore(redis_url, prefix=redis_prefix)
         else:
             store = GatewayStore()
 
         # Seed asset records from pack (all healthy at startup)
         for pack_asset in loaded.pack.assets:
-            await store.set_asset(AssetRecord(
-                id=pack_asset.id,
-                type=loaded.pack.asset_noun.singular,
-                state=AssetState.healthy,
-            ))
+            await store.set_asset(
+                AssetRecord(
+                    id=pack_asset.id,
+                    type=loaded.pack.asset_noun.singular,
+                    state=AssetState.healthy,
+                )
+            )
 
         app.state.store = store
         app.state.loaded_pack = loaded

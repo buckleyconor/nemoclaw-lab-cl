@@ -49,10 +49,7 @@ class RedfishAdapter:
     async def list_events(self, asset_id: str | None = None) -> list[MonitorEvent]:
         async with self._client() as client:
             if asset_id:
-                url = (
-                    f"{self._base}/redfish/v1/Systems/{asset_id}"
-                    "/LogServices/DCGM/Entries"
-                )
+                url = f"{self._base}/redfish/v1/Systems/{asset_id}/LogServices/DCGM/Entries"
                 r = await client.get(url)
                 r.raise_for_status()
                 entries = r.json().get("Members", [])

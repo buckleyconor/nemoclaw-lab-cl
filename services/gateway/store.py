@@ -8,6 +8,7 @@ without any router changes between environments.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 from dataclasses import dataclass, field
 
@@ -19,8 +20,8 @@ from libs.common.models import (
     Notification,
 )
 
-
 # ── Per-asset record ──────────────────────────────────────────────────────────
+
 
 @dataclass
 class AssetRecord:
@@ -31,6 +32,7 @@ class AssetRecord:
 
 
 # ── SSE broker ────────────────────────────────────────────────────────────────
+
 
 class SSEBroker:
     """Fan-out SSE broker. One asyncio.Queue per subscriber."""
@@ -44,10 +46,8 @@ class SSEBroker:
         return q
 
     def unsubscribe(self, q: asyncio.Queue[str]) -> None:
-        try:
+        with contextlib.suppress(ValueError):
             self._queues.remove(q)
-        except ValueError:
-            pass
 
     async def publish(self, event_type: str, data: dict) -> None:
         self._fanout(json.dumps({"type": event_type, "data": data}))
@@ -62,6 +62,7 @@ class SSEBroker:
 
 
 # ── In-memory store ───────────────────────────────────────────────────────────
+
 
 @dataclass
 class GatewayStore:

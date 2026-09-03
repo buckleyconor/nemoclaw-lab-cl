@@ -159,7 +159,13 @@ def push_argv(
     # the sandbox file's parent directory so it lands AT target.sandbox_path —
     # a file-path destination would mkdir a same-named directory and nest the
     # file inside it, "succeeding" while the real file stays untouched.
-    return [nemoclaw_bin, sandbox_name, "upload", str(scratch), target.sandbox_path.rsplit("/", 1)[0] + "/"]
+    return [
+        nemoclaw_bin,
+        sandbox_name,
+        "upload",
+        str(scratch),
+        target.sandbox_path.rsplit("/", 1)[0] + "/",
+    ]
 
 
 def editor_argv(editor_bin: str, editor_args: list[str], path: Path) -> list[str]:
@@ -221,8 +227,8 @@ def run_target(
         print(
             f"[console] editor not found: {config.editor_bin!r} is not installed on this host.\n"
             "[console] Install vim ('sudo apt-get install -y vim'), or set TERMINAL_EDITOR_BIN\n"
-            "[console] (e.g. 'vi' or 'nano') and restart the terminal daemon."
-            , file=out
+            "[console] (e.g. 'vi' or 'nano') and restart the terminal daemon.",
+            file=out,
         )
         return False
 
@@ -306,7 +312,11 @@ def run_reset(
             text=True,
             check=False,
         )
-        name = target.scratch_rel if target.kind == "workspace_file" else f"{target.scratch_rel}/SKILL.md"
+        name = (
+            target.scratch_rel
+            if target.kind == "workspace_file"
+            else f"{target.scratch_rel}/SKILL.md"
+        )
         if push.returncode != 0:
             print(f"[console] reset push FAILED for {name}: {push.stderr.strip()}", file=out)
             all_ok = False
@@ -340,7 +350,13 @@ def check_configured(
         with tempfile.TemporaryDirectory() as tmp_dir:
             dest = Path(tmp_dir) / "download"
             dl = run(
-                [config.nemoclaw_bin, config.sandbox_name, "download", target.sandbox_path, str(dest)],
+                [
+                    config.nemoclaw_bin,
+                    config.sandbox_name,
+                    "download",
+                    target.sandbox_path,
+                    str(dest),
+                ],
                 capture_output=True,
                 text=True,
                 check=False,
@@ -349,7 +365,9 @@ def check_configured(
             # so download materializes `dest` itself as a directory — same
             # convention edit_path() uses for the live PTY edit flow.
             content_path = dest / "SKILL.md" if target.kind == "skill" else dest
-            content = content_path.read_text() if dl.returncode == 0 and content_path.is_file() else None
+            content = (
+                content_path.read_text() if dl.returncode == 0 and content_path.is_file() else None
+            )
         result[target.key] = bool(content) and content != blank_content(target)
     return result
 

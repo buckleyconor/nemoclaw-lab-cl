@@ -5,7 +5,6 @@ from pydantic import ValidationError
 
 from libs.common.models import Scenario
 
-
 VALID_SCENARIO_DICT = {
     "id": "scn-gpu-xid-79",
     "pack_id": "datacenter-xe9680",

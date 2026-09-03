@@ -18,16 +18,15 @@ Also exposes three FastAPI endpoints:
 from __future__ import annotations
 
 import os
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-from libs.common.models import ApprovalDecision
+from libs.common.models import ApprovalDecision, MonitoringAdapterType
 from libs.common.pack_loader import load_pack
-from libs.common.models import MonitoringAdapterType
 from services.mcp_tools.adapters.generic import GenericAdapter
 from services.mcp_tools.adapters.redfish import RedfishAdapter
 from services.mcp_tools.fault_registry import FaultEventRegistry

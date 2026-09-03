@@ -17,9 +17,9 @@ from typing import Protocol
 
 import httpx
 
+from libs.common.models import ApprovalDecision
 from services.mcp_tools.fault_registry import FaultEventRegistry
 from services.mcp_tools.token_store import ApprovalTokenStore
-from libs.common.models import ApprovalDecision
 
 
 class _ClearFn(Protocol):

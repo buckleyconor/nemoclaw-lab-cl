@@ -12,8 +12,8 @@ from __future__ import annotations
 import asyncio
 import json
 
-import pytest
 import fakeredis.aioredis as fake_aioredis
+import pytest
 
 from libs.common.models import AssetState, FaultEventStatus
 from services.gateway.redis_store import RedisGatewayStore
@@ -27,6 +27,7 @@ async def store() -> RedisGatewayStore:
 
 
 # ── REDIS-01: FaultEvent CRUD ─────────────────────────────────────────────────
+
 
 async def test_redis01_create_and_get_fault(store: RedisGatewayStore) -> None:
     evt = await store.create_fault_event(
@@ -72,6 +73,7 @@ async def test_redis01_update_nonexistent_fault_returns_none(store: RedisGateway
 
 # ── REDIS-02: Asset CRUD ──────────────────────────────────────────────────────
 
+
 async def test_redis02_set_and_get_asset(store: RedisGatewayStore) -> None:
     asset = AssetRecord(id="xe9680-01", type="gpu-server")
     await store.set_asset(asset)
@@ -110,6 +112,7 @@ async def test_redis02_list_assets(store: RedisGatewayStore) -> None:
 
 # ── REDIS-03: Notification CRUD ───────────────────────────────────────────────
 
+
 async def test_redis03_create_and_list_notifications(store: RedisGatewayStore) -> None:
     n1 = await store.create_notification(
         fault_event_id="fe-1",
@@ -128,9 +131,7 @@ async def test_redis03_create_and_list_notifications(store: RedisGatewayStore) -
 
 
 async def test_redis03_mark_read(store: RedisGatewayStore) -> None:
-    notif = await store.create_notification(
-        fault_event_id="fe-1", title="t", body="b"
-    )
+    notif = await store.create_notification(fault_event_id="fe-1", title="t", body="b")
     assert not notif.read
     result = await store.mark_read(notif.id)
     assert result is True
@@ -152,13 +153,10 @@ async def test_redis03_unread_count(store: RedisGatewayStore) -> None:
 
 # ── REDIS-04: Activity ────────────────────────────────────────────────────────
 
+
 async def test_redis04_create_and_list_activity(store: RedisGatewayStore) -> None:
-    e1 = await store.create_activity(
-        fault_event_id="fe-1", step="diagnose", message="Running KB search"
-    )
-    e2 = await store.create_activity(
-        fault_event_id="fe-1", step="remediate", message="Applied patch"
-    )
+    await store.create_activity(fault_event_id="fe-1", step="diagnose", message="Running KB search")
+    await store.create_activity(fault_event_id="fe-1", step="remediate", message="Applied patch")
     events = await store.list_activity_events()
     steps = [e.step for e in events]
     assert "diagnose" in steps
@@ -166,6 +164,7 @@ async def test_redis04_create_and_list_activity(store: RedisGatewayStore) -> Non
 
 
 # ── REDIS-05: Pending tokens ──────────────────────────────────────────────────
+
 
 async def test_redis05_set_and_get_pending_token(store: RedisGatewayStore) -> None:
     await store.set_pending_token("fe-1", "tok-abc123")
@@ -179,6 +178,7 @@ async def test_redis05_get_missing_token_returns_none(store: RedisGatewayStore) 
 
 
 # ── REDIS-06: SSE broker is present ──────────────────────────────────────────
+
 
 async def test_redis06_sse_broker_exists(store: RedisGatewayStore) -> None:
     assert store.sse is not None
@@ -226,6 +226,7 @@ async def test_redis06_sse_local_subscriber_receives_own_publish() -> None:
 
 # ── REDIS-07: Key isolation by prefix ────────────────────────────────────────
 
+
 async def test_redis07_prefix_isolation() -> None:
     """Two stores with different prefixes don't share data."""
     fake = fake_aioredis.FakeRedis(decode_responses=True)
@@ -238,6 +239,7 @@ async def test_redis07_prefix_isolation() -> None:
 
 
 # ── REDIS-08: get_fault returns None for missing ──────────────────────────────
+
 
 async def test_redis08_get_fault_missing_returns_none(store: RedisGatewayStore) -> None:
     result = await store.get_fault("no-such-id")

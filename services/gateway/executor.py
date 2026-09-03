@@ -116,9 +116,7 @@ class RemediationExecutor:
         if delay and self.delay_scale:
             await asyncio.sleep(delay * self.delay_scale)
         try:
-            evt = await store.create_activity(
-                fault_event_id=fault_id, step=step, message=message
-            )
+            evt = await store.create_activity(fault_event_id=fault_id, step=step, message=message)
             await store.sse.publish("activity", evt.model_dump(mode="json"))
         except Exception:
             log.warning("Failed to post activity %r for fault %s", step, fault_id)
@@ -131,17 +129,22 @@ class RemediationExecutor:
             return
         if status == FaultEventStatus.resolved and asset_id and await store.has_asset(asset_id):
             asset = await store.get_asset(asset_id)
-            await store.set_asset(AssetRecord(
-                id=asset.id,
-                type=asset.type,
-                state=AssetState.healthy,
-                active_fault_event_id=None,
-            ))
-            await store.sse.publish("asset", {
-                "id": asset_id,
-                "state": "healthy",
-                "active_fault_event_id": None,
-            })
+            await store.set_asset(
+                AssetRecord(
+                    id=asset.id,
+                    type=asset.type,
+                    state=AssetState.healthy,
+                    active_fault_event_id=None,
+                )
+            )
+            await store.sse.publish(
+                "asset",
+                {
+                    "id": asset_id,
+                    "state": "healthy",
+                    "active_fault_event_id": None,
+                },
+            )
         await store.sse.publish("fault", updated.model_dump(mode="json"))
 
     async def _run(
@@ -157,29 +160,47 @@ class RemediationExecutor:
     ) -> str:
         try:
             await self._set_status(store, fault_id, asset_id, FaultEventStatus.remediating)
-            await self._narrate(store, fault_id, "remediate",
-                                "✅ Approval received — single-use token validated", delay=0.5)
-            await self._narrate(store, fault_id, "remediate",
-                                f"Beginning remediation: {len(step_ids)} approved steps",
-                                delay=0.7)
+            await self._narrate(
+                store,
+                fault_id,
+                "remediate",
+                "✅ Approval received — single-use token validated",
+                delay=0.5,
+            )
+            await self._narrate(
+                store,
+                fault_id,
+                "remediate",
+                f"Beginning remediation: {len(step_ids)} approved steps",
+                delay=0.7,
+            )
 
             for step_id in step_ids:
                 label = step_labels.get(step_id, step_id)
                 await self._narrate(store, fault_id, "remediate", f"  ▶ {label}…", delay=1.2)
-                await self._narrate(store, fault_id, "remediate",
-                                    f"  ✓ {label} — complete", delay=1.5)
+                await self._narrate(
+                    store, fault_id, "remediate", f"  ✓ {label} — complete", delay=1.5
+                )
 
             result = await self.execute_fn(fault_id, token, step_ids)
             log.info("Remediation result for fault %s: %s", fault_id, result)
 
             if result.get("status") == "resolved":
-                await self._narrate(store, fault_id, "remediate",
-                                    f"Remediation complete — verifying {asset_id} health…",
-                                    delay=1.0)
+                await self._narrate(
+                    store,
+                    fault_id,
+                    "remediate",
+                    f"Remediation complete — verifying {asset_id} health…",
+                    delay=1.0,
+                )
                 await self._set_status(store, fault_id, asset_id, FaultEventStatus.resolved)
-                await self._narrate(store, fault_id, "resolved",
-                                    f"✅ {asset_id} returned to healthy state — fault cleared",
-                                    delay=0.8)
+                await self._narrate(
+                    store,
+                    fault_id,
+                    "resolved",
+                    f"✅ {asset_id} returned to healthy state — fault cleared",
+                    delay=0.8,
+                )
                 return "resolved"
 
             error = str(result.get("error", "unknown"))
@@ -188,6 +209,7 @@ class RemediationExecutor:
             return f"error:{error}"
         except Exception:
             log.exception("Remediation execution crashed for fault %s", fault_id)
-            await self._narrate(store, fault_id, "remediate",
-                                "⚠ Remediation error: internal execution failure")
+            await self._narrate(
+                store, fault_id, "remediate", "⚠ Remediation error: internal execution failure"
+            )
             return "error:internal"

@@ -7,13 +7,13 @@ Use ``create_app(pack_dir=...)`` in tests to inject a specific pack directory.
 from __future__ import annotations
 
 import os
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import AsyncGenerator
 
 from fastapi import FastAPI
 
-from libs.common.pack_loader import LoadedPack, PackLoadError, load_pack
+from libs.common.pack_loader import LoadedPack, load_pack
 from services.simulator.control import router as control_router
 from services.simulator.engine import SimulatorEngine
 from services.simulator.surfaces.generic import router as generic_router

@@ -23,6 +23,7 @@ def _engine(request: Request) -> SimulatorEngine:
 # Request / response schemas
 # ------------------------------------------------------------------
 
+
 class InjectRequest(BaseModel):
     asset_id: str
     scenario_id: str
@@ -46,6 +47,7 @@ class StateResponse(BaseModel):
 # ------------------------------------------------------------------
 # Endpoints
 # ------------------------------------------------------------------
+
 
 @router.post("/inject", response_model=InjectResponse)
 async def inject_fault(
