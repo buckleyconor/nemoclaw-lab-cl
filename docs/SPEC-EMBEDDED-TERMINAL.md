@@ -133,10 +133,12 @@ New FastAPI app, run **on the host** with the repo's uv environment. Not in dock
 - If the daemon is down, the dashboard still works fully — the terminal panel just shows disconnected.
 - **Hosts with ufw active (this GB10 host is one):** ufw's default-deny INPUT drops *all* container→host traffic, which blocks the gateway→daemon hop — and, discovered during M12 verification, has been silently breaking the ADR-011 webhook wake-up (`host.docker.internal:18790`) too, since that call is deliberately best-effort. Allow the compose subnet to reach the two host services:
   ```
-  sudo ufw allow from 172.23.0.0/16 to 172.17.0.1 port 8005 proto tcp comment 'nemoclaw terminal daemon (ADR-012)'
-  sudo ufw allow from 172.23.0.0/16 to any port 18790 proto tcp comment 'openclaw wake hook (ADR-011)'
+  sudo ufw allow from 172.28.100.0/24 to 172.17.0.1 port 8005 proto tcp comment 'nemoclaw terminal daemon (ADR-012)'
+  sudo ufw allow from 172.28.100.0/24 to any port 18790 proto tcp comment 'openclaw wake hook (ADR-011)'
   ```
-  (`172.23.0.0/16` = the `nemoclaw-lab-cl_default` compose network; `172.17.0.1` = docker0, the daemon's `TERMINAL_BIND` on this host.)
+  (`172.28.100.0/24` = the compose network, pinned in `docker-compose.yaml` so this rule is
+  the same on every host; `172.17.0.1` = docker0, the daemon's `TERMINAL_BIND` on this host —
+  detect yours with `ip -4 addr show docker0`. `make bootstrap` prints both values live.)
 - **Wake hook needs a relay too (ADR-011):** the ufw rule alone doesn't fix the webhook — openshell publishes the sandbox's hook port as an SSH forward hard-bound to `127.0.0.1:18790` and refuses a second forward on the same port, so containers can't reach it even with ufw open. Run `make hook-relay` (`deploy/scripts/hook-relay.py`), which binds `172.17.0.1:18790` and dials the loopback forward per connection — it survives sandbox/tunnel restarts and leaves the openshell-managed forward untouched.
 - Systemd user unit: optional later hardening, out of scope for v1.
 

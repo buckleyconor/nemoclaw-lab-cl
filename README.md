@@ -36,6 +36,11 @@ make doctor                   # expect: all checks passed
 
 Then open <http://localhost:8001/lab/>.
 
+> For the long-form version — full prerequisites, what runs in a container vs
+> on the host, how to plug in an existing endpoint or serve a model on the same
+> node, and verification — see
+> **[docs/single-node-deployment.md](docs/single-node-deployment.md)**.
+
 The agent cannot talk to a private/internal endpoint directly — NemoClaw's
 SSRF guard refuses it, and its network policy can only pin
 `host.openshell.internal`. The inference proxy bridges that alias to the real
@@ -97,19 +102,33 @@ Useful when a step fails partway and you need to resume by hand.
 
 ### Surviving a reboot
 
-The compose services come back on their own (`restart: unless-stopped`). The two
-host daemons do **not** — install the user units once:
+The compose services come back on their own (`restart: unless-stopped`). The
+host processes do **not** — install the self-heal layer once:
 
 ```bash
-mkdir -p ~/.config/systemd/user
-cp deploy/systemd/nemoclaw-*.{service,timer} ~/.config/systemd/user/
-systemctl --user daemon-reload
-systemctl --user enable --now nemoclaw-terminal nemoclaw-hook-relay
-sudo loginctl enable-linger $USER     # keep them alive without a login session
+sudo make install-selfheal
 ```
 
-Optionally also `systemctl --user enable --now nemoclaw-doctor.timer`, which
-runs `make doctor-fix` on a schedule so a dead daemon self-heals.
+That one command installs and enables:
+
+| Unit | Domain | What it does |
+|------|--------|--------------|
+| `nemoclaw-inference-watchdog.timer` | system | Every 60s: restarts nginx if the inference proxy is down or on stale sockets |
+| `nemoclaw-terminal.service` | system | The embedded-terminal daemon (ADR-012), `Restart=on-failure` |
+| `nemoclaw-gateway-<port>.service` | user | Boot-takeover of the OpenShell gateway |
+| `nemoclaw-hook-forward.service` | user | Keeps openshell's sandbox port-forward alive |
+| `nemoclaw-hook-relay.service` | user | Bridges that forward onto the docker bridge |
+| `nemoclaw-doctor.timer` | user | Every 5 min: `make doctor-fix`, so a dead daemon self-heals |
+
+It also runs `loginctl enable-linger` for the lab user (the user units must
+survive logout) and migrates a host off the older all-system layout in place.
+It is idempotent — re-run it after moving the checkout.
+
+The wake-hook chain lives in the **user** manager on purpose: the `nemoclaw`
+CLI needs the user session's D-Bus, and the gateway → forward → relay boot
+ordering is only expressible within one manager domain (2026-08-28 incident).
+Don't hand-copy units out of `deploy/systemd/` — they carry `__NEMOCLAW_*__`
+placeholders that the installer substitutes.
 
 One piece can't be unit-managed: openshell's sandbox port-forward. After a
 reboot, recover it **before** starting the relay —
@@ -268,7 +287,7 @@ The approval token is minted **server-side** when an operator clicks Approve in 
 
 ```bash
 uv run pytest                 # unit + integration (stub LLM)
-uv run pytest tests/e2e/      # end-to-end (requires running stack)
+uv run pytest tests/e2e/      # full fault lifecycle, all in-process (no stack, no LLM)
 ```
 
 ## Environment variables

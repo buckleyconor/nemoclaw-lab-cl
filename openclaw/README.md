@@ -37,8 +37,11 @@ openclaw/
    (`src/mcp.ts` `LLM_EXPOSED_TOOLS`); a module-load assert refuses any
    edit that re-introduces it.
 2. OpenClaw tool policy denies it and every built-in tool
-   (`tools.profile: minimal` + explicit `tools.deny`, deny wins) — set by
-   the onboard script.
+   (`tools.profile: full` narrowed by an explicit `tools.allow`, plus
+   `tools.deny`; deny wins over allow) — set by the onboard script.
+   `profile: minimal` looks safer but is not usable here: the profile sets a
+   BASE allowlist that `tools.allow` can only narrow, and `minimal` caps it
+   at `session_status`, which silently drops the plugin's seven tools.
 3. The token is minted only on operator approval and consumed by the
    Gateway's server-side executor; it never enters any LLM context.
    `remediation.execute` itself still validates token binding, single-use,

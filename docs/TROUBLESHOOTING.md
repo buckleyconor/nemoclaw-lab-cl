@@ -107,7 +107,8 @@ Log: `~/.local/state/nemoclaw-terminal.log`. Also check:
   `systemctl --user list-units | grep nemoclaw` for a re-appearing user unit.
 - On Linux with ufw, the compose subnet needs allow rules to reach the
   bridge-bound daemon and relay (SPEC-EMBEDDED-TERMINAL.md §6):
-  `172.23.0.0/16 → 172.17.0.1:8005` and `→ :18790`.
+  `172.28.100.0/24 → 172.17.0.1:8005` and `→ :18790` (the compose subnet is pinned in
+  `docker-compose.yaml`; `make bootstrap` prints the live-detected values).
 
 ## "The guide shows a pack-mismatch banner / wrong vertical data"
 
