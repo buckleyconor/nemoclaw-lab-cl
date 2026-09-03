@@ -1,19 +1,19 @@
 # Log bundle: scn-thermal-throttle — correlated DCGM / nvidia-smi / iDRAC extract, gpu-server-01 (XE9780L)
 
 2024-01-19T15:30:00Z INFO  dcgm[1234]: Thermal monitoring active. All GPU temps nominal on gpu-server-01.
-2024-01-19T15:30:00Z INFO  iDRAC[LifecycleLog]: Inlet temp: 24°C. All fans at 40%. Thermal headroom adequate.
-2024-01-19T15:31:00Z INFO  dcgm[1234]: GPU 3: Temp 71°C, Power 385W (limit 400W) — under ML training workload
-2024-01-19T15:32:00Z INFO  dcgm[1234]: GPU 3: Temp 76°C — trending up. Fan speed increasing.
-2024-01-19T15:33:00Z WARN  iDRAC[LifecycleLog]: Thermal: Fan zone 2 at 85% — elevated due to GPU 3 heat load
+2024-01-19T15:30:00Z INFO  iDRAC[LifecycleLog]: Coolant supply temp: 38°C. Secondary loop flow nominal. Thermal headroom adequate.
+2024-01-19T15:31:00Z INFO  dcgm[1234]: GPU 3: Temp 71°C, Power 1035W (limit 1100W) — under ML training workload
+2024-01-19T15:32:00Z INFO  dcgm[1234]: GPU 3: Temp 76°C — trending up. Cold plate delta-T narrowing.
+2024-01-19T15:33:00Z WARN  iDRAC[LifecycleLog]: Thermal: Cold plate delta-T on GPU 3 narrowed to 4°C — reduced coolant flow suspected
 2024-01-19T15:34:00Z WARN  dcgm[1234]: GPU 3: Temp 82°C — approaching throttle threshold (85°C)
-2024-01-19T15:34:30Z WARN  iDRAC[LifecycleLog]: Thermal: Inlet temp 27°C — above nominal (24°C)
+2024-01-19T15:34:30Z WARN  iDRAC[LifecycleLog]: Thermal: Coolant supply temp 44°C — above nominal (40°C)
 2024-01-19T15:35:00Z WARN  dcgm[1234]: GPU 3: Temp 87°C — throttle threshold (85°C) exceeded
-2024-01-19T15:35:01Z WARN  dcgm[1234]: GPU3: thermal throttle active — temperature 89°C exceeds 85°C threshold
+2024-01-19T15:35:01Z WARN  dcgm[1234]: GPU3: thermal throttle active — junction temperature 89°C exceeds 85°C threshold
 2024-01-19T15:35:01Z WARN  dcgm[1234]: GPU temperature threshold exceeded: performance throttled to prevent damage
-2024-01-19T15:35:01Z WARN  nvidia-smi[1235]: GPU 3: Clock throttle reason: HW Thermal Slowdown — SM clock 1410 MHz → 900 MHz
+2024-01-19T15:35:01Z WARN  nvidia-smi[1235]: GPU 3: Clock throttle reason: HW Thermal Slowdown — SM clock 2032 MHz → 1300 MHz
 2024-01-19T15:35:02Z WARN  iDRAC[LifecycleLog]: OEM.1.0.ThermalThrottle — GPU 3 thermal throttle active. Temp: 89°C. Threshold: 85°C.
 2024-01-19T15:35:02Z WARN  dcgm[1234]: GPU 3 compute throughput reduced 35% due to thermal throttle
 2024-01-19T15:35:03Z INFO  scheduler[5678]: Training job TRN-4471 experiencing GPU throttle — ETA extended
-2024-01-19T15:35:05Z WARN  iDRAC[LifecycleLog]: All fans at 100%. Max cooling engaged for GPU 3.
-2024-01-19T15:36:00Z WARN  iDRAC[LifecycleLog]: Inlet temp holding at 27°C — facility cooling check recommended (CRAC row 4)
+2024-01-19T15:35:05Z WARN  iDRAC[LifecycleLog]: Secondary loop pump at maximum. Max cooling engaged for GPU 3.
+2024-01-19T15:36:00Z WARN  iDRAC[LifecycleLog]: Coolant supply holding at 44°C — facility cooling check recommended (CDU rack 4)
 2024-01-19T15:36:30Z INFO  dcgm[1234]: GPU 3: Temp 88°C steady under throttle. Other 7 GPUs 70–78°C. Asset flagged for thermal remediation.

@@ -1,18 +1,20 @@
-# Log bundle: scn-psu-loss — iDRAC Lifecycle Log extract with DCGM correlation, gpu-server-01 (XE9780L)
+# Log bundle: scn-psu-loss — iDRAC Lifecycle Log extract with DCGM correlation, gpu-server-01 (XE9780L, 33kW powershelf)
 
-2024-01-17T03:10:00Z INFO  iDRAC[LifecycleLog]: System power healthy. PSU 1: 1100W, PSU 2: 1100W, PSU 3: 1100W, PSU 4: 1100W
-2024-01-17T03:10:00Z INFO  iDRAC[LifecycleLog]: PDU A and PDU B feeds nominal. Redundancy: 2+2
-2024-01-17T03:10:30Z INFO  iDRAC[LifecycleLog]: GPU workload steady. Total system draw: 3840W of 4400W available
-2024-01-17T03:11:00Z INFO  iDRAC[LifecycleLog]: Thermal: all inlet temps 22°C, all fans at 45%
+2024-01-17T03:10:00Z INFO  iDRAC[LifecycleLog]: Powershelf healthy. PSU 1: 5500W, PSU 2: 5500W, PSU 3: 5500W, PSU 4: 5500W, PSU 5: 5500W, PSU 6: 5500W
+2024-01-17T03:10:00Z INFO  iDRAC[LifecycleLog]: PDU A and PDU B feeds nominal. Redundancy policy: N+1 (33000W installed, 27500W budget)
+2024-01-17T03:10:30Z INFO  iDRAC[LifecycleLog]: GPU workload steady. Shelf draw: 22600W of 27500W budget — gpu-server-01 and gpu-server-02 connected
+2024-01-17T03:11:00Z INFO  iDRAC[LifecycleLog]: Thermal: coolant supply 38°C, secondary loop flow nominal
 2024-01-17T03:11:45Z WARN  iDRAC[LifecycleLog]: PSU.1.0.InputVoltageWarning — PSU 2: input voltage fluctuation detected (199V, threshold 200V)
 2024-01-17T03:11:46Z WARN  iDRAC[LifecycleLog]: PSU 2: input voltage 187V and falling — AC feed degrading
-2024-01-17T03:11:47Z CRIT  iDRAC[LifecycleLog]: PSU 2 input lost — AC feed absent on PDU B branch
+2024-01-17T03:11:47Z CRIT  iDRAC[LifecycleLog]: PSU 2 input lost — AC feed absent on PDU A branch
 2024-01-17T03:11:47Z CRIT  iDRAC[LifecycleLog]: PSU 2 input power lost — redundancy degraded
-2024-01-17T03:11:47Z CRIT  iDRAC[LifecycleLog]: OEM.1.0.PSULost — Power supply failure on PSU 2. System now operating on 3 of 4 PSUs.
+2024-01-17T03:11:47Z CRIT  iDRAC[LifecycleLog]: OEM.1.0.PSULost — Power supply failure on PSU 2. Powershelf now operating on 5 of 6 PSUs.
 2024-01-17T03:11:48Z WARN  iDRAC[LifecycleLog]: power supply failure — PSU 2 removed from active pool
-2024-01-17T03:11:48Z INFO  iDRAC[LifecycleLog]: Remaining capacity: PSU 1 (1100W), PSU 3 (1100W), PSU 4 (1100W) = 3300W. Current draw 3840W — OVER CAPACITY
+2024-01-17T03:11:48Z INFO  iDRAC[LifecycleLog]: Installed capacity 27500W. N+1 budget now 22000W. Current draw 22600W — OVER BUDGET
 2024-01-17T03:11:49Z CRIT  iDRAC[LifecycleLog]: Power budget exceeded. Initiating GPU power capping.
-2024-01-17T03:11:49Z WARN  dcgm[1234]: GPU power limits reduced: all GPUs capped at 300W (was 400W)
-2024-01-17T03:11:50Z WARN  dcgm[1234]: Training throughput on gpu-server-01 reduced ~20% under power cap
-2024-01-17T03:11:50Z INFO  iDRAC[LifecycleLog]: Alert: Critical PSU event on gpu-server-01. Immediate attention required.
-2024-01-17T03:12:10Z INFO  iDRAC[LifecycleLog]: System stable under power cap. PSU 2 state: Input Lost. Awaiting facilities check on PDU B branch.
+2024-01-17T03:11:49Z WARN  dcgm[1234]: GPU power limits reduced: all GPUs capped at 900W (was 1100W)
+2024-01-17T03:11:50Z WARN  dcgm[1234]: Training throughput on gpu-server-01 reduced ~12% under power cap
+2024-01-17T03:11:50Z WARN  dcgm[1234]: gpu-server-02 reports matching cap — shelf-level event, both sleds affected
+2024-01-17T03:11:50Z INFO  iDRAC[LifecycleLog]: Alert: Critical PSU event on powershelf serving gpu-server-01. Immediate attention required.
+2024-01-17T03:11:51Z INFO  iDRAC[LifecycleLog]: Shelf draw after cap: 19400W of 22000W budget — single-fault margin restored
+2024-01-17T03:12:10Z INFO  iDRAC[LifecycleLog]: System stable under power cap. PSU 2 state: Input Lost. Awaiting facilities check on PDU A branch.
