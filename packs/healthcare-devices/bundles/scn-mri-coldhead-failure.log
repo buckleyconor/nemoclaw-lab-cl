@@ -1,4 +1,4 @@
-# Log bundle: scn-mri-coldhead-failure — Siemens MAGNETOM Aera cryogenics monitoring extract, mri-01
+# Log bundle: scn-mri-coldhead-failure — 1.5T wide-bore MRI cryogenics monitoring extract, mri-01
 
 2026-06-20T02:00:00Z INFO  cryo[mri-01]: Coldhead cycling nominal — 1.2 Hz, second-stage temp 4.2K, helium pressure 1.8 bar
 2026-06-20T02:00:00Z INFO  cryo[mri-01]: Compressor running — nominal current draw, no fault flags

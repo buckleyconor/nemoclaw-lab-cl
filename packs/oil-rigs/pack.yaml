@@ -7,24 +7,24 @@ fleet_label: "Rig Equipment Health"
 monitoring_adapter: generic
 theme: dell-default
 sentinel_name: "Drilling Rig Agent"
-asset_spec_label: "NOV / ABB / Cameron rig floor & well-control package"
+asset_spec_label: "Rig floor & well-control equipment package"
 fleet_layout: list
 assets:
   - id: mud-pump-01
-    display_name: "Mud Pump No. 1 (NOV 14-P-220 Triplex)"
+    display_name: "Mud Pump No. 1 (14-P-220 Triplex)"
     image_url: "/icons/mud-pump.svg"
   - id: mud-pump-02
-    display_name: "Mud Pump No. 2 (NOV 14-P-220 Triplex)"
+    display_name: "Mud Pump No. 2 (14-P-220 Triplex)"
     image_url: "/icons/mud-pump.svg"
   - id: top-drive-01
-    display_name: "Top Drive (NOV TDS-11SA)"
+    display_name: "Top Drive (TDS-11SA Class AC)"
     image_url: "/icons/top-drive.svg"
   - id: drawworks-01
-    display_name: "Drawworks (NOV D2000)"
+    display_name: "Drawworks (D2000 Class AC)"
     image_url: "/icons/drawworks.svg"
   - id: bop-hpu-01
-    display_name: "BOP Control HPU (Cameron/Koomey Type E)"
+    display_name: "BOP Control HPU (Type E)"
     image_url: "/icons/bop-hpu.svg"
   - id: gen-01
-    display_name: "Rig Generator No. 1 (Caterpillar 3512C)"
+    display_name: "Rig Generator No. 1 (3512C Class Diesel)"
     image_url: "/icons/generator.svg"

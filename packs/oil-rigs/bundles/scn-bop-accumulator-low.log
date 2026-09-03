@@ -1,4 +1,4 @@
-# Log bundle: scn-bop-accumulator-low — BOP control unit (Koomey Type E) PLC extract, bop-hpu-01
+# Log bundle: scn-bop-accumulator-low — BOP control unit (Type E) PLC extract, bop-hpu-01
 
 2026-04-05T22:00:00Z INFO  bop-hpu[bop-hpu-01]: Accumulator bank pressure 3020 psi — within normal operating range (2800-3400 psi)
 2026-04-05T22:00:00Z INFO  bop-hpu[bop-hpu-01]: Electric pump (duty) standby — air pump (backup) standby

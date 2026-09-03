@@ -25,15 +25,15 @@ kb_article_ref: kb/KB700003.md
 
 remediation_steps:
   - id: restart_compressor
-    label: "Attempt compressor restart per Siemens cryogenics restart procedure"
+    label: "Attempt compressor restart per the scanner manufacturer's cryogenics restart procedure"
   - id: verify_coldhead_cycling
     label: "Verify coldhead second-stage temperature returns to nominal cycling range"
   - id: open_vendor_service_case
-    label: "Open Siemens service case for cryocooler diagnosis if restart does not hold"
+    label: "Open a manufacturer service case for cryocooler diagnosis if restart does not hold"
   - id: monitor_helium_trend
     label: "Monitor helium level and pressure trend continuously until service resolves the fault"
 impact:
-  summary: "Compressor restart is attempted immediately since a stopped coldhead allows helium boil-off and pressure rise; if restart doesn't hold, the scanner is taken out of clinical use and Siemens service is engaged before helium loss progresses toward a quench."
+  summary: "Compressor restart is attempted immediately since a stopped coldhead allows helium boil-off and pressure rise; if restart doesn't hold, the scanner is taken out of clinical use and the scanner manufacturer is engaged before helium loss progresses toward a quench."
   workload_impact: "If the compressor does not restart successfully, the scanner must be taken out of clinical service — all scheduled MRI exams on this unit need to be rescheduled or diverted until resolved."
   service_risk: "High — sustained coldhead failure allows liquid helium boil-off to continue, and if pressure relief is exceeded without intervention, the magnet can quench: an abrupt loss of superconductivity that vents helium and takes the scanner offline for days to weeks for a helium refill and magnet ramp."
   estimated_duration: "~15 minutes to attempt restart and assess; if unsuccessful, vendor service engagement and helium refill (if needed) can take days."

@@ -1,14 +1,14 @@
-# Log bundle: scn-infusion-pump-battery — BD Alaris PC unit device log extract, infusion-pump-01 (Med-Surg 3W)
+# Log bundle: scn-infusion-pump-battery — Infusion pump PC unit device log extract, infusion-pump-01 (Med-Surg 3W)
 
-2026-05-11T07:02:14Z INFO  alaris[infusion-pump-01]: Pump module active — Channel A, NS 0.9% at 75 mL/hr, on battery power
-2026-05-11T07:02:14Z INFO  alaris[infusion-pump-01]: Battery status — 34% charge, NiMH pack, est. runtime 22 min
-2026-05-11T07:02:14Z INFO  alaris[infusion-pump-01]: Patient transport in progress — 3W to Radiology, AC disconnected 07:01:50
-2026-05-11T07:08:33Z WARN  alaris[infusion-pump-01]: Battery status — 19% charge, est. runtime 12 min
-2026-05-11T07:12:07Z WARN  alaris[infusion-pump-01]: Battery run time low — estimated 8 minutes remaining at current infusion rate
-2026-05-11T07:12:07Z WARN  alaris[infusion-pump-01]: Audible low-battery alarm active on pump module
-2026-05-11T07:14:41Z WARN  alaris[infusion-pump-01]: Battery status — 8% charge, est. runtime 3 min, escalating alarm priority
-2026-05-11T07:16:52Z CRIT  alaris[infusion-pump-01]: Battery depleted — pump switched to AC power required, alarm silenced by AC connection
-2026-05-11T07:16:52Z CRIT  alaris[infusion-pump-01]: Infusion continued without interruption — AC reconnected on arrival at Radiology
-2026-05-11T07:16:53Z INFO  alaris[infusion-pump-01]: Battery charge cycle count — 412 (rated service life: 300 cycles typical, 500 max)
-2026-05-11T07:16:53Z WARN  alaris[infusion-pump-01]: Battery health flag — capacity degraded below 60% of rated runtime at full charge
-2026-05-11T07:20:15Z INFO  alaris[infusion-pump-01]: Biomed alert queued — battery replacement recommended, cycle count exceeds typical service life
+2026-05-11T07:02:14Z INFO  infusionpump[infusion-pump-01]: Pump module active — Channel A, NS 0.9% at 75 mL/hr, on battery power
+2026-05-11T07:02:14Z INFO  infusionpump[infusion-pump-01]: Battery status — 34% charge, NiMH pack, est. runtime 22 min
+2026-05-11T07:02:14Z INFO  infusionpump[infusion-pump-01]: Patient transport in progress — 3W to Radiology, AC disconnected 07:01:50
+2026-05-11T07:08:33Z WARN  infusionpump[infusion-pump-01]: Battery status — 19% charge, est. runtime 12 min
+2026-05-11T07:12:07Z WARN  infusionpump[infusion-pump-01]: Battery run time low — estimated 8 minutes remaining at current infusion rate
+2026-05-11T07:12:07Z WARN  infusionpump[infusion-pump-01]: Audible low-battery alarm active on pump module
+2026-05-11T07:14:41Z WARN  infusionpump[infusion-pump-01]: Battery status — 8% charge, est. runtime 3 min, escalating alarm priority
+2026-05-11T07:16:52Z CRIT  infusionpump[infusion-pump-01]: Battery depleted — pump switched to AC power required, alarm silenced by AC connection
+2026-05-11T07:16:52Z CRIT  infusionpump[infusion-pump-01]: Infusion continued without interruption — AC reconnected on arrival at Radiology
+2026-05-11T07:16:53Z INFO  infusionpump[infusion-pump-01]: Battery charge cycle count — 412 (rated service life: 300 cycles typical, 500 max)
+2026-05-11T07:16:53Z WARN  infusionpump[infusion-pump-01]: Battery health flag — capacity degraded below 60% of rated runtime at full charge
+2026-05-11T07:20:15Z INFO  infusionpump[infusion-pump-01]: Biomed alert queued — battery replacement recommended, cycle count exceeds typical service life

@@ -8,7 +8,7 @@ monitoring_adapter: generic
 theme: dell-default
 sentinel_name: "5G RAN Site Agent"
 asset_image_url: "/icons/radio-mast.svg"
-asset_spec_label: "Ericsson AIR 3268 AAS radio / Baseband 6630 macro gNodeB fleet"
+asset_spec_label: "AIR 3268 AAS radio / Baseband 6630 macro gNodeB fleet"
 fleet_layout: list
 assets:
   - id: gnb-site-01

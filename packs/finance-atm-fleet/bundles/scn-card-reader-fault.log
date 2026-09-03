@@ -1,4 +1,4 @@
-# Log bundle: scn-card-reader-fault — Diebold Nixdorf DN Series 200 ActivEdge reader extract, atm-04 (Westside Branch)
+# Log bundle: scn-card-reader-fault — Series 200 secure card reader extract, atm-04 (Westside Branch)
 
 2026-05-03T16:04:22Z INFO  reader[atm-04]: Card transaction complete — chip read OK, card ejected
 2026-05-03T16:11:58Z INFO  reader[atm-04]: Card transaction complete — chip read OK, card ejected

@@ -1,4 +1,4 @@
-# Log bundle: scn-mud-pump-washout — Rig SCADA / mud pump PLC extract, mud-pump-01 (NOV 14-P-220 Triplex)
+# Log bundle: scn-mud-pump-washout — Rig SCADA / mud pump PLC extract, mud-pump-01 (14-P-220 Triplex)
 
 2026-02-08T03:41:02Z INFO  scada[mud-pump-01]: Pump running — 95 SPM, discharge pressure 2140 psi, liner size 6.0in
 2026-02-08T03:41:02Z INFO  scada[mud-pump-01]: Suction pressure 55 psi, stroke rate steady, no cavitation flags

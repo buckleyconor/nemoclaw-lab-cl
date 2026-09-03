@@ -1,4 +1,4 @@
-# Log bundle: scn-dispenser-jam — NCR SelfServ 84 NDC device log extract, atm-02 (Main Branch Drive-Up)
+# Log bundle: scn-dispenser-jam — Lobby Series 84 NDC device log extract, atm-02 (Main Branch Drive-Up)
 
 2026-04-14T11:02:03Z INFO  ndc[atm-02]: Transaction complete — withdrawal $200, cassette 2 (20s), dispense OK
 2026-04-14T11:14:51Z INFO  ndc[atm-02]: Transaction complete — withdrawal $100, cassette 1 (20s), dispense OK
