@@ -96,12 +96,16 @@ def test_push_argv_uses_upload_for_files_and_skill_install_for_skills(
             str(tmp_path / target.scratch_rel),
         ]
     else:
+        # v0.0.109 OpenShell upload semantics: the destination is the parent
+        # DIRECTORY, not the file path. A file-path destination collides with
+        # the workspace templates the managed runtime seeds at first boot
+        # ("mkdir: cannot create directory '.../SOUL.md': File exists").
         assert argv == [
             "nemoclaw",
             "tenant-a",
             "upload",
             str(tmp_path / target.scratch_rel),
-            target.sandbox_path,
+            target.sandbox_path.rsplit("/", 1)[0] + "/",
         ]
 
 

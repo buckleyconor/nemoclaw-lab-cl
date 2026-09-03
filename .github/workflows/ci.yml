@@ -22,6 +22,19 @@ jobs:
       - name: Ruff format check
         run: uv run ruff format --check .
 
+  # The deploy scripts carry the bring-up logic and every logged incident to
+  # date was in this layer — lint it like the Python.
+  shellcheck:
+    name: Shell lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: shellcheck
+        # -x follows `source` directives so the shared lib is analysed in context.
+        run: shellcheck -x deploy/scripts/*.sh deploy/scripts/lib/*.sh
+
   typecheck:
     name: Type check
     runs-on: ubuntu-latest
@@ -48,12 +61,61 @@ jobs:
       - name: pytest
         run: uv run pytest tests/unit/ tests/integration/ -v --tb=short
 
+  # Both images build from source on every `make up` / `make bootstrap`, so a
+  # broken Dockerfile is otherwise discovered on the customer's node.
   build-images:
-    name: Multi-arch image build (dry run)
+    name: Image build (amd64)
     runs-on: ubuntu-latest
     needs: [lint, typecheck, test]
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
-      - name: Placeholder — implement in M7
-        run: echo "Multi-arch Docker build wired up in milestone M7"
+      - name: Backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.backend
+          platforms: linux/amd64
+          push: false
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
+      - name: Gateway image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.gateway
+          platforms: linux/amd64
+          push: false
+          cache-from: type=gha,scope=gateway
+          cache-to: type=gha,scope=gateway,mode=max
+
+  # arm64 (the GB10 target) only builds under QEMU here, and the backend's
+  # fastembed warmup makes that slow — so it runs alongside rather than gating
+  # every PR. It still catches an arm64-only wheel regression in the [ml] group.
+  build-images-arm64:
+    name: Image build (arm64, emulated)
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, test]
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.backend
+          platforms: linux/arm64
+          push: false
+          cache-from: type=gha,scope=backend-arm64
+          cache-to: type=gha,scope=backend-arm64,mode=max
+      - name: Gateway image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.gateway
+          platforms: linux/arm64
+          push: false
+          cache-from: type=gha,scope=gateway-arm64
+          cache-to: type=gha,scope=gateway-arm64,mode=max
