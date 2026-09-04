@@ -29,7 +29,7 @@ remediation_steps:
   - id: tag_out_of_service
     label: "Tag affected pump out-of-service in CMMS and remove from clinical circulation"
   - id: replace_battery_pack
-    label: "Replace battery pack per BD-authorized service procedure"
+    label: "Replace battery pack per manufacturer-authorized service procedure"
   - id: verify_runtime_pm
     label: "Verify full-charge runtime meets spec before returning pump to service"
 impact:

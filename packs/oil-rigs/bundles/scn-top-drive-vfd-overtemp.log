@@ -1,4 +1,4 @@
-# Log bundle: scn-top-drive-vfd-overtemp — Top drive VFD controller extract, top-drive-01 (NOV TDS-11SA)
+# Log bundle: scn-top-drive-vfd-overtemp — Top drive VFD controller extract, top-drive-01 (TDS-11SA)
 
 2026-03-22T09:14:00Z INFO  vfd[top-drive-01]: Drive motor 1 running — 145 RPM, 62% torque, IGBT temp 58C
 2026-03-22T09:14:00Z INFO  vfd[top-drive-01]: Cooling blower 1 running — 3600 RPM, 4HP TEFC motor nominal

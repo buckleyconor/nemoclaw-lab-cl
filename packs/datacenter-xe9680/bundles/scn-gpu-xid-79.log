@@ -1,17 +1,17 @@
-# Log bundle: scn-gpu-xid-79 — correlated DCGM / kernel / iDRAC extract, gpu-server-02 (XE9780L, 8x H100 SXM5)
+# Log bundle: scn-gpu-xid-79 — correlated DCGM / kernel / iDRAC extract, gpu-server-02 (XE9780L, 8x B300 SXM6)
 
 2024-01-15T09:20:00Z INFO  dcgm[1234]: Health monitoring started. Watching 8 GPUs on gpu-server-02.
-2024-01-15T09:20:01Z INFO  dcgm[1234]: Driver version 535.129.03, CUDA 12.3
-2024-01-15T09:20:05Z INFO  dcgm[1234]: GPU 0 (H100 SXM5 80GB): healthy. Temp 58°C, Power 240W
-2024-01-15T09:20:05Z INFO  dcgm[1234]: GPU 1 (H100 SXM5 80GB): healthy. Temp 61°C, Power 255W
-2024-01-15T09:20:05Z INFO  dcgm[1234]: GPU 2 (H100 SXM5 80GB): healthy. Temp 57°C, Power 248W
-2024-01-15T09:20:05Z INFO  dcgm[1234]: GPU 3 (H100 SXM5 80GB): healthy. Temp 60°C, Power 251W
-2024-01-15T09:20:05Z INFO  dcgm[1234]: NVLink fabric: all links healthy (16 links checked)
-2024-01-15T09:21:00Z INFO  dcgm[1234]: GPU 0: mem bandwidth 72 GB/s, compute 88%
-2024-01-15T09:21:00Z INFO  dcgm[1234]: GPU 1: mem bandwidth 69 GB/s, compute 91%
+2024-01-15T09:20:01Z INFO  dcgm[1234]: Driver version 580.82.07, CUDA 13.0
+2024-01-15T09:20:05Z INFO  dcgm[1234]: GPU 0 (B300 SXM6 288GB): healthy. Temp 58°C, Power 940W
+2024-01-15T09:20:05Z INFO  dcgm[1234]: GPU 1 (B300 SXM6 288GB): healthy. Temp 61°C, Power 985W
+2024-01-15T09:20:05Z INFO  dcgm[1234]: GPU 2 (B300 SXM6 288GB): healthy. Temp 57°C, Power 962W
+2024-01-15T09:20:05Z INFO  dcgm[1234]: GPU 3 (B300 SXM6 288GB): healthy. Temp 60°C, Power 971W
+2024-01-15T09:20:05Z INFO  dcgm[1234]: NVLink fabric: all links healthy (144 links checked)
+2024-01-15T09:21:00Z INFO  dcgm[1234]: GPU 0: mem bandwidth 6.4 TB/s, compute 88%
+2024-01-15T09:21:00Z INFO  dcgm[1234]: GPU 1: mem bandwidth 6.1 TB/s, compute 91%
 2024-01-15T09:22:15Z INFO  nvidia-smi[1235]: All 8 GPUs reporting healthy state
 2024-01-15T09:22:30Z INFO  dcgm[1234]: ECC error counts stable. DBE vol: 0 on all GPUs.
-2024-01-15T09:23:12Z INFO  iDRAC[LifecycleLog]: System board 12V rail nominal. GPU power draw 1980W aggregate.
+2024-01-15T09:23:12Z INFO  iDRAC[LifecycleLog]: System board 12V rail nominal. GPU power draw 7760W aggregate.
 2024-01-15T09:23:38Z WARN  kernel[  583.447211]: pciehp 0000:00:1c.7:pcie204: Slot(204): Attention button pressed
 2024-01-15T09:23:39Z WARN  kernel[  584.101834]: pciehp 0000:00:1c.7:pcie204: Slot(204): Card not present
 2024-01-15T09:23:39Z WARN  kernel[  584.415502]: NVRM: GPU at PCI:0000:3b:00: GPU-60ded90b-1a2b-3c4d-5e6f-7a8b9c0d1e2f

@@ -1,14 +1,14 @@
-# Log bundle: scn-monitor-telemetry-loss — Philips IntelliVue MX450 + PIC iX central station extract, monitor-02 (Telemetry Bed 12)
+# Log bundle: scn-monitor-telemetry-loss — Bedside patient monitor MX450 + central monitoring station extract, monitor-02 (Telemetry Bed 12)
 
-2026-06-02T14:20:00Z INFO  intellivue[monitor-02]: Monitor active — Bed 12, ECG/SpO2/NIBP streaming to PIC iX
+2026-06-02T14:20:00Z INFO  monitor[monitor-02]: Monitor active — Bed 12, ECG/SpO2/NIBP streaming to the central station
 2026-06-02T14:20:00Z INFO  wlan[monitor-02]: Associated AP: AP-3W-04, RSSI -58 dBm, nominal
 2026-06-02T14:41:12Z WARN  wlan[monitor-02]: WLAN signal quality degraded — associated AP roam failure, retry count elevated
 2026-06-02T14:41:12Z WARN  wlan[monitor-02]: RSSI -79 dBm, retry count 34% (baseline <5%)
 2026-06-02T14:41:38Z WARN  wlan[monitor-02]: Roam attempt to AP-3W-05 failed — authentication timeout
-2026-06-02T14:42:05Z WARN  wlan[monitor-02]: Data stream to PIC iX interrupted — buffering locally, 12s gap
-2026-06-02T14:42:19Z CRIT  intellivue[monitor-02]: Network connection to PIC iX lost — INOP: Network
+2026-06-02T14:42:05Z WARN  wlan[monitor-02]: Data stream to the central station interrupted — buffering locally, 12s gap
+2026-06-02T14:42:19Z CRIT  monitor[monitor-02]: Network connection to the central station lost — INOP: Network
 2026-06-02T14:42:19Z CRIT  pic-ix[central]: No Data from Bed 12 — central station lost connection to monitor-02, last update 47s ago
-2026-06-02T14:42:19Z INFO  intellivue[monitor-02]: Bedside monitoring unaffected — local display and alarms active, ECG/SpO2/NIBP continuing
+2026-06-02T14:42:19Z INFO  monitor[monitor-02]: Bedside monitoring unaffected — local display and alarms active, ECG/SpO2/NIBP continuing
 2026-06-02T14:42:25Z INFO  pic-ix[central]: Bed 12 tile flagged red — "No Data" banner displayed to telemetry techs
 2026-06-02T14:43:02Z WARN  wlan[monitor-02]: Continuing to attempt AP association — 3 failed attempts logged
 2026-06-02T14:43:44Z INFO  charge-nurse[3W-station]: Telemetry tech notified of Bed 12 data gap per unit escalation policy

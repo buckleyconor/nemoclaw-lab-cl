@@ -8,18 +8,18 @@ monitoring_adapter: generic
 theme: dell-default
 sentinel_name: "ATM Fleet Agent"
 asset_image_url: "/icons/atm.svg"
-asset_spec_label: "NCR SelfServ 84 / Diebold Nixdorf DN Series 200 branch and off-premise fleet"
+asset_spec_label: "Self-service branch and off-premise ATM fleet"
 fleet_layout: list
 assets:
   - id: atm-01
-    display_name: "ATM-01 (NCR SelfServ 84, Main Branch Lobby)"
+    display_name: "ATM-01 (Lobby Series 84, Main Branch Lobby)"
   - id: atm-02
-    display_name: "ATM-02 (NCR SelfServ 84, Main Branch Drive-Up)"
+    display_name: "ATM-02 (Lobby Series 84, Main Branch Drive-Up)"
   - id: atm-03
-    display_name: "ATM-03 (Diebold Nixdorf DN Series 200, Westside Branch)"
+    display_name: "ATM-03 (Series 200, Westside Branch)"
   - id: atm-04
-    display_name: "ATM-04 (Diebold Nixdorf DN Series 200, Westside Branch)"
+    display_name: "ATM-04 (Series 200, Westside Branch)"
   - id: atm-05
-    display_name: "ATM-05 (NCR SelfServ 84, Riverside Branch)"
+    display_name: "ATM-05 (Lobby Series 84, Riverside Branch)"
   - id: atm-06
-    display_name: "ATM-06 (Diebold Nixdorf DN Series 200, Off-Premise — Grocery Plaza)"
+    display_name: "ATM-06 (Series 200, Off-Premise — Grocery Plaza)"

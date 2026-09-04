@@ -1,9 +1,9 @@
-# Log bundle: scn-ecc-uncorrectable — correlated DCGM / kernel / iDRAC extract, gpu-server-01 (XE9780L, 8x H100 SXM5)
+# Log bundle: scn-ecc-uncorrectable — correlated DCGM / kernel / iDRAC extract, gpu-server-01 (XE9780L, 8x B300 SXM6)
 
 2024-01-16T14:05:00Z INFO  dcgm[1234]: Health monitoring active. 8 GPUs on gpu-server-01.
 2024-01-16T14:05:01Z INFO  dcgm[1234]: ECC mode: enabled on all GPUs. DBE vol counts: all 0.
-2024-01-16T14:06:00Z INFO  dcgm[1234]: GPU 1: mem bandwidth 81 GB/s, compute 95%
-2024-01-16T14:07:30Z INFO  dcgm[1234]: GPU 1: Temp 65°C, Power 310W — within limits
+2024-01-16T14:06:00Z INFO  dcgm[1234]: GPU 1: mem bandwidth 7.2 TB/s, compute 95%
+2024-01-16T14:07:30Z INFO  dcgm[1234]: GPU 1: Temp 65°C, Power 1024W — within limits
 2024-01-16T14:08:00Z INFO  nvidia-smi[1235]: GPU 1: ECC SBE vol 3, DBE vol 0 — within tolerance
 2024-01-16T14:09:11Z WARN  dcgm[1234]: GPU 1: DCGM_FI_DEV_ECC_SBE_VOL_TOTAL rising: 14 correctable errors in last 60s
 2024-01-16T14:09:30Z WARN  dcgm[1234]: GPU 1: SBE rate accelerating — 27 correctable errors in last 60s, all HBM bank 3

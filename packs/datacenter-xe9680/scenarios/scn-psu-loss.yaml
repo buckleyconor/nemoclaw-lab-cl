@@ -12,7 +12,7 @@ emit:
     - severity: Critical
       message: "PSU 2 input power lost — redundancy degraded"
     - severity: Warning
-      message: "System operating on single PSU; workload at risk"
+      message: "Powershelf operating without N+1 reserve; workload at risk"
 
 log_bundle_ref: bundles/scn-psu-loss.log
 
@@ -31,6 +31,6 @@ remediation_steps:
     label: "Confirm remaining PSU load within limits"
 impact:
   summary: "Alert acknowledged and physical PSU replacement scheduled; redundancy re-verified after the maintenance window."
-  workload_impact: "None immediately — the node keeps running on the redundant supplies. No drain or migration is required for this action."
-  service_risk: "Degraded power redundancy until the PSU is replaced; a second PSU failure in the same group could force an unplanned shutdown."
+  workload_impact: "None immediately — every sled on the shelf keeps running on the surviving supplies. No drain or migration is required for this action; GPU power capping may trim throughput 10-15% until redundancy is restored."
+  service_risk: "Degraded power redundancy across the whole shelf until the PSU is replaced; a second PSU failure could force an unplanned shutdown of every sled in the power domain."
   estimated_duration: "~5 minutes now + scheduled maintenance window"

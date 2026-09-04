@@ -55,13 +55,10 @@ html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:va
 .hero-grid{position:absolute;inset:0;opacity:.45;mask-image:radial-gradient(ellipse at center,black 30%,transparent 72%);-webkit-mask-image:radial-gradient(ellipse at center,black 30%,transparent 72%);}
 
 .hero-inner{position:relative;z-index:1;}
-.eyebrow{
-  font-size:.7rem;font-weight:700;letter-spacing:.22em;text-transform:uppercase;margin-bottom:14px;
-  background:linear-gradient(90deg,var(--dell),var(--nv) 40%,#ef4444 70%,var(--dell));
-  background-size:300% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
-  animation:rainbow 6s linear infinite;
+.hero-lockup{
+  display:block;margin:0 auto 18px;
+  width:clamp(150px,16vw,210px);height:auto;opacity:.95;
 }
-@keyframes rainbow{0%{background-position:0%}100%{background-position:300%}}
 .hero h1{
   font-size:clamp(2rem,4.5vw,3.2rem);font-weight:800;letter-spacing:-.03em;margin-bottom:12px;
   background:linear-gradient(135deg,#fff 0%,#93c5fd 100%);
@@ -166,7 +163,7 @@ footer{padding:24px;text-align:center;border-top:1px solid var(--border);color:v
       <rect width="100%" height="100%" fill="url(#dots)"/>
     </svg>
     <div class="hero-inner">
-      <div class="eyebrow">DELL × NVIDIA</div>
+      <img class="hero-lockup" src="./dell-nvidia-ai-factory-logo-lockup-v3.avif" alt="Dell Technologies AI Factory with NVIDIA" />
       <h1>Welcome to the<br>NemoClaw Lab</h1>
       <p class="hero-sub">Autonomous AI-driven infrastructure monitoring across every industry vertical. Watch the agent detect, diagnose, and resolve hardware faults — with you in control of the final decision.</p>
       <span class="hero-choose">Choose your industry vertical to begin ↓</span>
@@ -194,7 +191,7 @@ footer{padding:24px;text-align:center;border-top:1px solid var(--border);color:v
         <div class="card-icon">💻</div>
         <div class="card-body">
           <div class="card-title">Laptop Fleet Management</div>
-          <div class="card-desc">Manage a fleet of enterprise laptops across a distributed workforce. Agent detects display driver timeouts, GPU out-of-memory errors, and ECC memory faults.</div>
+          <div class="card-desc">Manage a fleet of enterprise laptops across a distributed workforce. The agent detects display driver timeouts, GPU out-of-memory errors, and ECC memory faults.</div>
         </div>
         <span class="badge active">Active</span>
         <span class="card-arrow">→</span>
@@ -205,7 +202,7 @@ footer{padding:24px;text-align:center;border-top:1px solid var(--border);color:v
         <div class="card-icon">⛽</div>
         <div class="card-body">
           <div class="card-title">Oil &amp; Gas</div>
-          <div class="card-desc">Monitor a drilling rig's critical equipment fleet — NOV mud pumps and top drive, Cameron/Koomey BOP control. Agent detects fluid end washouts, VFD overtemps, and accumulator pressure faults.</div>
+          <div class="card-desc">Monitor a drilling rig's critical equipment fleet — triplex mud pumps, top drive, and BOP control unit. The agent detects fluid end washouts, VFD overtemps, and accumulator pressure faults.</div>
         </div>
         <span class="badge active">Active</span>
         <span class="card-arrow">→</span>
@@ -216,7 +213,7 @@ footer{padding:24px;text-align:center;border-top:1px solid var(--border);color:v
         <div class="card-icon">🏥</div>
         <div class="card-body">
           <div class="card-title">Healthcare</div>
-          <div class="card-desc">Manage a hospital's biomedical device fleet — BD Alaris infusion pumps, Philips IntelliVue monitors, a Siemens MRI. Agent detects battery, telemetry, and cryogenic system faults.</div>
+          <div class="card-desc">Manage a hospital's biomedical device fleet — large-volume infusion pumps, bedside patient monitors, and a 1.5T MRI scanner. The agent detects battery, telemetry, and cryogenic system faults.</div>
         </div>
         <span class="badge active">Active</span>
         <span class="card-arrow">→</span>
@@ -227,7 +224,7 @@ footer{padding:24px;text-align:center;border-top:1px solid var(--border);color:v
         <div class="card-icon">🏦</div>
         <div class="card-body">
           <div class="card-title">Financial Services</div>
-          <div class="card-desc">Monitor a retail bank's branch and off-premise ATM fleet — NCR and Diebold Nixdorf units. Agent detects dispenser jams, card reader faults, and host connectivity loss.</div>
+          <div class="card-desc">Monitor a retail bank's branch and off-premise ATM fleet. The agent detects dispenser jams, card reader faults, and host connectivity loss.</div>
         </div>
         <span class="badge active">Active</span>
         <span class="card-arrow">→</span>
@@ -238,7 +235,7 @@ footer{padding:24px;text-align:center;border-top:1px solid var(--border);color:v
         <div class="card-icon">📡</div>
         <div class="card-body">
           <div class="card-title">Telco &amp; 5G RAN</div>
-          <div class="card-desc">Monitor a fleet of Ericsson 5G macro gNodeB sites. Agent detects GNSS sync loss, radio overtemperature derating, and eCPRI fronthaul link failures.</div>
+          <div class="card-desc">Monitor a fleet of 5G macro gNodeB sites. The agent detects GNSS sync loss, radio overtemperature derating, and eCPRI fronthaul link failures.</div>
         </div>
         <span class="badge active">Active</span>
         <span class="card-arrow">→</span>
@@ -247,7 +244,7 @@ footer{padding:24px;text-align:center;border-top:1px solid var(--border);color:v
     </div>
   </section>
 
-  <footer>NemoClaw AI Infrastructure Agent · Demo Environment · v0.1.0</footer>
+  <footer>NemoClaw AI Infrastructure Agent · Demo Environment</footer>
 </div>
 
 <div class="toast" id="toast"></div>

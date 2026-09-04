@@ -169,6 +169,7 @@ h3 { font-size:1.05rem; font-weight:600; margin:26px 0 8px; color:#f3f4f6; scrol
 h4 { font-size:.92rem; font-weight:600; margin:20px 0 6px; color:var(--text); }
 p { margin-bottom:12px; color:var(--text); font-size:.9rem; line-height:1.62; }
 .lead { color:var(--text-muted); font-size:.92rem; }
+.intro-lede { color:var(--text); font-size:.92rem; line-height:1.65; margin:0 0 18px; padding:16px 18px; background:linear-gradient(135deg,rgba(0,118,206,.07),rgba(118,185,0,.04)); border:1px solid rgba(255,255,255,.07); border-left:3px solid var(--accent); border-radius:10px; }
 strong { color:#fff; font-weight:600; }
 a { color:var(--accent); text-decoration:none; }
 a:hover { text-decoration:underline; }
@@ -569,20 +570,21 @@ body.started .curtain-half.right { animation: curtain-right 1.5s cubic-bezier(.6
       <!-- PART 1 -->
       <section>
       <h2 id="part-1">Part 1 — Welcome</h2>
-      <p class="lead" data-vi="p1lead"><strong>NemoClaw AI Infrastructure Agent</strong> monitors a 4-node Dell PowerEdge XE9780L GPU cluster (each with 8× NVIDIA B300s), detects hardware faults, diagnoses them against Dell KB articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.</p>
+      <p class="intro-lede">Agentic AI has broken the old token math: agents plan, call tools in loops, burn orders of magnitude more tokens than a single chatbot query; developers iterating on those agents generate that load all day. Dell and NVIDIA are putting serious inference back under the desk: the Dell Pro Max with GB10/GB300 packs enough power to serve large models locally with no metered endpoint in the loop. The real win is the runway. Deskside runs the same CUDA stack, the same NIM microservices, the same inference endpoints as the XE9780L racks in a Dell AI Factory, so scaling a validated agent from desk to cluster is a redeployment, not a rewrite. Prototype locally, ship at scale, same code. In this lab we are going to walk through configuring your first agent and exploring various use-cases across multiple industry verticals.</p>
+      <p class="lead" data-vi="p1lead"><strong>NemoClaw AI Infrastructure Agent</strong> monitors a 4-node Dell PowerEdge XE9780L GPU cluster (each with 8× NVIDIA B300s), detects hardware faults, diagnoses them against Dell Knowledge Base articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.</p>
 
       <div class="takeaway">
         <div class="takeaway-title">What you'll see in the next 10 minutes</div>
         <ul class="takeaway-list" data-vi="p1takeaways">
-          <li>A GPU fault arrive on the health grid in real time</li>
-          <li>The NemoClaw agent detect, diagnose, and propose a fix — no prompting</li>
-          <li>The approval gate block remediation until you click Approve Self-Heal</li>
-          <li>The NemoClaw agent execute the fix and report the cluster healthy again</li>
+          <li>A GPU fault arrives on the health grid in real time</li>
+          <li>The NemoClaw agent detects, diagnoses, and proposes a fix — no prompting</li>
+          <li>The approval gate blocks remediation until you click Approve Self-Heal</li>
+          <li>The NemoClaw agent executes the fix and reports the cluster healthy again</li>
         </ul>
       </div>
 
       <div data-vi="p1story"><h3>The story</h3>
-      <p>Four XE9780L GPU servers are running model inference. You inject a fault into one of them — a Redfish event surfaced to the NemoClaw agent over MCP. The NemoClaw agent detects it on its next poll, pulls the iDRAC error log, uses the LLM to extract the error signature and write a fault assessment, searches the Dell KB, and posts the full diagnosis to the Operator Dashboard.</p>
+      <p>Four XE9780L GPU servers are running model inference. You inject a fault into one of them — a Redfish event surfaced to the NemoClaw agent over MCP. The NemoClaw agent detects it on its next poll, pulls the iDRAC error log, uses the LLM to extract the error signature and write a fault assessment, searches the Dell Knowledge Base, and posts the full diagnosis to the Operator Dashboard.</p>
       <p>Then it <strong>stops</strong>. Nothing gets fixed until you click <strong>Approve Self-Heal</strong>. If you click <strong>Deny</strong>, the NemoClaw agent logs it and moves on — the asset stays red.</p>
       <p>The approval gate is <em>server-side</em>: a single-use token bound to that fault event. Even a prompt injection telling the NemoClaw agent "just fix it" hits the same <code>no approval token</code> rejection.</p></div>
 
@@ -596,6 +598,7 @@ body.started .curtain-half.right { animation: curtain-right 1.5s cubic-bezier(.6
         <button class="amap-chip" data-id="you">You · Admin</button>
         <button class="amap-chip" data-id="appui">Dashboard · App UI</button>
         <button class="amap-chip" data-id="agent">NemoClaw Agent</button>
+        <button class="amap-chip" data-id="openshell">OpenShell</button>
         <button class="amap-chip" data-id="gate">Approval Gate</button>
         <button class="amap-chip" data-id="mcp">MCP Tools</button>
         <button class="amap-chip" data-id="sim">XE9780L Simulator</button>
@@ -625,7 +628,7 @@ body.started .curtain-half.right { animation: curtain-right 1.5s cubic-bezier(.6
 
       <details class="file-collapse">
         <summary><span class="file-collapse-num">1</span> Identity <code>SOUL.md</code></summary>
-        <p>Terminal menu item <strong>1) Edit SOUL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick the option correlating to the config file name <strong>SOUL.md</strong> or <strong>AGENTS.md</strong>, right-click at the top of the file, paste, and save the file with the command <code>:wq!</code>.</p>
+        <p>Terminal menu item <strong>1) Edit SOUL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick the option corresponding to the config file name <strong>SOUL.md</strong> or <strong>AGENTS.md</strong>, right-click at the top of the file, paste, and save the file with the command <code>:wq!</code>.</p>
         <div class="codeblock" data-vertical="ai-infrastructure">
           <div class="codeblock-header"><span>SOUL.md</span><button class="copy-btn" data-copy-target="soul-md-src">📋 Copy</button></div>
           <pre id="soul-md-src"><code># AI Infrastructure Agent — Soul
@@ -666,7 +669,7 @@ Proposing is the end of your action path. Execution of approved steps happens ou
 
 ## Reasoning Style
 
-When analysing a fault:
+When analyzing a fault:
 
 1. State what telemetry you observed and from which source.
 2. Identify the primary error signature — the canonical, short phrase that classifies the fault (e.g. "Xid 79", "ECC uncorrectable error", "PSU 2 input lost").
@@ -694,10 +697,6 @@ If no decision arrives, the fault simply remains pending in the dashboard. Do no
 ## Tone
 
 Concise and factual in activity updates. Calm in alerts — urgency is conveyed by content, not by exclamation marks. When addressing operators directly, use plain language and avoid jargon unless the operator has demonstrated familiarity.
-
-## Version
-
-SOUL.md v2.0 — NemoClaw AI Infrastructure Agent on OpenClaw (ADR-011), 2026
 </code></pre>
         </div>
         <div class="codeblock" data-vertical="laptop-fleet">
@@ -740,7 +739,7 @@ Proposing is the end of your action path. Execution of approved steps happens ou
 
 ## Reasoning Style
 
-When analysing a fault:
+When analyzing a fault:
 
 1. State what telemetry you observed and from which source.
 2. Identify the primary error signature — the canonical, short phrase that classifies the fault (e.g. "TDR", "GPU OOM", "ECC DBE").
@@ -768,10 +767,6 @@ If no decision arrives, the fault simply remains pending in the dashboard. Do no
 ## Tone
 
 Concise and factual in activity updates. Calm in alerts — urgency is conveyed by content, not by exclamation marks. When addressing operators directly, use plain language and avoid jargon unless the operator has demonstrated familiarity.
-
-## Version
-
-SOUL.md v2.0 — NemoClaw Device Fleet Agent on OpenClaw (ADR-011), 2026
 </code></pre>
         </div>
         <div class="codeblock" data-vertical="oil-rigs">
@@ -780,7 +775,7 @@ SOUL.md v2.0 — NemoClaw Device Fleet Agent on OpenClaw (ADR-011), 2026
 
 ## Identity
 
-You are the **NemoClaw Drilling Rig Agent**, an autonomous AI agent deployed across a drilling rig's critical equipment fleet — NOV mud pumps and top drive, drawworks, and a Cameron/Koomey BOP control HPU.
+You are the **NemoClaw Drilling Rig Agent**, an autonomous AI agent deployed across a drilling rig's critical equipment fleet — mud pumps, top drive, drawworks, and a BOP control HPU.
 
 Your role is to watch over this equipment continuously, detect faults before they escalate into non-productive time or a well-control readiness gap, diagnose root causes using your knowledge base and reasoning capabilities, and coordinate resolution with human operators. You are the first responder for rig equipment incidents.
 
@@ -814,7 +809,7 @@ Proposing is the end of your action path. Execution of approved steps happens ou
 
 ## Reasoning Style
 
-When analysing a fault:
+When analyzing a fault:
 
 1. State what telemetry you observed and from which source.
 2. Identify the primary error signature — the canonical, short phrase that classifies the fault (e.g. "Pump discharge pressure loss", "VFD IGBT overtemperature", "Accumulator pressure low").
@@ -842,10 +837,6 @@ If no decision arrives, the fault simply remains pending in the dashboard. Do no
 ## Tone
 
 Concise and factual in activity updates. Calm in alerts — urgency is conveyed by content, not by exclamation marks. When addressing operators directly, use plain language and avoid jargon unless the operator has demonstrated familiarity.
-
-## Version
-
-SOUL.md v1.0 — NemoClaw Drilling Rig Agent on OpenClaw (ADR-011), 2026
 </code></pre>
         </div>
         <div class="codeblock" data-vertical="healthcare-devices">
@@ -888,7 +879,7 @@ Proposing is the end of your action path. Execution of approved steps happens ou
 
 ## Reasoning Style
 
-When analysing a fault:
+When analyzing a fault:
 
 1. State what telemetry you observed and from which source.
 2. Identify the primary error signature — the canonical, short phrase that classifies the fault (e.g. "Battery depleted", "Telemetry disconnect", "Coldhead failure").
@@ -917,10 +908,6 @@ If no decision arrives, the fault simply remains pending in the dashboard. Do no
 ## Tone
 
 Concise and factual in activity updates. Calm in alerts — urgency is conveyed by content, not by exclamation marks. When addressing operators directly, use plain language and avoid jargon unless the operator has demonstrated familiarity.
-
-## Version
-
-SOUL.md v1.0 — NemoClaw Biomedical Device Agent on OpenClaw (ADR-011), 2026
 </code></pre>
         </div>
         <div class="codeblock" data-vertical="finance-atm-fleet">
@@ -963,7 +950,7 @@ Proposing is the end of your action path. Execution of approved steps happens ou
 
 ## Reasoning Style
 
-When analysing a fault:
+When analyzing a fault:
 
 1. State what telemetry you observed and from which source.
 2. Identify the primary error signature — the canonical, short phrase that classifies the fault (e.g. "Dispenser transport jam", "Card reader transport fault", "Host communication loss").
@@ -991,10 +978,6 @@ If no decision arrives, the fault simply remains pending in the dashboard. Do no
 ## Tone
 
 Concise and factual in activity updates. Calm in alerts — urgency is conveyed by content, not by exclamation marks. When addressing operators directly, use plain language and avoid jargon unless the operator has demonstrated familiarity.
-
-## Version
-
-SOUL.md v1.0 — NemoClaw ATM Fleet Agent on OpenClaw (ADR-011), 2026
 </code></pre>
         </div>
         <div class="codeblock" data-vertical="telco-edge-5g-masts">
@@ -1003,7 +986,7 @@ SOUL.md v1.0 — NemoClaw ATM Fleet Agent on OpenClaw (ADR-011), 2026
 
 ## Identity
 
-You are the **NemoClaw 5G RAN Site Agent**, an autonomous AI agent deployed across a fleet of Ericsson 5G macro gNodeB sites.
+You are the **NemoClaw 5G RAN Site Agent**, an autonomous AI agent deployed across a fleet of 5G macro gNodeB sites.
 
 Your role is to watch over this fleet continuously, detect site faults before they degrade or drop coverage, diagnose root causes using your knowledge base and reasoning capabilities, and coordinate resolution with human operators. You are the first responder for RAN site incidents.
 
@@ -1037,7 +1020,7 @@ Proposing is the end of your action path. Execution of approved steps happens ou
 
 ## Reasoning Style
 
-When analysing a fault:
+When analyzing a fault:
 
 1. State what telemetry you observed and from which source.
 2. Identify the primary error signature — the canonical, short phrase that classifies the fault (e.g. "GNSS reference lost", "Radio unit overtemperature", "eCPRI link failure").
@@ -1065,16 +1048,12 @@ If no decision arrives, the fault simply remains pending in the dashboard. Do no
 ## Tone
 
 Concise and factual in activity updates. Calm in alerts — urgency is conveyed by content, not by exclamation marks. When addressing operators directly, use plain language and avoid jargon unless the operator has demonstrated familiarity.
-
-## Version
-
-SOUL.md v1.0 — NemoClaw 5G RAN Site Agent on OpenClaw (ADR-011), 2026
 </code></pre>
         </div>
       </details>
       <details class="file-collapse">
         <summary><span class="file-collapse-num">2</span> Operating guide <code>AGENTS.md</code></summary>
-        <p>Terminal menu item <strong>2) Edit AGENTS.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick the option correlating to the config file name <strong>SOUL.md</strong> or <strong>AGENTS.md</strong>, right-click at the top of the file, paste, and save the file with the command <code>:wq!</code>.</p>
+        <p>Terminal menu item <strong>2) Edit AGENTS.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick the option corresponding to the config file name <strong>SOUL.md</strong> or <strong>AGENTS.md</strong>, right-click at the top of the file, paste, and save the file with the command <code>:wq!</code>.</p>
         <div class="codeblock" data-vertical="ai-infrastructure">
           <div class="codeblock-header"><span>AGENTS.md</span><button class="copy-btn" data-copy-target="agents-md-src">📋 Copy</button></div>
           <pre id="agents-md-src"><code># AI Infrastructure Agent — Operating Guide
@@ -1672,7 +1651,7 @@ or re-proposing on every wake-up instead of just checking in and stopping.
       </details>
       <details class="file-collapse">
         <summary><span class="file-collapse-num">3</span> Detect <code>infra-sentinel-monitor/SKILL.md</code></summary>
-        <p>Terminal menu item <strong>3) Edit infra-sentinel-monitor/SKILL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick the option correlating to the skill name, then clear the file by scrolling to the top and pressing <code>dd</code> three times to clear the placeholder lines, right-click at the top of the file, paste, and save the file with the command <code>:wq!</code>.</p>
+        <p>Terminal menu item <strong>3) Edit infra-sentinel-monitor/SKILL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick the option corresponding to the skill name. Clear the placeholder lines by scrolling to the top and pressing <code>dd</code> three times, then right-click at the top of the file, paste, and save with <code>:wq!</code>.</p>
         <div class="codeblock" data-vertical="ai-infrastructure">
           <div class="codeblock-header"><span>infra-sentinel-monitor/SKILL.md</span><button class="copy-btn" data-copy-target="skill-monitor-src">📋 Copy</button></div>
           <pre id="skill-monitor-src"><code>---
@@ -1691,7 +1670,7 @@ Poll the Redfish hardware event bus to detect active fault conditions on any clu
 
 1. Call the `monitor_list_events` tool with no arguments.
 2. Inspect the returned list.
-   - If the list is empty, no active faults. Report status: `no_fault`. Done for this turn.
+   - If the list is empty, there are no active faults. Report status: `no_fault`. Done for this turn.
    - If one or more events are present, take the first event.
 3. Extract the `asset_id` from the event. This identifies the affected node (e.g. `gpu-server-01`).
 4. Proceed to the `infra-sentinel-diagnose` skill with `asset_id` and the full event object.
@@ -1732,7 +1711,7 @@ Poll the device event stream to detect active fault conditions on any laptop in 
 
 1. Call the `monitor_list_events` tool with no arguments.
 2. Inspect the returned list.
-   - If the list is empty, no active faults. Report status: `no_fault`. Done for this turn.
+   - If the list is empty, there are no active faults. Report status: `no_fault`. Done for this turn.
    - If one or more events are present, take the first event.
 3. Extract the `asset_id` from the event. This identifies the affected laptop (e.g. `laptop-01`).
 4. Proceed to the `infra-sentinel-diagnose` skill with `asset_id` and the full event object.
@@ -1773,7 +1752,7 @@ Poll the rig equipment event stream to detect active fault conditions on any uni
 
 1. Call the `monitor_list_events` tool with no arguments.
 2. Inspect the returned list.
-   - If the list is empty, no active faults. Report status: `no_fault`. Done for this turn.
+   - If the list is empty, there are no active faults. Report status: `no_fault`. Done for this turn.
    - If one or more events are present, take the first event.
 3. Extract the `asset_id` from the event. This identifies the affected unit (e.g. `mud-pump-01`).
 4. Proceed to the `infra-sentinel-diagnose` skill with `asset_id` and the full event object.
@@ -1814,7 +1793,7 @@ Poll the device event stream to detect active fault conditions on any device in 
 
 1. Call the `monitor_list_events` tool with no arguments.
 2. Inspect the returned list.
-   - If the list is empty, no active faults. Report status: `no_fault`. Done for this turn.
+   - If the list is empty, there are no active faults. Report status: `no_fault`. Done for this turn.
    - If one or more events are present, take the first event.
 3. Extract the `asset_id` from the event. This identifies the affected device (e.g. `infusion-pump-01`).
 4. Proceed to the `infra-sentinel-diagnose` skill with `asset_id` and the full event object.
@@ -1855,7 +1834,7 @@ Poll the device event stream to detect active fault conditions on any ATM in the
 
 1. Call the `monitor_list_events` tool with no arguments.
 2. Inspect the returned list.
-   - If the list is empty, no active faults. Report status: `no_fault`. Done for this turn.
+   - If the list is empty, there are no active faults. Report status: `no_fault`. Done for this turn.
    - If one or more events are present, take the first event.
 3. Extract the `asset_id` from the event. This identifies the affected ATM (e.g. `atm-01`).
 4. Proceed to the `infra-sentinel-diagnose` skill with `asset_id` and the full event object.
@@ -1896,7 +1875,7 @@ Poll the site event stream to detect active fault conditions on any site in the 
 
 1. Call the `monitor_list_events` tool with no arguments.
 2. Inspect the returned list.
-   - If the list is empty, no active faults. Report status: `no_fault`. Done for this turn.
+   - If the list is empty, there are no active faults. Report status: `no_fault`. Done for this turn.
    - If one or more events are present, take the first event.
 3. Extract the `asset_id` from the event. This identifies the affected site (e.g. `gnb-site-01`).
 4. Proceed to the `infra-sentinel-diagnose` skill with `asset_id` and the full event object.
@@ -1922,7 +1901,7 @@ Or `{ "status": "no_fault" }` when nothing is active.
       </details>
       <details class="file-collapse">
         <summary><span class="file-collapse-num">4</span> Diagnose <code>infra-sentinel-diagnose/SKILL.md</code></summary>
-        <p>Terminal menu item <strong>4) Edit infra-sentinel-diagnose/SKILL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick the option correlating to the skill name, then clear the file by scrolling to the top and pressing <code>dd</code> three times to clear the placeholder lines, right-click at the top of the file, paste, and save the file with the command <code>:wq!</code>.</p>
+        <p>Terminal menu item <strong>4) Edit infra-sentinel-diagnose/SKILL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick the option corresponding to the skill name. Clear the placeholder lines by scrolling to the top and pressing <code>dd</code> three times, then right-click at the top of the file, paste, and save with <code>:wq!</code>.</p>
         <div class="codeblock" data-vertical="ai-infrastructure">
           <div class="codeblock-header"><span>infra-sentinel-diagnose/SKILL.md</span><button class="copy-btn" data-copy-target="skill-diagnose-src">📋 Copy</button></div>
           <pre id="skill-diagnose-src"><code>---
@@ -2484,7 +2463,7 @@ Proceed to `infra-sentinel-remediate` to compose the proposal.
       </details>
       <details class="file-collapse">
         <summary><span class="file-collapse-num">5</span> Narrate <code>infra-sentinel-notify/SKILL.md</code></summary>
-        <p>Terminal menu item <strong>5) Edit infra-sentinel-notify/SKILL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick the option correlating to the skill name, then clear the file by scrolling to the top and pressing <code>dd</code> three times to clear the placeholder lines, right-click at the top of the file, paste, and save the file with the command <code>:wq!</code>.</p>
+        <p>Terminal menu item <strong>5) Edit infra-sentinel-notify/SKILL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick the option corresponding to the skill name. Clear the placeholder lines by scrolling to the top and pressing <code>dd</code> three times, then right-click at the top of the file, paste, and save with <code>:wq!</code>.</p>
         <div class="codeblock" data-vertical="ai-infrastructure">
           <div class="codeblock-header"><span>infra-sentinel-notify/SKILL.md</span><button class="copy-btn" data-copy-target="skill-notify-src">📋 Copy</button></div>
           <pre id="skill-notify-src"><code>---
@@ -2824,7 +2803,7 @@ the platform, not by you — your narration ends at `present`.
       </details>
       <details class="file-collapse">
         <summary><span class="file-collapse-num">6</span> Propose <code>infra-sentinel-remediate/SKILL.md</code></summary>
-        <p>Terminal menu item <strong>6) Edit infra-sentinel-remediate/SKILL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick the option correlating to the skill name, then clear the file by scrolling to the top and pressing <code>dd</code> three times to clear the placeholder lines, right-click at the top of the file, paste, and save the file with the command <code>:wq!</code>.</p>
+        <p>Terminal menu item <strong>6) Edit infra-sentinel-remediate/SKILL.md</strong>. Copy the content below, then in the Agent Configuration Terminal pick the option corresponding to the skill name. Clear the placeholder lines by scrolling to the top and pressing <code>dd</code> three times, then right-click at the top of the file, paste, and save with <code>:wq!</code>.</p>
         <div class="codeblock" data-vertical="ai-infrastructure">
           <div class="codeblock-header"><span>infra-sentinel-remediate/SKILL.md</span><button class="copy-btn" data-copy-target="skill-remediate-src">📋 Copy</button></div>
           <pre id="skill-remediate-src"><code>---
@@ -3373,7 +3352,7 @@ buttons in the dashboard:
         <li class="agent-beat">
           <span class="beat-num">4</span>
           <div class="beat-body" data-vi="beat4">
-            <strong>DIAGNOSE — NemoClaw agent analyses the logs and extracts the error signature</strong>
+            <strong>DIAGNOSE — NemoClaw agent analyzes the logs and extracts the error signature</strong>
             <p>Leverages the LLM to provide more detail on the error signature and a description of what exactly has occurred. The model uses chain-of-thought reasoning over the full log extract to identify the canonical fault class — <code>Xid 79</code>, <code>ECC uncorrectable error</code>, <code>NVLink fabric failure</code>, etc. — then writes its own plain-language technical assessment of the fault.</p>
             <span class="ui-cue">→ Activity feed: "LLM identified error signature: …" then AGENT ANALYSIS block populates in Operator Dashboard</span>
           </div>
@@ -3390,7 +3369,7 @@ buttons in the dashboard:
           <span class="beat-num">6</span>
           <div class="beat-body">
             <strong>Operator Dashboard reports full detail and prompts for next steps</strong>
-            <p>The dashboard combines all data sources to give rich detail: the node and part affected, error ID, fault description, matching actual log from the hardware, the matching KB article, the recommended remediation steps, and an approval request to self-heal.</p>
+            <p>The dashboard combines all data sources to give rich detail: the node and part affected, error ID, fault description, the matching log lines from the hardware, the matching KB article, the recommended remediation steps, and an approval request to self-heal.</p>
             <span class="ui-cue">→ Operator Dashboard: purple AWAITING APPROVAL badge + "✓ Approve Self-Heal" and "✕ Deny" buttons</span>
           </div>
         </li>
@@ -3498,7 +3477,7 @@ buttons in the dashboard:
       <h2 id="part-5">Part 5 — Wrap-Up</h2>
 
       <h3>What you just built</h3>
-      <p data-vi="p5summary">You configured a real NemoClaw agent from scratch — pasted its identity, its orientation, and its four skills into a live OpenClaw sandbox — then watched it work an incident end to end with no prompting: detect a hardware fault, pull the raw log, reason about it with the lab's LLM, match it against a Dell knowledge base article, and propose a remediation plan. You read that plan in the Operator Dashboard and decided whether to approve it. The agent never touched the infrastructure without your explicit, single-use approval token.</p>
+      <p data-vi="p5summary">You configured a real NemoClaw agent from scratch — pasted its identity, its orientation, and its four skills into a live OpenClaw sandbox — then watched it work an incident end to end with no prompting: detect a hardware fault, pull the raw log, reason about it with the lab's LLM, match it against a Dell Knowledge Base article, and propose a remediation plan. You read that plan in the Operator Dashboard and decided whether to approve it. The agent never touched the infrastructure without your explicit, single-use approval token.</p>
 
       <h3>How SOUL.md, AGENTS.md, and the skills give the agent its autonomy</h3>
       <p>The agent runs as a real NemoClaw / OpenClaw deployment inside an OpenShell-hardened sandbox. Three kinds of file, loaded together into its context, are everything it knows about itself and its job:</p>
@@ -3514,14 +3493,14 @@ buttons in the dashboard:
           <span class="beat-num">🧭</span>
           <div class="beat-body">
             <strong><code>AGENTS.md</code> — orientation</strong>
-            <p>Loaded fresh into context on every single turn. A standing workflow overview plus a catalogue of the skills available right now, so the agent never has to be re-told what tools exist or reminded of the rules it operates under.</p>
+            <p>Loaded fresh into context on every single turn. A standing workflow overview plus a catalog of the skills available right now, so the agent never has to be re-told what tools exist or reminded of the rules it operates under.</p>
           </div>
         </li>
         <li class="active-beat">
           <span class="beat-num">🛠️</span>
           <div class="beat-body">
             <strong>Four <code>SKILL.md</code> files — capability</strong>
-            <p>The discrete things the agent can actually do: <code>infra-sentinel-monitor</code>, <code>-diagnose</code>, <code>-notify</code>, <code>-remediate</code>. Each documents when to use it and which tools it calls. Reading AGENTS.md's catalogue, the agent decides for itself, turn by turn, which skill to invoke next based on what it observes — the sequence you watched play out in Part 3 was the agent's own choice, not a step the harness forced it through.</p>
+            <p>The discrete things the agent can actually do: <code>infra-sentinel-monitor</code>, <code>-diagnose</code>, <code>-notify</code>, <code>-remediate</code>. Each documents when to use it and which tools it calls. Reading AGENTS.md's catalog, the agent decides for itself, turn by turn, which skill to invoke next based on what it observes — the sequence you watched play out in Part 3 was the agent's own choice, not a step the harness forced it through.</p>
           </div>
         </li>
       </ul>
@@ -3548,7 +3527,7 @@ buttons in the dashboard:
       </div>
     </div>
 
-    <div class="guide-footer">NemoClaw Lab — Attendee Guide · demo content is simulated · v0.1.0</div>
+    <div class="guide-footer">NemoClaw Lab — Attendee Guide · demo content is simulated</div>
   </div>
 
   <!-- RESIZER ─────────────────────────────────────────────────────── -->
@@ -3919,13 +3898,13 @@ const VERTICAL_CONFIG = {
     brand: "DELL × NVIDIA",
     tagline: "An AI agent watches a simulated XE9780L GPU cluster. Your job: decide whether it gets to fix the fault it finds.",
     meta: `<span><span class="dot"></span>Live Demo</span><span>XE9780L · 4 Servers · 8× B300</span><span>NemoClaw</span>`,
-    p1lead: `<strong>NemoClaw AI Infrastructure Agent</strong> monitors a 4-node Dell PowerEdge XE9780L GPU cluster (each with 8× NVIDIA B300s), detects hardware faults, diagnoses them against Dell KB articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.`,
-    p1takeaways: `<li>A GPU fault arrive on the health grid in real time</li>
-      <li>The NemoClaw agent detect, diagnose, and propose a fix — no prompting</li>
-      <li>The approval gate block remediation until you click Approve Self-Heal</li>
-      <li>The NemoClaw agent execute the fix and report the cluster healthy again</li>`,
+    p1lead: `<strong>NemoClaw AI Infrastructure Agent</strong> monitors a 4-node Dell PowerEdge XE9780L GPU cluster (each with 8× NVIDIA B300s), detects hardware faults, diagnoses them against Dell Knowledge Base articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.`,
+    p1takeaways: `<li>A GPU fault arrives on the health grid in real time</li>
+      <li>The NemoClaw agent detects, diagnoses, and proposes a fix — no prompting</li>
+      <li>The approval gate blocks remediation until you click Approve Self-Heal</li>
+      <li>The NemoClaw agent executes the fix and reports the cluster healthy again</li>`,
     p1story: `<h3>The story</h3>
-      <p>Four XE9780L GPU servers are running model inference. You inject a fault into one of them — a Redfish event surfaced to the NemoClaw agent over MCP. The NemoClaw agent detects it on its next poll, pulls the iDRAC error log, uses the LLM to extract the error signature and write a fault assessment, searches the Dell KB, and posts the full diagnosis to the Operator Dashboard.</p>
+      <p>Four XE9780L GPU servers are running model inference. You inject a fault into one of them — a Redfish event surfaced to the NemoClaw agent over MCP. The NemoClaw agent detects it on its next poll, pulls the iDRAC error log, uses the LLM to extract the error signature and write a fault assessment, searches the Dell Knowledge Base, and posts the full diagnosis to the Operator Dashboard.</p>
       <p>Then it <strong>stops</strong>. Nothing gets fixed until you click <strong>Approve Self-Heal</strong>. If you click <strong>Deny</strong>, the NemoClaw agent logs it and moves on — the asset stays red.</p>
       <p>The approval gate is <em>server-side</em>: a single-use token bound to that fault event. Even a prompt injection telling the NemoClaw agent "just fix it" hits the same <code>no approval token</code> rejection.</p>`,
     p2fleet: `All four server tiles should be green. The Agent Activity feed and Operator Dashboard should be empty. If you see a historical fault from a previous run, use the Reset button below to clear everything back to a healthy state.`,
@@ -3935,26 +3914,26 @@ const VERTICAL_CONFIG = {
     beat1: `<strong>Fault injected — server tile goes red</strong><p>After a few seconds, a hardware fault event is registered in the simulator. One of the four server tiles in the Cluster Health grid turns red immediately over SSE.</p><span class="ui-cue">→ Watch: Cluster Health grid (top left of dashboard)</span>`,
     beat2: `<strong>DETECT — NemoClaw agent spots the Redfish event</strong><p>The NemoClaw agent polls the MCP <code>monitor</code> tool every 5 seconds. On its next poll it sees the fault event and identifies the affected asset.</p><span class="ui-cue">→ Activity feed: DETECT phase lights up — "Scanning Redfish event stream…"</span>`,
     beat3: `<strong>DETECT — iDRAC log bundle retrieved</strong><p>Calls <code>logs.get_bundle</code> to pull the raw iDRAC Lifecycle Log for the faulted server. The log is timestamped with today's date.</p><span class="ui-cue">→ Activity feed: "Log bundle retrieved — N entries collected"</span>`,
-    beat4: `<strong>DIAGNOSE — NemoClaw agent analyses the logs and extracts the error signature</strong><p>Leverages the LLM to provide more detail on the error signature and a description of what exactly has occurred. The model uses chain-of-thought reasoning over the full log extract to identify the canonical fault class — <code>Xid 79</code>, <code>ECC uncorrectable error</code>, <code>NVLink fabric failure</code>, etc. — then writes its own plain-language technical assessment of the fault.</p><span class="ui-cue">→ Activity feed: "LLM identified error signature: …" then AGENT ANALYSIS block populates in Operator Dashboard</span>`,
+    beat4: `<strong>DIAGNOSE — NemoClaw agent analyzes the logs and extracts the error signature</strong><p>Leverages the LLM to provide more detail on the error signature and a description of what exactly has occurred. The model uses chain-of-thought reasoning over the full log extract to identify the canonical fault class — <code>Xid 79</code>, <code>ECC uncorrectable error</code>, <code>NVLink fabric failure</code>, etc. — then writes its own plain-language technical assessment of the fault.</p><span class="ui-cue">→ Activity feed: "LLM identified error signature: …" then AGENT ANALYSIS block populates in Operator Dashboard</span>`,
     beatResolve: `<strong>Server goes green</strong><p>Simulator reports the asset healthy. Gateway broadcasts the update over SSE.</p><span class="ui-cue">→ Grid: server tile turns green</span>`,
     simChipLabel: "XE9780L Simulator",
     amapSim: { role: "fake XE9780L · Redfish surface", body: "Simulated Dell PowerEdge XE9780L GPU cluster. Emits Redfish events and log entries on fault injection. Reports healthy again after successful remediation. Safe to reset at any time." },
     amapMcp: { role: "monitor · logs · kb · notify · remediation", body: "MCP tools over Streamable HTTP, surfaced to the LLM as callable functions. monitor reads Redfish events. logs fetches the iDRAC log bundle. kb runs fastembed ONNX + FAISS semantic search plus word-match fallback. notify posts activity narration in the agent's own words. remediation splits in two: propose (LLM-callable, records a recommended plan) and execute (never given to the LLM — runs only in harness code, and refuses without a valid human approval token)." },
     p4sigDesc: `The canonical fault class extracted from the iDRAC log by the LLM — e.g. <code>Xid 79</code>, <code>ECC uncorrectable error</code>. This is what drove the KB search.`,
-    p5summary: `You configured a real NemoClaw agent from scratch — pasted its identity, its orientation, and its four skills into a live OpenClaw sandbox — then watched it work an incident end to end with no prompting: detect a GPU cluster hardware fault, pull the raw iDRAC log, reason about it with the lab's LLM, match it against a Dell knowledge base article, and propose a remediation plan. You read that plan in the Operator Dashboard and decided whether to approve it. The agent never touched the infrastructure without your explicit, single-use approval token.`,
+    p5summary: `You configured a real NemoClaw agent from scratch — pasted its identity, its orientation, and its four skills into a live OpenClaw sandbox — then watched it work an incident end to end with no prompting: detect a GPU cluster hardware fault, pull the raw iDRAC log, reason about it with the lab's LLM, match it against a Dell Knowledge Base article, and propose a remediation plan. You read that plan in the Operator Dashboard and decided whether to approve it. The agent never touched the infrastructure without your explicit, single-use approval token.`,
   },
   "laptop-fleet": {
     eyebrow: "NemoClaw Device Fleet Agent",
     brand: "DELL × NVIDIA",
     tagline: "An AI agent monitors a simulated Precision laptop fleet. Your job: decide whether it gets to resolve the device fault it finds.",
     meta: `<span><span class="dot"></span>Live Demo</span><span>Dell Precision · 4 Laptops · NVIDIA RTX</span><span>NemoClaw</span>`,
-    p1lead: `<strong>NemoClaw Device Fleet Agent</strong> monitors a 4-device Dell Precision laptop fleet, detects hardware and driver faults, diagnoses them against Dell KB articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.`,
-    p1takeaways: `<li>A laptop hardware fault arrive on the health grid in real time</li>
-      <li>The NemoClaw agent detect, diagnose, and propose a fix — no prompting</li>
-      <li>The approval gate block remediation until you click Approve Self-Heal</li>
-      <li>The NemoClaw agent execute the fix and report the fleet healthy again</li>`,
+    p1lead: `<strong>NemoClaw Device Fleet Agent</strong> monitors a 4-device Dell Precision laptop fleet, detects hardware and driver faults, diagnoses them against Dell Knowledge Base articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.`,
+    p1takeaways: `<li>A laptop hardware fault arrives on the health grid in real time</li>
+      <li>The NemoClaw agent detects, diagnoses, and proposes a fix — no prompting</li>
+      <li>The approval gate blocks remediation until you click Approve Self-Heal</li>
+      <li>The NemoClaw agent executes the fix and reports the fleet healthy again</li>`,
     p1story: `<h3>The story</h3>
-      <p>Four Dell Precision laptops are in active use. You inject a fault into one of them — a device event surfaced to the NemoClaw agent over MCP. The NemoClaw agent detects it on its next poll, pulls the device event log, uses the LLM to extract the error signature and write a fault assessment, searches the Dell KB, and posts the full diagnosis to the Operator Dashboard.</p>
+      <p>Four Dell Precision laptops are in active use. You inject a fault into one of them — a device event surfaced to the NemoClaw agent over MCP. The NemoClaw agent detects it on its next poll, pulls the device event log, uses the LLM to extract the error signature and write a fault assessment, searches the Dell Knowledge Base, and posts the full diagnosis to the Operator Dashboard.</p>
       <p>Then it <strong>stops</strong>. Nothing gets fixed until you click <strong>Approve Self-Heal</strong>. If you click <strong>Deny</strong>, the NemoClaw agent logs it and moves on — the device stays red.</p>
       <p>The approval gate is <em>server-side</em>: a single-use token bound to that fault event. Even a prompt injection telling the NemoClaw agent "just fix it" hits the same <code>no approval token</code> rejection.</p>`,
     p2fleet: `All four laptop tiles should be green. The Agent Activity feed and Operator Dashboard should be empty. If you see a historical fault from a previous run, use the Reset button below to clear everything back to a healthy state.`,
@@ -3964,24 +3943,24 @@ const VERTICAL_CONFIG = {
     beat1: `<strong>Fault injected — laptop tile goes red</strong><p>After a few seconds, a device fault event is registered in the simulator. One of the four laptop tiles in the Fleet Health grid turns red immediately over SSE.</p><span class="ui-cue">→ Watch: Fleet Health grid (top left of dashboard)</span>`,
     beat2: `<strong>DETECT — NemoClaw agent spots the device event</strong><p>The NemoClaw agent polls the MCP <code>monitor</code> tool every 5 seconds. On its next poll it sees the fault event and identifies the affected device.</p><span class="ui-cue">→ Activity feed: DETECT phase lights up — "Scanning device event stream…"</span>`,
     beat3: `<strong>DETECT — device event log bundle retrieved</strong><p>Calls <code>logs.get_bundle</code> to pull the raw device event log for the faulted laptop. The log is timestamped with today's date.</p><span class="ui-cue">→ Activity feed: "Log bundle retrieved — N entries collected"</span>`,
-    beat4: `<strong>DIAGNOSE — NemoClaw agent analyses the logs and extracts the error signature</strong><p>Leverages the LLM to provide more detail on the error signature and a description of what exactly has occurred. The model uses chain-of-thought reasoning over the full log extract to identify the canonical fault class — <code>TDR</code>, <code>ECC DBE</code>, <code>GPU OOM</code>, etc. — then writes its own plain-language technical assessment of the fault.</p><span class="ui-cue">→ Activity feed: "LLM identified error signature: …" then AGENT ANALYSIS block populates in Operator Dashboard</span>`,
+    beat4: `<strong>DIAGNOSE — NemoClaw agent analyzes the logs and extracts the error signature</strong><p>Leverages the LLM to provide more detail on the error signature and a description of what exactly has occurred. The model uses chain-of-thought reasoning over the full log extract to identify the canonical fault class — <code>TDR</code>, <code>ECC DBE</code>, <code>GPU OOM</code>, etc. — then writes its own plain-language technical assessment of the fault.</p><span class="ui-cue">→ Activity feed: "LLM identified error signature: …" then AGENT ANALYSIS block populates in Operator Dashboard</span>`,
     beatResolve: `<strong>Laptop goes green</strong><p>Simulator reports the device healthy. Gateway broadcasts the update over SSE.</p><span class="ui-cue">→ Grid: laptop tile turns green</span>`,
     simChipLabel: "Precision Simulator",
     amapSim: { role: "fake Precision fleet · event surface", body: "Simulated Dell Precision laptop fleet (4 devices). Emits device events and log entries on fault injection. Reports healthy again after successful remediation. Safe to reset at any time." },
     amapMcp: { role: "monitor · logs · kb · notify · remediation", body: "MCP tools over Streamable HTTP, surfaced to the LLM as callable functions. monitor reads the device event stream. logs fetches the device event log bundle. kb runs fastembed ONNX + FAISS semantic search plus word-match fallback. notify posts activity narration in the agent's own words. remediation splits in two: propose (LLM-callable, records a recommended plan) and execute (never given to the LLM — runs only in harness code, and refuses without a valid human approval token)." },
     p4sigDesc: `The canonical fault class extracted from the device log by the LLM — e.g. <code>TDR</code>, <code>GPU OOM</code>, <code>ECC DBE</code>. This is what drove the KB search.`,
-    p5summary: `You configured a real NemoClaw agent from scratch — pasted its identity, its orientation, and its four skills into a live OpenClaw sandbox — then watched it work an incident end to end with no prompting: detect a laptop fleet hardware fault, pull the raw device event log, reason about it with the lab's LLM, match it against a Dell knowledge base article, and propose a remediation plan. You read that plan in the Operator Dashboard and decided whether to approve it. The agent never touched the device without your explicit, single-use approval token.`,
+    p5summary: `You configured a real NemoClaw agent from scratch — pasted its identity, its orientation, and its four skills into a live OpenClaw sandbox — then watched it work an incident end to end with no prompting: detect a laptop fleet hardware fault, pull the raw device event log, reason about it with the lab's LLM, match it against a Dell Knowledge Base article, and propose a remediation plan. You read that plan in the Operator Dashboard and decided whether to approve it. The agent never touched the device without your explicit, single-use approval token.`,
   },
   "oil-rigs": {
     eyebrow: "NemoClaw Drilling Rig Agent",
-    brand: "DELL × NOV",
+    brand: "DELL × NVIDIA",
     tagline: "An AI agent watches a simulated drilling rig's critical equipment. Your job: decide whether it gets to act on the fault it finds.",
-    meta: `<span><span class="dot"></span>Live Demo</span><span>NOV / ABB / Cameron · 6 Units</span><span>NemoClaw</span>`,
-    p1lead: `<strong>NemoClaw Drilling Rig Agent</strong> monitors a drilling rig's critical equipment fleet — mud pumps, top drive, BOP control HPU — detects faults, diagnoses them against vendor KB articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.`,
+    meta: `<span><span class="dot"></span>Live Demo</span><span>Rig Floor &amp; Well Control · 6 Units</span><span>NemoClaw</span>`,
+    p1lead: `<strong>NemoClaw Drilling Rig Agent</strong> monitors a drilling rig's critical equipment fleet (mud pumps, top drive, BOP control HPU), detects faults, diagnoses them against vendor KB articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.`,
     p1takeaways: `<li>Drilling equipment failures arrive on the health grid in real time</li>
-      <li>The NemoClaw agent detect, diagnose, and propose a fix — no prompting</li>
-      <li>The approval gate block remediation until you click Approve Self-Heal</li>
-      <li>The NemoClaw agent execute the fix and report the rig healthy again</li>`,
+      <li>The NemoClaw agent detects, diagnoses, and proposes a fix — no prompting</li>
+      <li>The approval gate blocks remediation until you click Approve Self-Heal</li>
+      <li>The NemoClaw agent executes the fix and reports the rig healthy again</li>`,
     p1story: `<h3>The story</h3>
       <p>Six critical rig units are running normally — mud pumps, a top drive, drawworks, a BOP control HPU, and a generator. You inject a fault into one of them — an equipment event surfaced to the NemoClaw agent over MCP. The NemoClaw agent detects it on its next poll, pulls the rig SCADA log, uses the LLM to extract the error signature and write a fault assessment, searches the KB, and posts the full diagnosis to the Operator Dashboard.</p>
       <p>Then it <strong>stops</strong>. Nothing gets fixed until you click <strong>Approve Self-Heal</strong>. If you click <strong>Deny</strong>, the NemoClaw agent logs it and moves on — the asset stays red.</p>
@@ -3993,7 +3972,7 @@ const VERTICAL_CONFIG = {
     beat1: `<strong>Fault injected — unit tile goes red</strong><p>After a few seconds, an equipment fault event is registered in the simulator. One of the six unit tiles in the Rig Equipment Health grid turns red immediately over SSE.</p><span class="ui-cue">→ Watch: Rig Equipment Health grid (top left of dashboard)</span>`,
     beat2: `<strong>DETECT — NemoClaw agent spots the equipment event</strong><p>The NemoClaw agent polls the MCP <code>monitor</code> tool every 5 seconds. On its next poll it sees the fault event and identifies the affected unit.</p><span class="ui-cue">→ Activity feed: DETECT phase lights up — "Scanning equipment event stream…"</span>`,
     beat3: `<strong>DETECT — rig SCADA log bundle retrieved</strong><p>Calls <code>logs.get_bundle</code> to pull the raw SCADA/PLC log for the faulted unit. The log is timestamped with today's date.</p><span class="ui-cue">→ Activity feed: "Log bundle retrieved — N entries collected"</span>`,
-    beat4: `<strong>DIAGNOSE — NemoClaw agent analyses the logs and extracts the error signature</strong><p>Leverages the LLM to provide more detail on the error signature and a description of what exactly has occurred. The model uses chain-of-thought reasoning over the full log extract to identify the canonical fault class — <code>fluid end washout</code>, <code>VFD IGBT overtemperature</code>, <code>accumulator pressure low</code>, etc. — then writes its own plain-language technical assessment of the fault.</p><span class="ui-cue">→ Activity feed: "LLM identified error signature: …" then AGENT ANALYSIS block populates in Operator Dashboard</span>`,
+    beat4: `<strong>DIAGNOSE — NemoClaw agent analyzes the logs and extracts the error signature</strong><p>Leverages the LLM to provide more detail on the error signature and a description of what exactly has occurred. The model uses chain-of-thought reasoning over the full log extract to identify the canonical fault class — <code>fluid end washout</code>, <code>VFD IGBT overtemperature</code>, <code>accumulator pressure low</code>, etc. — then writes its own plain-language technical assessment of the fault.</p><span class="ui-cue">→ Activity feed: "LLM identified error signature: …" then AGENT ANALYSIS block populates in Operator Dashboard</span>`,
     beatResolve: `<strong>Unit goes green</strong><p>Simulator reports the asset healthy. Gateway broadcasts the update over SSE.</p><span class="ui-cue">→ Grid: unit tile turns green</span>`,
     simChipLabel: "Rig Equipment Simulator",
     amapSim: { role: "fake drilling rig · event surface", body: "Simulated drilling rig critical equipment fleet (mud pumps, top drive, BOP control HPU, generator). Emits equipment events and log entries on fault injection. Reports healthy again after successful remediation. Safe to reset at any time." },
@@ -4003,14 +3982,14 @@ const VERTICAL_CONFIG = {
   },
   "healthcare-devices": {
     eyebrow: "NemoClaw Biomedical Device Agent",
-    brand: "DELL × PHILIPS",
+    brand: "DELL × NVIDIA",
     tagline: "An AI agent watches a simulated hospital biomedical device fleet. Your job: decide whether it gets to act on the fault it finds.",
-    meta: `<span><span class="dot"></span>Live Demo</span><span>BD / Philips / Siemens · 5 Devices</span><span>NemoClaw</span>`,
-    p1lead: `<strong>NemoClaw Biomedical Device Agent</strong> monitors a hospital's biomedical device fleet — infusion pumps, patient monitors, an MRI scanner — detects faults, diagnoses them against vendor KB articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.`,
+    meta: `<span><span class="dot"></span>Live Demo</span><span>Clinical Device Fleet · 5 Devices</span><span>NemoClaw</span>`,
+    p1lead: `<strong>NemoClaw Biomedical Device Agent</strong> monitors a hospital's biomedical device fleet (infusion pumps, patient monitors, an MRI scanner), detects faults, diagnoses them against vendor KB articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.`,
     p1takeaways: `<li>Biomedical equipment failures arrive on the health grid in real time</li>
-      <li>The NemoClaw agent detect, diagnose, and propose a fix — no prompting</li>
-      <li>The approval gate block remediation until you click Approve Self-Heal</li>
-      <li>The NemoClaw agent execute the fix and report the device fleet healthy again</li>`,
+      <li>The NemoClaw agent detects, diagnoses, and proposes a fix — no prompting</li>
+      <li>The approval gate blocks remediation until you click Approve Self-Heal</li>
+      <li>The NemoClaw agent executes the fix and reports the device fleet healthy again</li>`,
     p1story: `<h3>The story</h3>
       <p>Five clinical devices are in active use — two infusion pumps, two patient monitors, and an MRI scanner. You inject a fault into one of them — a device event surfaced to the NemoClaw agent over MCP. The NemoClaw agent detects it on its next poll, pulls the device log, uses the LLM to extract the error signature and write a fault assessment, searches the KB, and posts the full diagnosis to the Operator Dashboard.</p>
       <p>Then it <strong>stops</strong>. Nothing gets fixed until you click <strong>Approve Self-Heal</strong>. If you click <strong>Deny</strong>, the NemoClaw agent logs it and moves on — the asset stays red. This lab covers equipment faults only — it never proposes clinical or patient-care decisions.</p>
@@ -4022,7 +4001,7 @@ const VERTICAL_CONFIG = {
     beat1: `<strong>Fault injected — device tile goes red</strong><p>After a few seconds, a device fault event is registered in the simulator. One of the five device tiles in the Device Fleet Health grid turns red immediately over SSE.</p><span class="ui-cue">→ Watch: Device Fleet Health grid (top left of dashboard)</span>`,
     beat2: `<strong>DETECT — NemoClaw agent spots the device event</strong><p>The NemoClaw agent polls the MCP <code>monitor</code> tool every 5 seconds. On its next poll it sees the fault event and identifies the affected device.</p><span class="ui-cue">→ Activity feed: DETECT phase lights up — "Scanning device event stream…"</span>`,
     beat3: `<strong>DETECT — device log bundle retrieved</strong><p>Calls <code>logs.get_bundle</code> to pull the raw device log for the faulted equipment. The log is timestamped with today's date.</p><span class="ui-cue">→ Activity feed: "Log bundle retrieved — N entries collected"</span>`,
-    beat4: `<strong>DIAGNOSE — NemoClaw agent analyses the logs and extracts the error signature</strong><p>Leverages the LLM to provide more detail on the error signature and a description of what exactly has occurred. The model uses chain-of-thought reasoning over the full log extract to identify the canonical fault class — <code>battery depleted</code>, <code>telemetry disconnect</code>, <code>coldhead failure</code>, etc. — then writes its own plain-language technical assessment of the fault.</p><span class="ui-cue">→ Activity feed: "LLM identified error signature: …" then AGENT ANALYSIS block populates in Operator Dashboard</span>`,
+    beat4: `<strong>DIAGNOSE — NemoClaw agent analyzes the logs and extracts the error signature</strong><p>Leverages the LLM to provide more detail on the error signature and a description of what exactly has occurred. The model uses chain-of-thought reasoning over the full log extract to identify the canonical fault class — <code>battery depleted</code>, <code>telemetry disconnect</code>, <code>coldhead failure</code>, etc. — then writes its own plain-language technical assessment of the fault.</p><span class="ui-cue">→ Activity feed: "LLM identified error signature: …" then AGENT ANALYSIS block populates in Operator Dashboard</span>`,
     beatResolve: `<strong>Device goes green</strong><p>Simulator reports the device healthy. Gateway broadcasts the update over SSE.</p><span class="ui-cue">→ Grid: device tile turns green</span>`,
     simChipLabel: "Biomedical Device Simulator",
     amapSim: { role: "fake hospital device fleet · event surface", body: "Simulated hospital biomedical device fleet (infusion pumps, patient monitors, an MRI scanner). Emits device events and log entries on fault injection. Reports healthy again after successful remediation. Safe to reset at any time." },
@@ -4032,14 +4011,14 @@ const VERTICAL_CONFIG = {
   },
   "finance-atm-fleet": {
     eyebrow: "NemoClaw ATM Fleet Agent",
-    brand: "DELL × NCR",
+    brand: "DELL × NVIDIA",
     tagline: "An AI agent watches a simulated bank ATM fleet. Your job: decide whether it gets to act on the fault it finds.",
-    meta: `<span><span class="dot"></span>Live Demo</span><span>NCR / Diebold Nixdorf · 6 ATMs</span><span>NemoClaw</span>`,
+    meta: `<span><span class="dot"></span>Live Demo</span><span>Branch &amp; Off-Premise · 6 ATMs</span><span>NemoClaw</span>`,
     p1lead: `<strong>NemoClaw ATM Fleet Agent</strong> monitors a retail bank's branch and off-premise ATM fleet, detects faults, diagnoses them against vendor KB articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.`,
     p1takeaways: `<li>ATM equipment failures arrive on the health grid in real time</li>
-      <li>The NemoClaw agent detect, diagnose, and propose a fix — no prompting</li>
-      <li>The approval gate block remediation until you click Approve Self-Heal</li>
-      <li>The NemoClaw agent execute the fix and report the ATM fleet healthy again</li>`,
+      <li>The NemoClaw agent detects, diagnoses, and proposes a fix — no prompting</li>
+      <li>The approval gate blocks remediation until you click Approve Self-Heal</li>
+      <li>The NemoClaw agent executes the fix and reports the ATM fleet healthy again</li>`,
     p1story: `<h3>The story</h3>
       <p>Six ATMs across branch and off-premise sites are in active service. You inject a fault into one of them — a device event surfaced to the NemoClaw agent over MCP. The NemoClaw agent detects it on its next poll, pulls the ATM's NDC device log, uses the LLM to extract the error signature and write a fault assessment, searches the KB, and posts the full diagnosis to the Operator Dashboard.</p>
       <p>Then it <strong>stops</strong>. Nothing gets fixed until you click <strong>Approve Self-Heal</strong>. If you click <strong>Deny</strong>, the NemoClaw agent logs it and moves on — the asset stays red.</p>
@@ -4051,7 +4030,7 @@ const VERTICAL_CONFIG = {
     beat1: `<strong>Fault injected — ATM tile goes red</strong><p>After a few seconds, a device fault event is registered in the simulator. One of the six ATM tiles in the ATM Fleet Health grid turns red immediately over SSE.</p><span class="ui-cue">→ Watch: ATM Fleet Health grid (top left of dashboard)</span>`,
     beat2: `<strong>DETECT — NemoClaw agent spots the device event</strong><p>The NemoClaw agent polls the MCP <code>monitor</code> tool every 5 seconds. On its next poll it sees the fault event and identifies the affected ATM.</p><span class="ui-cue">→ Activity feed: DETECT phase lights up — "Scanning device event stream…"</span>`,
     beat3: `<strong>DETECT — NDC device log bundle retrieved</strong><p>Calls <code>logs.get_bundle</code> to pull the raw NDC device log for the faulted ATM. The log is timestamped with today's date.</p><span class="ui-cue">→ Activity feed: "Log bundle retrieved — N entries collected"</span>`,
-    beat4: `<strong>DIAGNOSE — NemoClaw agent analyses the logs and extracts the error signature</strong><p>Leverages the LLM to provide more detail on the error signature and a description of what exactly has occurred. The model uses chain-of-thought reasoning over the full log extract to identify the canonical fault class — <code>dispenser transport jam</code>, <code>card reader transport fault</code>, <code>host communication loss</code>, etc. — then writes its own plain-language technical assessment of the fault.</p><span class="ui-cue">→ Activity feed: "LLM identified error signature: …" then AGENT ANALYSIS block populates in Operator Dashboard</span>`,
+    beat4: `<strong>DIAGNOSE — NemoClaw agent analyzes the logs and extracts the error signature</strong><p>Leverages the LLM to provide more detail on the error signature and a description of what exactly has occurred. The model uses chain-of-thought reasoning over the full log extract to identify the canonical fault class — <code>dispenser transport jam</code>, <code>card reader transport fault</code>, <code>host communication loss</code>, etc. — then writes its own plain-language technical assessment of the fault.</p><span class="ui-cue">→ Activity feed: "LLM identified error signature: …" then AGENT ANALYSIS block populates in Operator Dashboard</span>`,
     beatResolve: `<strong>ATM goes green</strong><p>Simulator reports the ATM healthy. Gateway broadcasts the update over SSE.</p><span class="ui-cue">→ Grid: ATM tile turns green</span>`,
     simChipLabel: "ATM Fleet Simulator",
     amapSim: { role: "fake ATM fleet · event surface", body: "Simulated retail bank ATM fleet (6 ATMs, branch and off-premise). Emits device events and log entries on fault injection. Reports healthy again after successful remediation. Safe to reset at any time." },
@@ -4061,14 +4040,14 @@ const VERTICAL_CONFIG = {
   },
   "telco-edge-5g-masts": {
     eyebrow: "NemoClaw 5G RAN Site Agent",
-    brand: "DELL × ERICSSON",
+    brand: "DELL × NVIDIA",
     tagline: "An AI agent watches a simulated fleet of 5G macro gNodeB sites. Your job: decide whether it gets to act on the fault it finds.",
-    meta: `<span><span class="dot"></span>Live Demo</span><span>Ericsson AIR 3268 · 5 Sites</span><span>NemoClaw</span>`,
-    p1lead: `<strong>NemoClaw 5G RAN Site Agent</strong> monitors a fleet of Ericsson 5G macro gNodeB sites, detects faults, diagnoses them against vendor KB articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.`,
-    p1takeaways: `<li>Next generation 5G radio base equipment failures arrive on the health grid in real time</li>
-      <li>The NemoClaw agent detect, diagnose, and propose a fix — no prompting</li>
-      <li>The approval gate block remediation until you click Approve Self-Heal</li>
-      <li>The NemoClaw agent execute the fix and report the site healthy again</li>`,
+    meta: `<span><span class="dot"></span>Live Demo</span><span>5G Macro gNodeB · 5 Sites</span><span>NemoClaw</span>`,
+    p1lead: `<strong>NemoClaw 5G RAN Site Agent</strong> monitors a fleet of 5G macro gNodeB sites, detects faults, diagnoses them against vendor KB articles, and proposes remediation — but <strong>won't touch anything until you approve it</strong> in the Operator Dashboard.`,
+    p1takeaways: `<li>Next-generation 5G radio equipment failures arrive on the health grid in real time</li>
+      <li>The NemoClaw agent detects, diagnoses, and proposes a fix — no prompting</li>
+      <li>The approval gate blocks remediation until you click Approve Self-Heal</li>
+      <li>The NemoClaw agent executes the fix and reports the site healthy again</li>`,
     p1story: `<h3>The story</h3>
       <p>Five 5G macro sites are in active service. You inject a fault into one of them — a site event surfaced to the NemoClaw agent over MCP. The NemoClaw agent detects it on its next poll, pulls the site's baseband/radio log, uses the LLM to extract the error signature and write a fault assessment, searches the KB, and posts the full diagnosis to the Operator Dashboard.</p>
       <p>Then it <strong>stops</strong>. Nothing gets fixed until you click <strong>Approve Self-Heal</strong>. If you click <strong>Deny</strong>, the NemoClaw agent logs it and moves on — the asset stays red.</p>
@@ -4080,10 +4059,10 @@ const VERTICAL_CONFIG = {
     beat1: `<strong>Fault injected — site tile goes red</strong><p>After a few seconds, a site fault event is registered in the simulator. One of the five site tiles in the RAN Site Health grid turns red immediately over SSE.</p><span class="ui-cue">→ Watch: RAN Site Health grid (top left of dashboard)</span>`,
     beat2: `<strong>DETECT — NemoClaw agent spots the site event</strong><p>The NemoClaw agent polls the MCP <code>monitor</code> tool every 5 seconds. On its next poll it sees the fault event and identifies the affected site.</p><span class="ui-cue">→ Activity feed: DETECT phase lights up — "Scanning site event stream…"</span>`,
     beat3: `<strong>DETECT — baseband/radio log bundle retrieved</strong><p>Calls <code>logs.get_bundle</code> to pull the raw baseband/radio log for the faulted site. The log is timestamped with today's date.</p><span class="ui-cue">→ Activity feed: "Log bundle retrieved — N entries collected"</span>`,
-    beat4: `<strong>DIAGNOSE — NemoClaw agent analyses the logs and extracts the error signature</strong><p>Leverages the LLM to provide more detail on the error signature and a description of what exactly has occurred. The model uses chain-of-thought reasoning over the full log extract to identify the canonical fault class — <code>GNSS reference lost</code>, <code>radio unit overtemperature</code>, <code>eCPRI link failure</code>, etc. — then writes its own plain-language technical assessment of the fault.</p><span class="ui-cue">→ Activity feed: "LLM identified error signature: …" then AGENT ANALYSIS block populates in Operator Dashboard</span>`,
+    beat4: `<strong>DIAGNOSE — NemoClaw agent analyzes the logs and extracts the error signature</strong><p>Leverages the LLM to provide more detail on the error signature and a description of what exactly has occurred. The model uses chain-of-thought reasoning over the full log extract to identify the canonical fault class — <code>GNSS reference lost</code>, <code>radio unit overtemperature</code>, <code>eCPRI link failure</code>, etc. — then writes its own plain-language technical assessment of the fault.</p><span class="ui-cue">→ Activity feed: "LLM identified error signature: …" then AGENT ANALYSIS block populates in Operator Dashboard</span>`,
     beatResolve: `<strong>Site goes green</strong><p>Simulator reports the site healthy. Gateway broadcasts the update over SSE.</p><span class="ui-cue">→ Grid: site tile turns green</span>`,
     simChipLabel: "RAN Site Simulator",
-    amapSim: { role: "fake 5G RAN fleet · event surface", body: "Simulated Ericsson 5G macro gNodeB site fleet (5 sites). Emits site events and log entries on fault injection. Reports healthy again after successful remediation. Safe to reset at any time." },
+    amapSim: { role: "fake 5G RAN fleet · event surface", body: "Simulated 5G macro gNodeB site fleet (5 sites). Emits site events and log entries on fault injection. Reports healthy again after successful remediation. Safe to reset at any time." },
     amapMcp: { role: "monitor · logs · kb · notify · remediation", body: "MCP tools over Streamable HTTP, surfaced to the LLM as callable functions. monitor reads the site event stream. logs fetches the baseband/radio log bundle. kb runs fastembed ONNX + FAISS semantic search plus word-match fallback. notify posts activity narration in the agent's own words. remediation splits in two: propose (LLM-callable, records a recommended plan) and execute (never given to the LLM — runs only in harness code, and refuses without a valid human approval token)." },
     p4sigDesc: `The canonical fault class extracted from the baseband/radio log by the LLM — e.g. <code>GNSS reference lost</code>, <code>eCPRI link failure</code>. This is what drove the KB search.`,
     p5summary: `You configured a real NemoClaw agent from scratch — pasted its identity, its orientation, and its four skills into a live OpenClaw sandbox — then watched it work an incident end to end with no prompting: detect a 5G RAN site fault, pull the raw baseband/radio log, reason about it with the lab's LLM, match it against a vendor knowledge base article, and propose a remediation plan. You read that plan in the Operator Dashboard and decided whether to approve it. The agent never touched the site without your explicit, single-use approval token.`,
@@ -4139,6 +4118,7 @@ const AMAP = {
   you:   { role: "the human in the loop", body: "You watch the Operator Dashboard, read the NemoClaw agent's fault diagnosis and analysis, and click Approve Self-Heal or Deny. Nothing is remediated without your explicit decision." },
   appui: { role: "port :8001 · React/Vite · SSE", body: "Cluster health grid, Operator Dashboard, and Agent Activity feed. All panels update live via Server-Sent Events — no page refresh needed." },
   agent: { role: "NemoClaw · 5 skills · soul.md", body: "NemoClaw AI agent that dynamically decides which skill/tool to call next — monitor, diagnose, notify, or propose remediation — based on what it observes at each wake-up. Uses the lab's LLM with chain-of-thought reasoning for log analysis and fault assessment. Can propose a remediation plan, but cannot execute it — execution requires a valid human approval token retrieved outside the LLM's context." },
+  openshell: { role: "policy-sandboxed container · the agent's blast radius", body: "The hardened sandbox the NemoClaw agent actually runs inside. OpenShell gives the agent its own container with a declarative policy wrapped around it: the filesystem is scoped to the sandbox's own /sandbox tree so the agent can read and write its persona, skills and working files but nothing on the host; egress is deny-by-default, with only the lab's MCP servers and inference endpoint on the allow-list, so a compromised prompt has nowhere to call out to; and processes run unprivileged, so the agent cannot escalate out of its own container. Everything you paste into the Agent Configuration Terminal — SOUL.md, AGENTS.md, the four SKILL.md files — lands in this sandbox, and every tool call the agent makes leaves from it. It is what makes handing an autonomous agent real infrastructure credentials a bounded risk rather than an open one." },
   gate:  { role: "server-side HITL enforcement", body: "Lives in the Gateway service, not the NemoClaw agent prompt. When you click Approve Self-Heal, a single-use token is minted server-side and bound to that specific fault event. The remediation tool validates it before running anything." },
   mcp:   { role: "monitor · logs · kb · notify · remediation", body: "MCP tools over Streamable HTTP, surfaced to the LLM as callable functions. monitor reads Redfish events. logs fetches the iDRAC log bundle. kb runs fastembed ONNX + FAISS semantic search plus word-match fallback. notify posts activity narration in the agent's own words. remediation splits in two: propose (LLM-callable, records a recommended plan) and execute (never given to the LLM — runs only in harness code, and refuses without a valid human approval token)." },
   sim:   { role: "fake XE9780L · Redfish surface", body: "Simulated Dell PowerEdge XE9780L GPU cluster. Emits Redfish events and log entries on fault injection. Reports healthy again after successful remediation. Safe to reset at any time." },
