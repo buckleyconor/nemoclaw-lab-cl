@@ -116,9 +116,9 @@ genuinely confusing failure.
 Three variables drive everything, in `.env`:
 
 ```bash
-LLM_BASE_URL=https://model.example.lab/api/qwen36/v1   # must include /v1
+LLM_BASE_URL=https://model.example.lab/api/model_name/v1   # must include /v1
 LLM_API_KEY=<real key>
-LLM_MODEL=qwen3.6-35b-a3b-fp8                          # as the endpoint reports it
+LLM_MODEL=model_name                          # as the endpoint reports it
 ```
 
 Verify before you go further — this is exactly what bootstrap will do, and
@@ -214,7 +214,7 @@ and a matching `--tool-call-parser`, the agent will never call a tool.
 
 ```bash
 LLM_BASE_URL=http://<host-ip>:11434/v1     # the /v1 suffix is required
-LLM_MODEL=qwen3:32b                        # must be a tool-calling model
+LLM_MODEL=model_name                        # must be a tool-calling model
 LLM_API_KEY=ollama                         # ignored by Ollama, but see below
 ```
 
