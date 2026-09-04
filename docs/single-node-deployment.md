@@ -70,6 +70,7 @@ locally on top of that is what actually drives your requirements.
 | `python3`, `openssl`, `curl` | hook-relay, token generation, probes | Present on stock Ubuntu |
 | `nginx` | The sandbox → LLM route (§3) | `sudo apt-get install -y nginx` |
 | `uv` | Runs the terminal daemon | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
+| `nvidia-ctk` | NVIDIA  | `sudo apt install nvidia-ctk` |
 
 `make bootstrap` checks all of these and tells you which is missing. `uv` is
 only needed for the optional embedded terminal, so it warns rather than fails.
