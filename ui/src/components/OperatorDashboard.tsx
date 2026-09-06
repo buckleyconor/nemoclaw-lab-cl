@@ -104,12 +104,12 @@ const cardLabelStyle = {
 } as const;
 
 // ── Staged reveal timeline ────────────────────────────────────────────────────
-// The agent's backend loop is faster than a human can follow: a Qwen turn
-// completes the whole investigation (logs → signature → KB → assessment →
-// remediation) in seconds, and the dashboard receives the full picture as a
-// burst of SSE updates. For live demos the dashboard replays the
-// investigation in the same causal order the agent worked in, on a fixed
-// timeline anchored at the moment the fault first appears:
+// The agent's backend loop is faster than a human can follow: a
+// <model_name> turn completes the whole investigation (logs → signature →
+// KB → assessment → remediation) in seconds, and the dashboard receives the
+// full picture as a burst of SSE updates. For live demos the dashboard
+// replays the investigation in the same causal order the agent worked in, on
+// a fixed timeline anchored at the moment the fault first appears:
 //
 //   T+0.0  fault detected (header + placeholder cards)
 //   T+2.0  agent issues the log-pull command
