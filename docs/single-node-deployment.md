@@ -69,6 +69,7 @@ locally on top of that is what actually drives your requirements.
 | `git` | Clone the repo | `sudo apt-get install -y git` |
 | `python3`, `openssl`, `curl` | hook-relay, token generation, probes | Present on stock Ubuntu |
 | `nginx` | The sandbox → LLM route (§3) | `sudo apt-get install -y nginx` |
+| `nemoclaw` CLI | The agent runtime and the OpenShell gateway | See [Installing the CLI](#installing-the-cli) — the published one-liner onboards a sandbox too |
 | `uv` | Runs the terminal daemon | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
 | `nvidia-ctk` (NVIDIA Container Toolkit) | Only for §3c, and only if you serve the model from a **container** — it exposes the host GPU to that container. The lab's own four services are CPU-only. | [Add NVIDIA's apt repo](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html), then `sudo apt-get install -y nvidia-container-toolkit` and `sudo nvidia-ctk runtime configure --runtime=docker && sudo systemctl restart docker` |
 
@@ -76,6 +77,33 @@ locally on top of that is what actually drives your requirements.
 only needed for the optional embedded terminal, so it warns rather than fails.
 `nvidia-ctk` is not checked at all — nothing in the lab requires it, and it
 matters only for a containerised model server you run yourself.
+
+### Installing the CLI
+
+```bash
+curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash
+```
+
+This does **more than install**. The installer runs in three phases and phase 3
+onboards a sandbox of its own — a bare `nemoclaw onboard` against the managed
+image, unrelated to this lab's sandbox and pointed at whatever its prompts
+settle on. Two consequences worth planning for:
+
+- You are left with a **stray managed sandbox** beside the lab's. Harmless, but
+  not free: it holds disk and a registered gateway session. Remove it with
+  `nemoclaw <name> destroy` once `make bootstrap` has finished.
+- **Do not set `NEMOCLAW_SANDBOX_NAME` to this lab's `SANDBOX_NAME`** (default
+  `infra-sentinel`). If you do, the installer creates *that* name from the
+  managed image, and `make bootstrap` will find it, print "already exists —
+  skipping onboarding", and hand you a lab whose sandbox has neither the MCP
+  plugin nor a route to your LLM. See §8.
+
+There is no supported way to install the CLI alone: `--defer-onboarding` is
+Hermes-only and aborts outright for the `openclaw` agent this lab uses.
+`deploy/scripts/install-nemoclaw-cli.sh` does achieve it, by calling the
+installer's own phases 1-2 (ADR-015) — but it depends on an upstream internal
+function and has not been verified on a clean host, so it is opt-in and not the
+documented path.
 
 ### CLI version ↔ sandbox image coupling
 
@@ -246,6 +274,9 @@ git clone https://github.com/buckleyconor/nemoclaw-lab-cl.git
 cd nemoclaw-lab-cl
 ```
 
+Everything in §2 must already be in place — in particular the `nemoclaw` CLI,
+which Step 3's preflight checks but no step installs for you.
+
 ### Step 1 — configure
 
 ```bash
@@ -409,7 +440,7 @@ No code changes or image rebuilds are involved — see [ADR-007](adr/ADR-007.md)
 
 ## 8. First-run traps
 
-Three things bite on a fresh host specifically. Everything else lives in
+Four things bite on a fresh host specifically. Everything else lives in
 [TROUBLESHOOTING.md](TROUBLESHOOTING.md), which is organised by symptom.
 
 1. **CLI / sandbox image version skew.** Fails ~10 minutes into the image
@@ -420,6 +451,11 @@ Three things bite on a fresh host specifically. Everything else lives in
 3. **Onboarding ran before the proxy was live.** The endpoint URL is baked in
    at onboard time, so a proxy that came up afterwards doesn't retroactively
    fix the sandbox. `make repoint-llm` re-points it without a rebuild.
+4. **The CLI installer's sandbox collided with the lab's.** If
+   `nemoclaw <SANDBOX_NAME> status` already succeeds before `make bootstrap`
+   first runs, bootstrap skips onboarding by design and the lab comes up around
+   the wrong sandbox — green, and unable to reach your LLM.
+   `make bootstrap FORCE=1` re-onboards over it. See "Installing the CLI" (§2).
 
 A useful habit: when anything seems wrong, run `make doctor` **first**. Both
 failures logged during development were dead host processes, not code — and
