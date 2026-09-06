@@ -17,8 +17,8 @@
 # and a reachable OpenAI-compatible LLM endpoint.
 #
 # Environment:
-#   LLM_BASE_URL   (required) the real endpoint, e.g. https://model.example.lab/api/qwen36/v1
-#   LLM_MODEL      (required) e.g. qwen3.6-35b-a3b-fp8
+#   LLM_BASE_URL   (required) the real endpoint, e.g. https://model.example.lab/api/<model_name>/v1
+#   LLM_MODEL      (required) e.g. <model_name>
 #   LLM_API_KEY    (required) the endpoint's real API key — no dummy default
 #   LLM_PROXY_PORT (default: 18100) host inference proxy port; the sandbox is
 #                  onboarded against http://host.openshell.internal:<port>/v1

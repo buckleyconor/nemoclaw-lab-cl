@@ -69,8 +69,8 @@ locally on top of that is what actually drives your requirements.
 | `git` | Clone the repo | `sudo apt-get install -y git` |
 | `python3`, `openssl`, `curl` | hook-relay, token generation, probes | Present on stock Ubuntu |
 | `nginx` | The sandbox → LLM route (§3) | `sudo apt-get install -y nginx` |
+| `nemoclaw` CLI | The agent runtime | `curl -fsSL https://www.nvidia.com/nemoclaw.sh \| bash` |
 | `uv` | Runs the terminal daemon | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
-| `nvidia-ctk` | NVIDIA  | `sudo apt install nvidia-ctk` |
 
 `make bootstrap` checks all of these and tells you which is missing. `uv` is
 only needed for the optional embedded terminal, so it warns rather than fails.
@@ -116,9 +116,9 @@ genuinely confusing failure.
 Three variables drive everything, in `.env`:
 
 ```bash
-LLM_BASE_URL=https://model.example.lab/api/model_name/v1   # must include /v1
+LLM_BASE_URL=https://model.example.lab/api/<model_name>/v1   # must include /v1
 LLM_API_KEY=<real key>
-LLM_MODEL=model_name                          # as the endpoint reports it
+LLM_MODEL=<model_name>                                       # as the endpoint reports it
 ```
 
 Verify before you go further — this is exactly what bootstrap will do, and
@@ -214,7 +214,7 @@ and a matching `--tool-call-parser`, the agent will never call a tool.
 
 ```bash
 LLM_BASE_URL=http://<host-ip>:11434/v1     # the /v1 suffix is required
-LLM_MODEL=model_name                        # must be a tool-calling model
+LLM_MODEL=<model_name>                     # must be a tool-calling model
 LLM_API_KEY=ollama                         # ignored by Ollama, but see below
 ```
 
