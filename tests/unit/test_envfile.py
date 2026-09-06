@@ -50,8 +50,8 @@ def env_file(tmp_path: Path) -> Path:
 
 
 def test_reads_a_plain_value(env_file: Path) -> None:
-    env_file.write_text("LLM_MODEL=qwen3.6-35b-a3b-fp8\n")
-    assert env_get(env_file.parent, "LLM_MODEL") == "qwen3.6-35b-a3b-fp8"
+    env_file.write_text("LLM_MODEL=<model_name>\n")
+    assert env_get(env_file.parent, "LLM_MODEL") == "<model_name>"
 
 
 def test_strips_a_trailing_inline_comment(env_file: Path) -> None:
