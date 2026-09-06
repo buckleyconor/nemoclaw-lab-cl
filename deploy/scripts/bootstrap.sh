@@ -46,8 +46,14 @@ command -v docker >/dev/null || die "docker not found."
 docker info >/dev/null 2>&1 || die "docker daemon not reachable (are you in the 'docker' group?)."
 docker compose version >/dev/null 2>&1 \
   || die "docker compose plugin not found. Install: sudo apt-get install -y docker-compose-plugin"
+# The public `curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash` installs the
+# CLI *and* onboards a managed sandbox (installer phase 3), which is not the
+# sandbox this lab wants and runs before the inference proxy exists — see
+# ADR-015. install-nemoclaw-cli.sh stops after the CLI.
 command -v nemoclaw >/dev/null \
-  || die "nemoclaw CLI not found. Install: curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash"
+  || die "nemoclaw CLI not found. Install (CLI only, no onboarding):
+    NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1 deploy/scripts/install-nemoclaw-cli.sh
+  The upstream 'curl … nemoclaw.sh | bash' also onboards a sandbox — see ADR-015."
 # Load-bearing for hook-relay / doctor / token generation — stock Ubuntu has
 # them, but a minimal VM image may not.
 for tool in python3 openssl curl; do
