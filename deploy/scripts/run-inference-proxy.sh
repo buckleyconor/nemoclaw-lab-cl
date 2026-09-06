@@ -10,7 +10,7 @@
 #
 # Usage:
 #   deploy/scripts/run-inference-proxy.sh          (reads LLM_BASE_URL from .env)
-#   LLM_BASE_URL=https://model.example.lab/api/qwen36/v1 deploy/scripts/run-inference-proxy.sh
+#   LLM_BASE_URL=https://model.example.lab/api/<model_name>/v1 deploy/scripts/run-inference-proxy.sh
 #
 # Environment (env wins over .env):
 #   LLM_BASE_URL     (required) the real OpenAI-compatible endpoint, incl. path
