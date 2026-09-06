@@ -70,10 +70,12 @@ locally on top of that is what actually drives your requirements.
 | `python3`, `openssl`, `curl` | hook-relay, token generation, probes | Present on stock Ubuntu |
 | `nginx` | The sandbox → LLM route (§3) | `sudo apt-get install -y nginx` |
 | `uv` | Runs the terminal daemon | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
-| `nvidia-ctk` | NVIDIA  | `sudo apt install nvidia-ctk` |
+| `nvidia-ctk` (NVIDIA Container Toolkit) | Only for §3c, and only if you serve the model from a **container** — it exposes the host GPU to that container. The lab's own four services are CPU-only. | [Add NVIDIA's apt repo](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html), then `sudo apt-get install -y nvidia-container-toolkit` and `sudo nvidia-ctk runtime configure --runtime=docker && sudo systemctl restart docker` |
 
-`make bootstrap` checks all of these and tells you which is missing. `uv` is
+`make bootstrap` checks these and tells you which is missing. `uv` is
 only needed for the optional embedded terminal, so it warns rather than fails.
+`nvidia-ctk` is not checked at all — nothing in the lab requires it, and it
+matters only for a containerised model server you run yourself.
 
 ### CLI version ↔ sandbox image coupling
 
