@@ -13,6 +13,27 @@ When something is broken rather than un-built, go to
 
 ---
 
+## The whole thing, in eight steps
+
+The rest of this document is the detail behind these. If you only want the
+shape of the job, it is this:
+
+| # | Step | Where |
+|---|---|---|
+| 1 | **Have an OpenAI-compatible endpoint that supports tool calling.** An existing internal one, or vLLM/Ollama served on this same node. Tool calling is not optional. | [§3](#3-point-the-lab-at-an-inference-endpoint) |
+| 2 | **Install the prerequisites**, including the `nemoclaw` CLI (`curl -fsSL https://www.nvidia.com/nemoclaw.sh \| bash`). The installer also deploys and onboards a default agent — expected, and deleted in step 6. | [§2](#2-prerequisites) |
+| 3 | **Configure `.env`**: `cp .env.example .env`, then set `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`. | [Step 1](#step-1--configure) |
+| 4 | **Deploy the inference proxy**: `deploy/scripts/run-inference-proxy.sh`. The sandbox's only route to the LLM. Must be live *before* step 5. | [Step 2](#step-2--bring-up-the-inference-proxy) |
+| 5 | **`make bootstrap`** — builds the stack, onboards the lab's agent, starts the host daemons. ~10-15 min. Run the `sudo ufw allow` rules it prints. | [Step 3](#step-3--build-onboard-verify), [Step 4](#step-4--firewall) |
+| 6 | **Remove the installer's default agent** from step 2: `nemoclaw <name> destroy`. | [Step 5](#step-5--remove-the-installers-default-agent) |
+| 7 | **`sudo make install-selfheal`** — survives reboots. Without it a reboot brings the containers back but not the host processes. | [Step 6](#step-6--survive-reboots) |
+| 8 | **`make doctor`** — red/green check of every moving part; each failure prints its own fix. Then open <http://localhost:8001/lab/>. | [Step 7](#step-7--verify) |
+
+Steps 3-8 are the deployment proper ([§4](#4-deployment-steps)); steps 1-2 are
+prerequisites you do once per host.
+
+---
+
 ## 1. What runs where
 
 The single most useful thing to understand before you start: **only four
@@ -91,7 +112,7 @@ settle on. Two consequences worth planning for:
 
 - You are left with a **stray managed sandbox** beside the lab's. Harmless, but
   not free: it holds disk and a registered gateway session. Remove it with
-  `nemoclaw <name> destroy` once `make bootstrap` has finished.
+  `nemoclaw <name> destroy` once `make bootstrap` has finished — [Step 5](#step-5--remove-the-installers-default-agent).
 - **Do not set `NEMOCLAW_SANDBOX_NAME` to this lab's `SANDBOX_NAME`** (default
   `infra-sentinel`). If you do, the installer creates *that* name from the
   managed image, and `make bootstrap` will find it, print "already exists —
@@ -143,7 +164,18 @@ Tool calling is not optional — the entire agent loop is tool calls. A model
 without it will onboard cleanly and then never do anything, which is a
 genuinely confusing failure.
 
-Three variables drive everything, in `.env`:
+Three variables drive everything, and they live in `.env`. Create it from the
+sample and edit it — this is the same step as [Step 1](#step-1--configure), so
+if you have already done it there, skip ahead:
+
+```bash
+cp .env.example .env
+$EDITOR .env               # set LLM_BASE_URL, LLM_MODEL and LLM_API_KEY (required)
+set -a; . ./.env; set +a   # activate it — export the values into this shell
+```
+
+`.env` is gitignored and `.env.example` carries every other setting at its
+default, so the three LLM values are the only ones you must supply:
 
 ```bash
 LLM_BASE_URL=https://model.example.lab/api/<model_name>/v1   # must include /v1
@@ -159,7 +191,15 @@ curl -sS -H "Authorization: Bearer $LLM_API_KEY" "$LLM_BASE_URL/models" | head -
 ```
 
 You want HTTP 200 and your `LLM_MODEL` in the listing. `401`/`403` means the
-key is wrong; a timeout means the host can't reach the endpoint at all.
+key is wrong; a timeout means the host can't reach the endpoint at all. Empty
+variables in the command mean the `set -a` line didn't run — it applies to one
+shell only, so repeat it in any new terminal.
+
+What the activation is and isn't for: it makes `$LLM_BASE_URL` and friends
+available to the ad-hoc `curl` checks in this section and §3c. The deploy
+scripts and `make` targets do **not** need it — they read `.env` off disk
+themselves (`deploy/scripts/lib/envfile.sh`), so a value you change later is
+picked up without re-exporting anything.
 
 > **These values are baked into the sandbox at onboard time.** Editing `.env`
 > afterwards does not move a running agent — see §7 for `make repoint-llm`.
@@ -281,7 +321,8 @@ which Step 3's preflight checks but no step installs for you.
 
 ```bash
 cp .env.example .env
-$EDITOR .env          # set LLM_BASE_URL, LLM_MODEL, LLM_API_KEY (§3)
+$EDITOR .env               # set LLM_BASE_URL, LLM_MODEL, LLM_API_KEY (§3)
+set -a; . ./.env; set +a   # activate it in this shell, for the §3 curl checks
 ```
 
 ### Step 2 — bring up the inference proxy
@@ -328,7 +369,22 @@ If `ufw` is active, bootstrap prints three `sudo ufw allow` rules. **Run them.**
 See §6 for why skipping this produces a lab that looks healthy and does
 nothing.
 
-### Step 5 — survive reboots
+### Step 5 — remove the installer's default agent
+
+The CLI installer's phase 3 onboarded a sandbox of its own (§2). It is not the
+lab's agent and nothing uses it, so once `make bootstrap` has finished, delete
+it:
+
+```bash
+nemoclaw list                 # find the installer's sandbox, not SANDBOX_NAME
+nemoclaw <name> destroy
+```
+
+Leave this lab's sandbox — `SANDBOX_NAME` in `.env`, default `infra-sentinel` —
+alone. If the two share a name, the installer's sandbox *is* what bootstrap
+came up around; see §8, trap 4.
+
+### Step 6 — survive reboots
 
 ```bash
 sudo make install-selfheal
@@ -339,7 +395,7 @@ terminal daemon unit, and a `doctor --fix` timer. Without it, a reboot brings
 the containers back but not the host processes — and nothing tells you. See
 the README's *Surviving a reboot* for the full unit list.
 
-### Step 6 — verify
+### Step 7 — verify
 
 ```bash
 make doctor
