@@ -15,22 +15,44 @@ called out below.
 
 ### First-time setup
 
-Four things, in order. Only the first needs a decision from you.
+Eight steps, in order — the short form of
+[the eight-step overview](docs/single-node-deployment.md#the-whole-thing-in-eight-steps).
+Only the first two need a decision from you.
 
 ```bash
-# 1. Point the lab at the LLM endpoint
+# 1. Have an OpenAI-compatible endpoint that supports TOOL CALLING — an
+#    existing internal one, or vLLM/Ollama on this same host. Not optional:
+#    without it the agent onboards cleanly and then never acts.
+
+# 2. Install the prerequisites (docker + compose plugin, git, nginx, uv —
+#    full table in docs/single-node-deployment.md §2), then the nemoclaw CLI.
+#    The installer also onboards a default agent of its own; you delete it
+#    at step 6.
+curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash
+git clone https://github.com/buckleyconor/nemoclaw-lab-cl.git
+cd nemoclaw-lab-cl
+
+# 3. Point the lab at the endpoint, and activate the file
 cp .env.example .env
 $EDITOR .env                  # set LLM_BASE_URL, LLM_MODEL and LLM_API_KEY (required)
+set -a; . ./.env; set +a      # activate it in this shell
 
-# 2. Bring up the inference proxy — the sandbox's route to the LLM (ADR-014)
-sudo apt-get install -y nginx           # if not already present
+# 4. Bring up the inference proxy — the sandbox's route to the LLM (ADR-014)
 deploy/scripts/run-inference-proxy.sh
 
-# 3. Build the stack, onboard the agent, start the host daemons, verify
+# 5. Build the stack, onboard the agent, start the host daemons (~10-15 min),
+#    then run the `sudo ufw allow` commands it prints, if ufw is active
 make bootstrap
 
-# 4. Run the `sudo ufw allow` commands bootstrap prints (if ufw is active),
-#    then re-check
+# 6. Remove the default agent the CLI installer onboarded at step 2
+nemoclaw list                 # find its name — NOT the lab's SANDBOX_NAME
+nemoclaw <name> destroy
+
+# 7. Survive reboots — the containers come back on their own, the host
+#    processes do not (see "Surviving a reboot" below)
+sudo make install-selfheal
+
+# 8. Verify
 make doctor                   # expect: all checks passed
 ```
 
