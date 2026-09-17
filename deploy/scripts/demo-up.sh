@@ -82,7 +82,8 @@ else
   echo "Started (sandbox: ${SANDBOX_NAME}, log: ${STATE_DIR}/nemoclaw-terminal.log)."
   if [[ -z "$TERMINAL_WS_URL" ]]; then
     echo "First run — the daemon just wrote TERMINAL_WS_URL/TERMINAL_TOKEN to .env."
-    echo "Restart the gateway so its terminal proxy picks them up:  docker compose up -d gateway"
+    echo "Restarting the gateway so its terminal proxy picks up the credentials..."
+    docker compose up -d gateway
   fi
 fi
 
