@@ -278,9 +278,13 @@ def test_run_reset_blanks_every_target_and_pushes_all_six(tmp_path: Path) -> Non
     ok = run_reset(config, run=fake_run)
 
     assert ok is True
-    # One push per target, no downloads and no editor invocations.
-    assert len(calls) == len(MENU_TARGETS)
-    for argv in calls:
+    # One push per target, no downloads and no editor invocations, followed by
+    # a single best-effort session reset so the conversation starts fresh too.
+    push_calls, session_calls = calls[: len(MENU_TARGETS)], calls[len(MENU_TARGETS):]
+    assert len(session_calls) == 1
+    assert session_calls[0][:4] == ["nemoclaw", "tenant-a", "sessions", "reset"]
+    assert session_calls[0][4:] == ["main", "--reason", "new"]
+    for argv in push_calls:
         assert argv[2] in ("upload", "skill")
     # Every scratch file exists and matches blank_content() for its kind:
     # truly empty for SOUL.md/AGENTS.md, a minimal frontmatter stub for
