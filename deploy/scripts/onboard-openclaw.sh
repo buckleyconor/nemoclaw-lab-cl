@@ -272,12 +272,34 @@ nemoclaw "$SANDBOX_NAME" exec -- openclaw config set hooks \
 
 # Safety-net poll (webhook is the primary wake-up, fired by the Gateway on
 # scenario injection): check the monitoring surface every minute.
-nemoclaw "$SANDBOX_NAME" exec -- openclaw cron add \
-  --name "infra-sentinel-safety-poll" \
-  --cron "* * * * *" \
-  --session main \
-  --system-event "safety-net poll: run the Infrastructure Fault Response program" \
-  --wake now || echo "WARN: cron add failed — webhook remains the only trigger"
+# On a fresh install the first cron add pends: the host CLI is only paired with
+# operator.pairing/read/write, while cron management needs operator.admin, so
+# the gateway returns an isRepair scope-upgrade request. `devices approve` must
+# target the requestId (--latest only covers pairing requests) and publish the
+# approval via the local fallback. Approve the request this install just minted,
+# then retry once.
+CRON_ADD=(
+  openclaw cron add
+  --name "infra-sentinel-safety-poll"
+  --cron "* * * * *"
+  --session main
+  --system-event "safety-net poll: run the Infrastructure Fault Response program"
+  --wake now
+)
+if ! nemoclaw "$SANDBOX_NAME" exec -- "${CRON_ADD[@]}" >/dev/null 2>&1; then
+  echo "  First cron add needed operator.admin — approving the paired device's scope upgrade and retrying..."
+  PENDING_ID="$(nemoclaw "$SANDBOX_NAME" exec -- openclaw devices list --json 2>/dev/null \
+    | python3 -c 'import json,sys,re
+t=sys.stdin.read(); t=re.sub(r"(?s)^.*?(\{)",r"\1",t,count=1)
+p=json.loads(t).get("pending",[]) if t.startswith("{") else []
+print(p[0]["requestId"] if p else "")')"
+  if [ -n "$PENDING_ID" ]; then
+    nemoclaw "$SANDBOX_NAME" exec -- openclaw devices approve "$PENDING_ID" >/dev/null 2>&1 \
+      && echo "  Approved scope upgrade (${PENDING_ID%%-*})."
+  fi
+  nemoclaw "$SANDBOX_NAME" exec -- "${CRON_ADD[@]}" \
+    || echo "WARN: cron add failed — webhook remains the only trigger"
+fi
 
 # `nemoclaw <name> gateway restart` is not a real subcommand — recover is the
 # host-side action that restarts the sandbox's gateway/dashboard.
