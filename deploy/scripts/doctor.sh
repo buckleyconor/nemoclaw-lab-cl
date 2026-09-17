@@ -267,6 +267,16 @@ if [[ -n "$TERMINAL_WS_URL" ]]; then
     fi
   fi
 
+  # A freshly-started daemon (first run generates its token and writes .env)
+  # can take several seconds to bind :8005 — tolerate that before failing,
+  # otherwise a fresh install spuriously reports bootstrap Error 1.
+  if ! terminal_up; then
+    for _ in $(seq 1 7); do
+      sleep 2
+      terminal_up && break
+    done
+  fi
+
   if terminal_up; then
     pass "terminal daemon" "$TERM_HTTP"
   else
