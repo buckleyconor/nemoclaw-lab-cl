@@ -178,7 +178,11 @@ fi
 # ── Things that need privileges: print, never run ────────────────────────────
 COMPOSE_NET="$(docker network inspect "$(basename "$PWD")_default" \
   --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}' 2>/dev/null || true)"
-if command -v ufw >/dev/null && systemctl is-active --quiet ufw 2>/dev/null; then
+# Check the authoritative state: `ufw status` reports "Status: active" only
+# when the firewall is actually enforcing. `systemctl is-active ufw` reflects
+# the service unit, which stays "active" on hosts where ufw is installed but
+# disabled (Status: inactive), falsely claiming rules are required.
+if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
   echo
   echo "── ufw is active — these rules are required ──────────────────────"
   echo "Without them the container→host hops fail SILENTLY: the terminal panel"
