@@ -130,6 +130,14 @@ FROM ${SANDBOX_BASE}
 ARG NEMOCLAW_TOOL_DISCLOSURE=progressive
 ENV NEMOCLAW_TOOL_DISCLOSURE=${NEMOCLAW_TOOL_DISCLOSURE}
 
+# The base image bakes agents.defaults.model.primary=nemotron-3-super into
+# /sandbox/.openclaw/openclaw.json, and the runtime reconciler is a no-op in
+# OpenShell's non-root sandbox (nemoclaw-start.sh returns early on uid!=0), so
+# there is no runtime rescue before the CLI's step-7 smoke check. The smoke
+# gate is only primary == inference/<model> (baseUrl/apiKey/provider are already
+# correct in the base). We re-bake only `primary` (see the RUN appended after
+# the heredoc below) instead of re-running generate-openclaw-config, which would
+# re-introduce the managed-proxy/capability flags the base bake suppresses.
 COPY nemoclaw-infra-tools/ /opt/nemoclaw-infra-tools/
 WORKDIR /opt/nemoclaw-infra-tools
 RUN npm ci --no-audit --no-fund && npm run build && npm prune --omit=dev
@@ -147,6 +155,16 @@ WORKDIR /sandbox
 # that marker is non-empty (the managed NemoClaw image declares it too).
 USER sandbox
 DOCKERFILE
+
+# Re-bake `primary` (and keep models[0] consistent with it) to the model that is
+# actually being onboarded. We DO NOT rely on an ARG/ENV NEMOCLAW_PRIMARY_MODEL_REF
+# here: the gateway build backend overrides/ignores it (the build log shows the
+# patched ARG, yet the image ENV is the factory default), and a `RUN python3 - <<EOF`
+# heredoc is silently dropped (no-op, exit 0). So the literal model id from
+# $LLM_MODEL is inlined directly into the python -c argument at generation time.
+cat >> "$BUILD_DIR/Dockerfile" <<BAKE_PRIMARY
+RUN /usr/bin/python3 -c 'import json,sys; p="/sandbox/.openclaw/openclaw.json"; ref=sys.argv[1]; bare=ref[len("inference/"):] if ref.startswith("inference/") else ref; c=json.load(open(p)); c["agents"]["defaults"]["model"]["primary"]=ref; inf=c["models"]["providers"]["inference"]; inf["models"][0]["id"]=bare; inf["models"][0]["name"]=ref; json.dump(c,open(p,"w",encoding="utf-8"))' "inference/${LLM_MODEL}"
+BAKE_PRIMARY
 
 # ── 2. Onboard against the LLM endpoint ──────────────────────────────────────
 NEMOCLAW_PROVIDER=custom \
