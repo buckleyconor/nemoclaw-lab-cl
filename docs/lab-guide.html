@@ -3668,9 +3668,16 @@ function returnToMenu() {
   btn.disabled = true;
   btn.textContent = "Resetting sandbox config…";
   try { sessionStorage.removeItem("nemoclawLabStarted"); } catch { /* private mode */ }
-  fetch(`${window.location.origin}/api/terminal/reset`, { method: "POST" })
-    .catch(() => {})
-    .finally(() => { window.location.href = "./index.html"; });
+  // Blank the persona AND clear the gateway's activity/fault feed so the next
+  // scenario starts from a clean slate. /api/terminal/reset only blanks the
+  // SOUL/skills (option 7); /api/presenter/reset is what empties the activity
+  // pane the operator sees — without it the old scenario's messages linger
+  // next to the fresh persona. Both are best-effort and must never block
+  // navigation.
+  Promise.allSettled([
+    fetch(`${window.location.origin}/api/terminal/reset`, { method: "POST" }),
+    fetch(`${window.location.origin}/api/presenter/reset`, { method: "POST" }),
+  ]).finally(() => { window.location.href = "./index.html"; });
 }
 
 // ── Pack/vertical mismatch banner ───────────────────────────────────
