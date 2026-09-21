@@ -130,6 +130,15 @@ FROM ${SANDBOX_BASE}
 ARG NEMOCLAW_TOOL_DISCLOSURE=progressive
 ENV NEMOCLAW_TOOL_DISCLOSURE=${NEMOCLAW_TOOL_DISCLOSURE}
 
+# Pin the build identity rather than inheriting the base's. Every instruction
+# after FROM runs as the base image's default USER, and openclaw-sandbox flipped
+# that from root to sandbox at v0.0.124. COPY always lands root:root 0755
+# (only --chown changes that), so on a sandbox-default base `npm ci` dies with
+# `EACCES: permission denied, mkdir '/opt/nemoclaw-infra-tools/node_modules'`.
+# root here reproduces the image byte-state every CLI release up to v0.0.123
+# produced — including the root-owned extensions/<plugin> copy NemoClaw itself
+# expects (see docs/TROUBLESHOOTING.md, "npm error code EACCES").
+USER root
 COPY nemoclaw-infra-tools/ /opt/nemoclaw-infra-tools/
 WORKDIR /opt/nemoclaw-infra-tools
 RUN npm ci --no-audit --no-fund && npm run build && npm prune --omit=dev
