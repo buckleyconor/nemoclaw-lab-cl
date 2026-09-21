@@ -388,7 +388,9 @@ contract changes — all fixed in-tree, listed here so a future re-onboard
    openclaw.json` are missing. Fix (in `onboard-openclaw.sh`): base on
    `ghcr.io/nvidia/nemoclaw/openclaw-sandbox:v<cli-version>` (pin to the
    installed CLI release) and keep the trailing `WORKDIR /sandbox` +
-   `USER sandbox`.
+   `USER sandbox`. Note that from v0.0.124 that base declares `sandbox` as its
+   *default* USER too, which raises a fresh wall — see the "npm error code
+   EACCES" section below.
 2. **`nemoclaw <name> upload` destinations are directories.** The v0.0.109
    OpenShell transport extracts the source into the destination directory
    (file → `<dest>/<name>`, dir → `<dest>/<dirname>/`). A file-path
@@ -417,3 +419,68 @@ anyway (doctor's "agent model" check reads the config, not the trace), and a
 sandbox recreate picks up the configured model. `make repoint-llm` after a
 model change needs `--no-verify` internally only because the *host* can't
 resolve `host.openshell.internal` (container DNS does).
+
+## "npm error code EACCES: permission denied, mkdir '/opt/nemoclaw-infra-tools/node_modules'" during onboarding
+
+Ten minutes into `make bootstrap`, at step 7 of the sandbox image build:
+
+```
+Step 7/10 : RUN npm ci --no-audit --no-fund && npm run build && npm prune --omit=dev
+npm error code EACCES
+npm error syscall mkdir
+npm error path /opt/nemoclaw-infra-tools/node_modules
+npm error errno -13
+```
+
+Neither a code bug nor an architecture problem — nothing to do with ARM vs
+x86, or with WSL. Every instruction after `FROM` runs as the **base image's
+default USER**, and `ghcr.io/nvidia/nemoclaw/openclaw-sandbox` changed that
+from `root` to `sandbox` at **v0.0.124** (v0.0.102–v0.0.123 ship `root`).
+`COPY` always lands `root:root 0755` — only `--chown` changes that — so on a
+sandbox-default base `npm ci` cannot create `node_modules` inside the
+directory the COPY step just made. Hence the one-repo-two-hosts shape: green
+on the GB10 (older CLI), EACCES on a laptop with a newer one. The tag follows
+`nemoclaw --version`, so nothing in the repo changed — only what it resolved
+to.
+
+Confirm before changing anything:
+
+```bash
+nemoclaw --version
+docker image inspect --format '{{.Config.User}}' \
+  "ghcr.io/nvidia/nemoclaw/openclaw-sandbox:v$(nemoclaw --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')"
+# sandbox  → this failure.   root → look elsewhere.
+```
+
+(`docker image inspect` needs the base present locally; onboarding pulls it, so
+a host that got as far as step 7 already has it. `docker pull` the tag first if
+not.)
+
+**Fixed in-tree.** `deploy/scripts/onboard-openclaw.sh` now declares
+`USER root` before the COPY, so the build identity no longer depends on which
+CLI release happens to be installed. The generated image still ends in
+`WORKDIR /sandbox` + `USER sandbox` (OpenShell's marker contract), and the
+`openclaw doctor --fix` layer runs as root exactly as it did on every base up
+to v0.0.123. Re-onboard to pick it up:
+
+```bash
+make bootstrap FORCE=1
+```
+
+On a host you can't edit, pin a pre-flip base for one run — but that freezes
+the symptom, not the cause, and the next CLI upgrade walks into it again:
+
+```bash
+export SANDBOX_BASE=ghcr.io/nvidia/nemoclaw/openclaw-sandbox:v0.0.123
+make bootstrap FORCE=1
+```
+
+`SANDBOX_BASE` is read from the environment only (not `.env`), and
+`FORCE=1` matters here because bootstrap skips onboarding for a sandbox that
+already exists. See the pinning note in `docs/single-node-deployment.md` §2.
+
+**Do not "fix" it with `COPY --chown=sandbox:sandbox`.** root-owned
+`extensions/<plugin>` is the state NemoClaw expects to find — its rebuild
+audit deliberately tolerates permission-denied while walking those from the
+sandbox user — so the chown variant drifts away from what every working
+sandbox here has been built from. Build as root, drop to sandbox at the end.
