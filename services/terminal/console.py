@@ -255,11 +255,11 @@ def run_target(
     if push.returncode != 0:
         print(f"[console] push FAILED: {push.stderr.strip()}", file=out)
         return False
-    # The "(target=N)" suffix is a stable, machine-parseable marker the
-    # embedded terminal panel (ui/src/components/TerminalPanel.tsx) watches
-    # for in the raw PTY byte stream — it fires immediately on push success,
-    # unlike the green checkmark in format_menu(), which only appears on the
-    # *next* full menu redraw (after "Press Enter to return to the menu...").
+    # Human-facing push-success line. The "(target=N)" suffix used to be
+    # watched by the embedded terminal panel (ui/src/components/
+    # TerminalPanel.tsx) to auto-collapse the pane after menu item 6; the
+    # auto-collapse was removed (attendees read the silent shrink as a bug),
+    # so this is now just diagnostic detail in the console log.
     print(f"[console] pushed to sandbox. (target={target.key})", file=out)
     return True
 
