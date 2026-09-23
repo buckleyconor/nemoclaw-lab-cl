@@ -3836,8 +3836,21 @@ function triggerFault() {
   const btn = document.getElementById("injectBtn");
   const status = document.getElementById("startStatus");
 
+  // The config-status pre-flight below can take several seconds (the daemon
+  // shells out six times to check the sandbox files), so acknowledge the
+  // click immediately and disable the button. Without this the stall reads
+  // as a dead button, and the countdown-only guard above doesn't engage
+  // until after the fetch resolves — a re-click mid-stall queues a second
+  // countdown and a second fault.
+  btn.disabled = true;
+  btn.style.opacity = ".6";
+  status.style.color = "var(--warning)";
+  status.textContent = "Checking agent configuration…";
+
   // Block when opened as file:// — browser prevents cross-origin fetch to http://
   if (window.location.protocol === "file:") {
+    btn.disabled = false;
+    btn.style.opacity = "1";
     status.style.color = "var(--critical)";
     status.innerHTML = `Open via the gateway instead: <a href="http://localhost:8001/lab/lab-guide.html" style="color:var(--accent)">http://localhost:8001/lab/lab-guide.html</a>`;
     return;
@@ -3855,6 +3868,8 @@ function triggerFault() {
     .then(r => r.json())
     .then(data => {
       if (data && data.ok && data.configured === false) {
+        btn.disabled = false;
+        btn.style.opacity = "1";
         status.style.color = "var(--critical)";
         status.textContent = "Please configure the Agent first — Part 1, Steps 1–6 must be completed before proceeding.";
         return;
