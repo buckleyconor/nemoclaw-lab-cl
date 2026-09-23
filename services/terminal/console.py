@@ -244,8 +244,7 @@ def run_target(
         if error is not None:
             print(f"[console] NOT pushed — {error}.", file=out)
             print(
-                "[console] The paste likely got mangled (did you press 'i' before "
-                "pasting?). Pick the same menu item and try again.",
+                "[console] The paste likely got mangled. Pick the same menu item and try again.",
                 file=out,
             )
             return False
