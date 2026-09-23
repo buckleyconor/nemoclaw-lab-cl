@@ -240,7 +240,13 @@ export function FleetGrid({ assets, pack, onSelectAsset, idle }: Props) {
         ) : (
           <div style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+            // Two columns for as long as tiles can stay >= ~160px (the width
+            // where the status badge starts to crowd the card) — growing the
+            // guide panel shrinks the dashboard, and collapsing a 4-asset
+            // fleet to a 1x4 stack at the old 220px floor made expanding the
+            // left panel feel punished. Only below ~360px of grid does it
+            // fall to a single column.
+            gridTemplateColumns: "repeat(auto-fill, minmax(min(220px, max(160px, calc(50% - 7px))), 1fr))",
             gap: 14,
           }}>
             {assets.map((a) => (
