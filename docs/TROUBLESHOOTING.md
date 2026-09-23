@@ -58,7 +58,7 @@ Check in this order:
    nemoclaw infra-sentinel exec --no-tty -- cat /sandbox/.openclaw/workspace/SOUL.md
    ```
 
-   Empty output → redo Part 1 of the lab guide (all six files, items 1–6
+   Empty output → redo Part 2 of the lab guide (all six files, items 1–6
    green in the terminal menu).
 
 4. **Detection is working but slow (~1 minute).** The webhook missed and the
