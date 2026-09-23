@@ -58,10 +58,12 @@ def test_find_target_returns_none_for_unknown_selection() -> None:
 
 
 def test_reset_key_is_not_an_edit_target() -> None:
-    """Option 7 (reset) is a console action, not a MenuTarget — find_target
-    must not resolve it, so the main loop's dedicated reset branch handles it."""
-    assert RESET_KEY == "7"
+    """`r` (reset) is a console action, not a MenuTarget — find_target must
+    not resolve it, so the main loop's dedicated reset branch handles it.
+    Letter key on purpose: it must not read as a seventh setup step."""
+    assert RESET_KEY == "r"
     assert find_target(RESET_KEY) is None
+    assert find_target("7") is None
 
 
 @pytest.mark.parametrize("target", MENU_TARGETS, ids=lambda t: t.key)
@@ -118,10 +120,12 @@ def test_format_menu_lists_all_targets_reset_and_quit() -> None:
     menu = format_menu("tenant-a")
     for t in MENU_TARGETS:
         assert t.label in menu
-    assert f"7) {RESET_LABEL}" in menu
+    assert f"{RESET_KEY}) {RESET_LABEL}" in menu
     assert "q) Quit" in menu
-    # Reset renders after the edit targets and before Quit.
-    assert menu.index("6)") < menu.index("7)") < menu.index("q) Quit")
+    # Reset renders after the edit targets and before Quit, and the menu
+    # carries no stray "7" a user could mistake for a seventh setup step.
+    assert menu.index("6)") < menu.index(f"{RESET_KEY})") < menu.index("q) Quit")
+    assert "7)" not in menu
 
 
 def test_menu_labels_describe_the_push_destination() -> None:

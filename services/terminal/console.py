@@ -4,16 +4,18 @@ Not a shell. This is the entire program the terminal daemon (`services/terminal/
 main.py`) spawns onto the PTY when running in restricted mode (ADR-013, M9
 30-tenant Kubernetes deployment): a numbered menu of exactly six edit targets —
 SOUL.md, AGENTS.md, and the four infra-sentinel skills — plus a reset action
-(option 7) that blanks and re-pushes all six. Every target is a hardcoded
+(letter key `r`, never numbered, so it can't be mistaken for a setup step)
+that blanks and re-pushes all six. Every target is a hardcoded
 (sandbox path, scratch path) pair; no operator-typed string ever reaches a
 subprocess argv, so there is no shell-injection surface to sanitize.
 
 Per selection: best-effort `nemoclaw <name> download` seeds a scratch copy,
 `vim -Z` (restricted vim — no `:!`, `:sh`, suspend, or writing another file)
 edits it in place on the PTY, then `nemoclaw <name> upload` (SOUL.md/AGENTS.md)
-or `nemoclaw <name> skill install` (skills) pushes it back — plus a reset action (option 7) that
-blanks and re-pushes all six AND resets the agent's `main` session, so a
-persona reset always starts a fresh conversation too. All subprocess
+or `nemoclaw <name> skill install` (skills) pushes it back — plus a reset
+action (menu option `r`) that blanks and re-pushes all six AND resets the
+agent's `main` session, so a persona reset always starts a fresh
+conversation too. All subprocess
 calls use literal argv lists, never `shell=True`.
 """
 
@@ -88,7 +90,10 @@ MENU_TARGETS: tuple[MenuTarget, ...] = (
     ),
 )
 
-RESET_KEY = "7"
+# Letter key, deliberately NOT a number: the six numbered items are the
+# guided setup steps, and attendees read a seventh number as "step 7 I
+# haven't done" — reset must never look like part of the walkthrough.
+RESET_KEY = "r"
 RESET_LABEL = "Reset all config (SOUL.md, AGENTS.md, all SKILL.md files and the conversation are reset)"
 
 QUIT_KEYS = ("q", "Q")
@@ -452,7 +457,7 @@ def main() -> None:
             return
         if selection.strip() in QUIT_KEYS:
             return
-        if selection.strip() == RESET_KEY:
+        if selection.strip().lower() == RESET_KEY:
             try:
                 confirm = input(
                     "[console] This blanks SOUL.md, AGENTS.md and all four SKILL.md "
