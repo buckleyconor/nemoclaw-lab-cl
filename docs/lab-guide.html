@@ -282,6 +282,14 @@ body.vertical-telco-edge-5g-masts .codeblock[data-vertical="telco-edge-5g-masts"
 .panel-card .panel-title { font-size:.9rem; font-weight:600; color:#fff; margin-bottom:6px; }
 .panel-card .panel-desc { font-size:.8rem; color:var(--text-muted); line-height:1.48; }
 .panel-card .panel-icon { font-size:18px; margin-bottom:7px; }
+/* icon-left: emoji sits in a left column beside the label/title line while
+   the description spans the full card width below (saves vertical space) —
+   used by the dashboard layout tour tiles. grid-template-rows keeps the
+   label/title row at content height when the card is stretched to match a
+   taller grid neighbor; the description row takes all remaining space. */
+.panel-card.icon-left { display:grid; grid-template-columns:auto 1fr; grid-template-rows:auto 1fr; column-gap:10px; }
+.panel-card.icon-left .panel-icon { align-self:center; margin:0; }
+.panel-card.icon-left .panel-desc { grid-column:1 / -1; }
 
 /* ── TABLE ──────────────────────────────────────────────────────── */
 .table { width:100%; border-collapse:collapse; margin:12px 0; font-size:.8rem; }
@@ -612,32 +620,46 @@ body.started .curtain-half.right { animation: curtain-right 1.5s cubic-bezier(.6
       </div>
 
       <h4>The dashboard layout</h4>
-      <div class="panel-2">
-        <div class="panel-card">
+      <div class="panel-2" style="margin-bottom:12px;">
+        <div class="panel-card icon-left" style="grid-column:1 / -1;">
+          <div class="panel-icon">🔔</div>
+          <div>
+            <div class="panel-label">Header (bell icon)</div>
+            <div class="panel-title">Notification Inbox</div>
+          </div>
+          <div class="panel-desc">A badge appears when the agent posts a fault notification. Click it to see the alert history.</div>
+        </div>
+        <div class="panel-card icon-left">
           <div class="panel-icon">🔲</div>
-          <div class="panel-label">Top left</div>
-          <div class="panel-title" data-vi="p2panelTitle">Cluster Health</div>
+          <div>
+            <div class="panel-label">Top left</div>
+            <div class="panel-title" data-vi="p2panelTitle">Cluster Health</div>
+          </div>
           <div class="panel-desc" data-vi="p2panelDesc">One tile per server. Green = healthy, red = faulted. Updates live over SSE — no refresh needed. Watch this tile turn red the moment a fault is injected.</div>
         </div>
-        <div class="panel-card">
+        <div class="panel-card icon-left">
           <div class="panel-icon">📋</div>
-          <div class="panel-label">Top right</div>
-          <div class="panel-title">Agent Activity</div>
+          <div>
+            <div class="panel-label">Top right</div>
+            <div class="panel-title">Agent Activity</div>
+          </div>
           <div class="panel-desc">A chronological reasoning trace showing every agent step in real time, grouped by phase: DETECT → DIAGNOSE → SEARCH KB → PRESENT → REMEDIATE → RESOLVED. This is the agent thinking out loud.</div>
         </div>
-      </div>
-      <div class="panel-2" style="margin-bottom:12px;">
-        <div class="panel-card" style="border-color:rgba(139,92,246,.3);">
+        <div class="panel-card icon-left" style="border-color:rgba(139,92,246,.3);grid-column:1 / -1;">
           <div class="panel-icon">🖥️</div>
-          <div class="panel-label">Bottom — full width</div>
-          <div class="panel-title">Operator Dashboard</div>
+          <div>
+            <div class="panel-label">Middle</div>
+            <div class="panel-title">Operator Dashboard</div>
+          </div>
           <div class="panel-desc">Appears the moment a fault is active. Shows the error signature, matched KB article, the agent's own analysis of the fault, numbered remediation steps, and the <strong>Approve Self-Heal / Deny</strong> buttons. This is where you make your decision.</div>
         </div>
-        <div class="panel-card">
-          <div class="panel-icon">🔔</div>
-          <div class="panel-label">Header (bell icon)</div>
-          <div class="panel-title">Notification Inbox</div>
-          <div class="panel-desc">A badge appears when the agent posts a fault notification. Click it to see the alert history.</div>
+        <div class="panel-card icon-left" style="grid-column:1 / -1;">
+          <div class="panel-icon">⌨️</div>
+          <div>
+            <div class="panel-label">Bottom</div>
+            <div class="panel-title">Agent Configuration Terminal</div>
+          </div>
+          <div class="panel-desc">The locked-down lab-host shell where you configure your agent in Part 2. It's not a general-purpose terminal: it shows a menu of the six agent files, pushes each one into the sandbox automatically after you save, and offers <code>r</code> to reset everything and <code>q</code> to quit.</div>
         </div>
       </div>
       </section>
