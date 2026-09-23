@@ -92,10 +92,25 @@ function UnconfiguredWarning({ detail }: { detail?: string }) {
 }
 
 export function ActivityFeed({ events, idle, agentConfigured, agentStatusDetail }: Props) {
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const logRef = useRef<HTMLDivElement>(null);
+  const prevLenRef = useRef(0);
 
+  // Auto-scroll the feed to its newest line. Deliberately NOT
+  // scrollIntoView: this dashboard runs inside lab-guide.html's iframe, and
+  // scrollIntoView also scrolls every ancestor container — each SSE event
+  // was yanking the whole lab-guide page down to the iframe. Scrolling the
+  // log div itself stays contained. The near-bottom check additionally
+  // leaves the reader alone when they've scrolled up to re-read history;
+  // first batch after load/reset always jumps to newest.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = logRef.current;
+    if (!el) return;
+    const prev = prevLenRef.current;
+    prevLenRef.current = events.length;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    if (nearBottom || prev === 0 || events.length < prev) {
+      el.scrollTo({ top: el.scrollHeight });
+    }
   }, [events]);
 
   // Build grouped sections: each time the step changes, start a new group
@@ -139,7 +154,7 @@ export function ActivityFeed({ events, idle, agentConfigured, agentStatusDetail 
       </div>
 
       {/* Log body */}
-      <div style={{
+      <div ref={logRef} style={{
         overflowY: "auto",
         flex: 1,
         fontFamily: "var(--mono)",
@@ -211,7 +226,7 @@ export function ActivityFeed({ events, idle, agentConfigured, agentStatusDetail 
                 </div>
               );
             })}
-            <div ref={bottomRef} style={{ height: 6 }} />
+            <div style={{ height: 6 }} />
           </>
         )}
       </div>
