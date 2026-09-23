@@ -187,7 +187,7 @@ code { font-family:var(--mono); font-size:.8em; background:var(--bg-card); borde
 .copy-btn:hover { background:var(--accent); border-color:var(--accent); color:#fff; }
 .copy-btn.copied { background:var(--healthy); border-color:var(--healthy); color:#042218; }
 
-/* ── FILE COLLAPSE (SOUL.md / AGENTS.md / SKILL.md source, Part 1) ─ */
+/* ── FILE COLLAPSE (SOUL.md / AGENTS.md / SKILL.md source, Part 2) ─ */
 .file-collapse { margin:12px 0; border:1px solid var(--border); border-radius:8px; background:var(--bg-card); overflow:hidden; }
 .file-collapse summary { cursor:pointer; padding:12px 16px; font-weight:600; font-size:.86rem; color:var(--text); list-style:none; display:flex; align-items:center; gap:8px; }
 .file-collapse summary::-webkit-details-marker { display:none; }
@@ -196,7 +196,7 @@ code { font-family:var(--mono); font-size:.8em; background:var(--bg-card); borde
 .file-collapse summary code { font-size:.78rem; color:var(--nv-green); background:transparent; }
 .file-collapse > p { padding:0 16px; margin:0 0 10px; color:var(--text-muted); font-size:.82rem; line-height:1.5; }
 .file-collapse .codeblock { margin:0 12px 14px; max-height:340px; overflow-y:auto; }
-/* Part 1's SOUL.md/AGENTS.md/SKILL.md source blocks are per-vertical static
+/* Part 2's SOUL.md/AGENTS.md/SKILL.md source blocks are per-vertical static
    HTML (not JS template literals) — their content is full of literal
    backticks and `\|` markdown escapes that would corrupt a JS template
    string. ai-infrastructure is the default/fallback vertical, so its block
@@ -245,7 +245,7 @@ body.vertical-telco-edge-5g-masts .codeblock[data-vertical="telco-edge-5g-masts"
 .beat-body p { color:var(--text-muted); font-size:.82rem; margin:0; line-height:1.5; }
 .beat-body .ui-cue { font-family:var(--mono); font-size:.75rem; color:var(--accent); display:block; margin-top:5px; }
 
-/* ── ARCH DIAGRAM (Part 1) ──────────────────────────────────────── */
+/* ── ARCH DIAGRAM (Part 2) ──────────────────────────────────────── */
 /* Vertical-agnostic: the diagram names all six verticals itself, so it lives
    in static markup outside any [data-vi] block and applyVertical() leaves it
    alone. Thumbnail is a <button> so it is keyboard-reachable; the lightbox is
@@ -568,7 +568,7 @@ body.started .curtain-half.right { animation: curtain-right 1.5s cubic-bezier(.6
 
     <nav class="guide-nav" id="guideNav">
       <a href="#part-1" class="nav-step" data-section="part-1"><span class="nav-num">1</span>Welcome</a>
-      <a href="#part-2" class="nav-step" data-section="part-2"><span class="nav-num">2</span>Dashboard</a>
+      <a href="#part-2" class="nav-step" data-section="part-2"><span class="nav-num">2</span>Agent</a>
       <a href="#part-3" class="nav-step" data-section="part-3"><span class="nav-num">3</span>Fault Arrives</a>
       <a href="#part-4" class="nav-step" data-section="part-4"><span class="nav-num">4</span>Decision</a>
       <a href="#part-5" class="nav-step" data-section="part-5"><span class="nav-num">5</span>Wrap-Up</a>
@@ -596,6 +596,55 @@ body.started .curtain-half.right { animation: curtain-right 1.5s cubic-bezier(.6
       <p>Four XE9780L GPU servers are running model inference. You inject a fault into one of them — a Redfish event surfaced to the NemoClaw agent over MCP. The NemoClaw agent detects it on its next poll, pulls the iDRAC error log, uses the LLM to extract the error signature and write a fault assessment, searches the Dell Knowledge Base, and posts the full diagnosis to the Operator Dashboard.</p>
       <p>Then it <strong>stops</strong>. Nothing gets fixed until you click <strong>Approve Self-Heal</strong>. If you click <strong>Deny</strong>, the NemoClaw agent logs it and moves on — the asset stays red.</p>
       <p>The approval gate is <em>server-side</em>: a single-use token bound to that fault event. Even a prompt injection telling the NemoClaw agent "just fix it" hits the same <code>no approval token</code> rejection.</p></div>
+
+      <h3>The dashboard (right panel)</h3>
+      <p>The live dashboard loads automatically in the right panel once you click "Start Your Lab" — no setup needed.</p>
+
+      <div class="callout success">
+        <div class="callout-title">Right now: everything should be green</div>
+        <p data-vi="p2fleet">All four server tiles should be green. The Agent Activity feed and Operator Dashboard should be empty. If you see a historical fault from a previous run, use the Reset button below to clear everything back to a healthy state.</p>
+        <div style="margin-top:12px;">
+          <button id="resetBtn" onclick="resetDashboard()" style="background:rgba(16,185,129,.12);color:#10b981;border:1px solid rgba(16,185,129,.35);border-radius:6px;padding:7px 16px;font-size:12px;font-weight:700;letter-spacing:.04em;cursor:pointer;font-family:var(--sans);transition:background .15s;" onmouseover="this.style.background='rgba(16,185,129,.22)'" onmouseout="this.style.background='rgba(16,185,129,.12)'">
+            ↺ Reset to healthy state
+          </button>
+          <span id="resetStatus" style="margin-left:12px;font-family:var(--mono);font-size:11px;color:var(--text-dim);"></span>
+        </div>
+      </div>
+
+      <h4>The dashboard layout</h4>
+      <div class="panel-2">
+        <div class="panel-card">
+          <div class="panel-icon">🔲</div>
+          <div class="panel-label">Top left</div>
+          <div class="panel-title" data-vi="p2panelTitle">Cluster Health</div>
+          <div class="panel-desc" data-vi="p2panelDesc">One tile per server. Green = healthy, red = faulted. Updates live over SSE — no refresh needed. Watch this tile turn red the moment a fault is injected.</div>
+        </div>
+        <div class="panel-card">
+          <div class="panel-icon">📋</div>
+          <div class="panel-label">Top right</div>
+          <div class="panel-title">Agent Activity</div>
+          <div class="panel-desc">A chronological reasoning trace showing every agent step in real time, grouped by phase: DETECT → DIAGNOSE → SEARCH KB → PRESENT → REMEDIATE → RESOLVED. This is the agent thinking out loud.</div>
+        </div>
+      </div>
+      <div class="panel-2" style="margin-bottom:12px;">
+        <div class="panel-card" style="border-color:rgba(139,92,246,.3);">
+          <div class="panel-icon">🖥️</div>
+          <div class="panel-label">Bottom — full width</div>
+          <div class="panel-title">Operator Dashboard</div>
+          <div class="panel-desc">Appears the moment a fault is active. Shows the error signature, matched KB article, the agent's own analysis of the fault, numbered remediation steps, and the <strong>Approve Self-Heal / Deny</strong> buttons. This is where you make your decision.</div>
+        </div>
+        <div class="panel-card">
+          <div class="panel-icon">🔔</div>
+          <div class="panel-label">Header (bell icon)</div>
+          <div class="panel-title">Notification Inbox</div>
+          <div class="panel-desc">A badge appears when the agent posts a fault notification. Click it to see the alert history.</div>
+        </div>
+      </div>
+      </section>
+
+      <!-- PART 2 -->
+      <section>
+      <h2 id="part-2">Part 2 — Your Agent</h2>
 
       <button class="archfig" id="archFigBtn" aria-label="Enlarge the NemoClaw Lab architecture diagram">
         <img src="./nemoclaw-lab-architecture.png" alt="NemoClaw Lab architecture, top to bottom: the lab's LLM endpoint exchanges tool calls and reasoning with the NemoClaw Agent running inside an isolated OpenShell sandbox; the agent calls the Redfish, Logs and Search MCP servers over MCP and gets structured results back; those servers query simulated hardware that varies per vertical (AI Infra, Laptop Fleet, Oil &amp; Gas, Healthcare, Finance, Telco/Edge), while a fault injector drives scripted failures into it." />
@@ -3272,54 +3321,6 @@ buttons in the dashboard:
       </details>
       </section>
 
-      <!-- PART 2 -->
-      <section>
-      <h2 id="part-2">Part 2 — Dashboard (right panel)</h2>
-      <p>The live dashboard loads automatically in the right panel once you click "Start Your Lab" — no setup needed.</p>
-
-      <div class="callout success">
-        <div class="callout-title">Right now: everything should be green</div>
-        <p data-vi="p2fleet">All four server tiles should be green. The Agent Activity feed and Operator Dashboard should be empty. If you see a historical fault from a previous run, use the Reset button below to clear everything back to a healthy state.</p>
-        <div style="margin-top:12px;">
-          <button id="resetBtn" onclick="resetDashboard()" style="background:rgba(16,185,129,.12);color:#10b981;border:1px solid rgba(16,185,129,.35);border-radius:6px;padding:7px 16px;font-size:12px;font-weight:700;letter-spacing:.04em;cursor:pointer;font-family:var(--sans);transition:background .15s;" onmouseover="this.style.background='rgba(16,185,129,.22)'" onmouseout="this.style.background='rgba(16,185,129,.12)'">
-            ↺ Reset to healthy state
-          </button>
-          <span id="resetStatus" style="margin-left:12px;font-family:var(--mono);font-size:11px;color:var(--text-dim);"></span>
-        </div>
-      </div>
-
-      <h3>The dashboard layout</h3>
-      <div class="panel-2">
-        <div class="panel-card">
-          <div class="panel-icon">🔲</div>
-          <div class="panel-label">Top left</div>
-          <div class="panel-title" data-vi="p2panelTitle">Cluster Health</div>
-          <div class="panel-desc" data-vi="p2panelDesc">One tile per server. Green = healthy, red = faulted. Updates live over SSE — no refresh needed. Watch this tile turn red the moment a fault is injected.</div>
-        </div>
-        <div class="panel-card">
-          <div class="panel-icon">📋</div>
-          <div class="panel-label">Top right</div>
-          <div class="panel-title">Agent Activity</div>
-          <div class="panel-desc">A chronological reasoning trace showing every agent step in real time, grouped by phase: DETECT → DIAGNOSE → SEARCH KB → PRESENT → REMEDIATE → RESOLVED. This is the agent thinking out loud.</div>
-        </div>
-      </div>
-      <div class="panel-2" style="margin-bottom:12px;">
-        <div class="panel-card" style="border-color:rgba(139,92,246,.3);">
-          <div class="panel-icon">🖥️</div>
-          <div class="panel-label">Bottom — full width</div>
-          <div class="panel-title">Operator Dashboard</div>
-          <div class="panel-desc">Appears the moment a fault is active. Shows the error signature, matched KB article, the agent's own analysis of the fault, numbered remediation steps, and the <strong>Approve Self-Heal / Deny</strong> buttons. This is where you make your decision.</div>
-        </div>
-        <div class="panel-card">
-          <div class="panel-icon">🔔</div>
-          <div class="panel-label">Header (bell icon)</div>
-          <div class="panel-title">Notification Inbox</div>
-          <div class="panel-desc">A badge appears when the agent posts a fault notification. Click it to see the alert history.</div>
-        </div>
-      </div>
-
-      </section>
-
       <!-- PART 3 -->
       <section>
       <h2 id="part-3">Part 3 — Trigger &amp; Watch</h2>
@@ -3648,7 +3649,7 @@ async function startLab() {
   // Reset the sandbox config before the lab begins, so every lab run starts
   // from blank SOUL.md/AGENTS.md/skills — but only ONCE per tab+pack: the
   // sessionStorage guard means an accidental F5 mid-demo doesn't wipe the
-  // config the attendee just spent Part 1 pasting in. Arriving fresh from
+  // config the attendee just spent Part 2 pasting in. Arriving fresh from
   // the vertical picker always resets (index.html clears the flag on card
   // click), as does switching to a different pack (the flag is pack-keyed).
   if (sessionStorage.getItem("nemoclawLabStarted") !== expected) {
@@ -3878,7 +3879,7 @@ function triggerFault() {
         btn.disabled = false;
         btn.style.opacity = "1";
         status.style.color = "var(--critical)";
-        status.textContent = "Please configure the Agent first — Part 1, Steps 1–6 must be completed before proceeding.";
+        status.textContent = "Please configure the Agent first — Part 2, Steps 1–6 must be completed before proceeding.";
         return;
       }
       startFaultCountdown(base, btn, status);
@@ -4177,7 +4178,7 @@ document.getElementById("amapChips").addEventListener("click", e => {
 // ── Copy buttons ───────────────────────────────────────────────────
 // data-copy: a fixed literal string. data-copy-target: read a sibling
 // <pre>'s live textContent instead — used for the full SOUL.md/AGENTS.md/
-// SKILL.md file bodies (Part 1), which are too large/quote-heavy for an
+// SKILL.md file bodies (Part 2), which are too large/quote-heavy for an
 // HTML attribute and are already rendered on-page for the operator to read.
 document.querySelectorAll(".copy-btn").forEach(btn => {
   const targetId = btn.dataset.copyTarget;
