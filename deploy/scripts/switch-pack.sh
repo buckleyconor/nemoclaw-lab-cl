@@ -67,5 +67,5 @@ echo "  curl -s http://localhost:8001/api/pack | python3 -m json.tool"
 echo
 echo "Note: this only restarts the docker-compose stack. The OpenClaw sandbox"
 echo "(SOUL.md/AGENTS.md/skills) is managed separately — reset it via the"
-echo "embedded terminal's option 7, or the lab guide's 'Ready for a different"
+echo "embedded terminal's reset option (r), or the lab guide's 'Ready for a"
 echo "scenario?' button, before starting the next pack's persona exercise."

@@ -122,7 +122,7 @@ def test_daemon_restricted_mode_console_menu_edit_and_push_over_the_wire(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Terminal daemon — POST /reset (non-interactive equivalent of console option 7)
+# Terminal daemon — POST /reset (non-interactive equivalent of menu option `r`)
 # ─────────────────────────────────────────────────────────────────────────────
 
 

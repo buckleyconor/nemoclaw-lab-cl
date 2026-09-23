@@ -26,8 +26,9 @@ Also exposes three bearer-token-gated HTTP actions alongside /ws:
   POST /switch-pack    {"pack_id": str} -> restarts the docker-compose stack
                        on a different PACK_ID (deploy/scripts/switch-pack.sh),
                        detached — see docs/PACK-EXPANSION-PLAN.md.
-  POST /reset          restricted mode only — non-interactive equivalent of
-                       the console's menu option 7 (console.run_reset()).
+   POST /reset          restricted mode only — non-interactive equivalent of
+                        the console's reset action (menu option `r`,
+                        console.run_reset()).
   GET  /config-status  restricted mode only — per-target read of whether
                        SOUL.md/AGENTS.md/the four SKILL.md files have
                        actually been pasted into the sandbox (console.
@@ -257,8 +258,9 @@ def create_app(token: str | None = None) -> FastAPI:
             return {"ok": True, "status": "switch-started", "pack_id": pack_id}
 
     if restricted:
-        # Non-interactive equivalent of the restricted console's menu option 7
-        # (services.terminal.console.RESET_KEY) — blanks and re-pushes SOUL.md/
+        # Non-interactive equivalent of the restricted console's reset action
+        # (menu option `r`, services.terminal.console.RESET_KEY) — blanks and
+        # re-pushes SOUL.md/
         # AGENTS.md/all four skills without a live PTY session, so the lab
         # guide's "Ready for a different scenario?" button can trigger it over
         # a plain POST. Only registered in restricted mode: reset is a

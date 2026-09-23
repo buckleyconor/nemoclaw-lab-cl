@@ -3661,9 +3661,10 @@ async function startLab() {
 
 // ── "Ready for a different scenario?" ───────────────────────────────
 // Blanks SOUL.md/AGENTS.md/all four skills in the shared OpenClaw sandbox
-// (the non-interactive equivalent of the restricted terminal's menu option
-// 7 — services.terminal.console.run_reset()) before sending the operator
-// back to pick another vertical, so the next pack's persona exercise starts
+// (the non-interactive equivalent of the restricted terminal's reset
+// action — menu option r, services.terminal.console.run_reset()) before
+// sending the operator back to pick another vertical, so the next pack's
+// persona exercise starts
 // from a clean sandbox instead of showing the previous pack's content.
 // Best-effort: the /api/terminal/reset route only exists when the terminal
 // daemon is running in restricted mode, so this must never block navigation.
@@ -3679,7 +3680,7 @@ function returnToMenu() {
   try { sessionStorage.removeItem("nemoclawLabStarted"); } catch { /* private mode */ }
   // Blank the persona AND clear the gateway's activity/fault feed so the next
   // scenario starts from a clean slate. /api/terminal/reset only blanks the
-  // SOUL/skills (option 7); /api/presenter/reset is what empties the activity
+  // SOUL/skills (menu option r); /api/presenter/reset is what empties the activity
   // pane the operator sees — without it the old scenario's messages linger
   // next to the fresh persona. Both are best-effort and must never block
   // navigation.
