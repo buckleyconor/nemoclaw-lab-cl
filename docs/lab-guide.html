@@ -483,8 +483,17 @@ body.started .curtain-half.right { animation: curtain-right 1.5s cubic-bezier(.6
   font-family: var(--sans);
 }
 .start-btn::after { content: "→"; margin-left: 12px; display: inline-block; transition: transform .2s; }
-.start-btn:hover { transform: translateY(-2px); filter: brightness(1.1); }
-.start-btn:hover::after { transform: translateX(5px); }
+.start-btn:not(:disabled):hover { transform: translateY(-2px); filter: brightness(1.1); }
+.start-btn:not(:disabled):hover::after { transform: translateX(5px); }
+/* Once clicked the button is disabled while the backend switches/starts —
+   drop the pointer cursor, pulse, and hover lift so it reads as inert. */
+.start-btn:disabled {
+  cursor: default;
+  animation: none;
+  box-shadow: 0 10px 36px rgba(6,114,203,.35);
+  filter: saturate(.55) brightness(.75);
+}
+.start-btn:disabled::after { content: ""; }
 @keyframes btn-pulse {
   0%,100%{ box-shadow: 0 0 0 0 rgba(6,114,203,.55), 0 10px 36px rgba(6,114,203,.45); }
   50%{ box-shadow: 0 0 0 12px rgba(6,114,203,0), 0 12px 40px rgba(6,114,203,.55); }
