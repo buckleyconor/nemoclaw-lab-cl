@@ -44,18 +44,10 @@ const THEME = {
 
 const encoder = new TextEncoder();
 
-// Menu item 6 (services.terminal.console's MENU_TARGETS) is
-// infra-sentinel-remediate — the last of the four skills in the guided
-// persona exercise. console.py's run_target() prints this exact marker the
-// moment that push succeeds (see console.py's comment above the line), well
-// before the green-checkmark line that only appears on the next full menu
-// redraw — watching for it here is what lets the panel collapse right away.
-const REMEDIATE_PUSHED_MARKER = "(target=6)";
 // Viewport-relative with a pixel cap: on a short window (half-screen laptop,
 // stacked lab-guide layout) a fixed 420px terminal would eat most of the
 // visible dashboard. FitAddon's ResizeObserver reflows the PTY on any change.
 const FULL_HEIGHT = "min(420px, 45vh)";
-const COLLAPSED_HEIGHT = "min(210px, 25vh)";
 
 type Status = "connecting" | "connected" | "disconnected" | "ended";
 
@@ -69,13 +61,10 @@ const STATUS_META: Record<Status, { color: string; label: string }> = {
 export function TerminalPanel() {
   const [enabled, setEnabled] = useState(false);
   const [status, setStatus] = useState<Status>("connecting");
-  const [collapsed, setCollapsed] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
-  const decoderRef = useRef(new TextDecoder());
-  const outputBufferRef = useRef("");
 
   useEffect(() => {
     gateway
@@ -106,14 +95,6 @@ export function TerminalPanel() {
       } else {
         const chunk = new Uint8Array(evt.data as ArrayBuffer);
         term.write(chunk);
-        // stream: true survives multi-byte UTF-8 sequences split across frames.
-        outputBufferRef.current += decoderRef.current.decode(chunk, { stream: true });
-        if (outputBufferRef.current.includes(REMEDIATE_PUSHED_MARKER)) {
-          setCollapsed(true);
-          outputBufferRef.current = "";
-        } else if (outputBufferRef.current.length > 8192) {
-          outputBufferRef.current = outputBufferRef.current.slice(-4096);
-        }
       }
     };
     ws.onclose = () => {
@@ -182,8 +163,6 @@ export function TerminalPanel() {
     <div>
       <div className="section-heading">Agent Configuration Terminal</div>
       <section
-        onClick={() => collapsed && setCollapsed(false)}
-        title={collapsed ? "Click to expand" : undefined}
         style={{
           background: "var(--bg-card)",
           border: "1px solid var(--border)",
@@ -191,8 +170,7 @@ export function TerminalPanel() {
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
-          height: collapsed ? COLLAPSED_HEIGHT : FULL_HEIGHT,
-          cursor: collapsed ? "pointer" : "default",
+          height: FULL_HEIGHT,
           transition: "height .25s ease",
         }}
       >
