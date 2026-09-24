@@ -11,7 +11,9 @@ subprocess argv, so there is no shell-injection surface to sanitize.
 Per selection: best-effort `nemoclaw <name> download` seeds a scratch copy,
 `vim -Z` (restricted vim — no `:!`, `:sh`, suspend, or writing another file)
 edits it in place on the PTY, then `nemoclaw <name> upload` (SOUL.md/AGENTS.md)
-or `nemoclaw <name> skill install` (skills) pushes it back. All subprocess
+or `nemoclaw <name> skill install` (skills) pushes it back — plus a reset action (option 7) that
+blanks and re-pushes all six AND resets the agent's `main` session, so a
+persona reset always starts a fresh conversation too. All subprocess
 calls use literal argv lists, never `shell=True`.
 """
 
@@ -87,7 +89,7 @@ MENU_TARGETS: tuple[MenuTarget, ...] = (
 )
 
 RESET_KEY = "7"
-RESET_LABEL = "Reset all config (SOUL.md, AGENTS.md and all SKILL.md files are blanked)"
+RESET_LABEL = "Reset all config (SOUL.md, AGENTS.md, all SKILL.md files and the conversation are reset)"
 
 QUIT_KEYS = ("q", "Q")
 
@@ -286,6 +288,45 @@ def blank_content(target: MenuTarget) -> str:
     return ""
 
 
+def reset_main_session(
+    config: ConsoleConfig,
+    *,
+    run: type[subprocess.run] = subprocess.run,  # type: ignore[valid-type]
+    out=sys.stdout,
+) -> bool:
+    """Best-effort: start the agent's `main` session fresh.
+
+    Blanking the persona (SOUL.md/AGENTS.md/skills) without also resetting the
+    conversation leaves the prior scenario's context in the sandbox — the LLM
+    context window keeps growing across demos and bleeds one vertical's history
+    into the next. `nemoclaw <sandbox> sessions reset main --reason new` routes
+    through the OpenClaw gateway and clears the transcript so the next message
+    starts on a clean entry. Non-fatal: returns False on any failure without
+    raising, so a persona reset is never failed because the gateway refused the
+    session reset.
+    """
+    argv = [
+        config.nemoclaw_bin,
+        config.sandbox_name,
+        "sessions",
+        "reset",
+        "main",
+        "--reason",
+        "new",
+    ]
+    try:
+        result = run(argv, capture_output=True, text=True, check=False)
+    except Exception as exc:  # e.g. missing nemoclaw binary
+        print(f"[console] session reset skipped: {exc}", file=out)
+        return False
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip()
+        print(f"[console] session reset skipped: {detail[:200]}", file=out)
+        return False
+    print("[console] session reset — next message starts a fresh conversation.", file=out)
+    return True
+
+
 def run_reset(
     config: ConsoleConfig,
     *,
@@ -293,12 +334,13 @@ def run_reset(
     run: type[subprocess.run] = subprocess.run,  # type: ignore[valid-type]
     out=sys.stdout,
 ) -> bool:
-    """Blank every target's scratch file and push all six into the sandbox.
+    """Blank every target's scratch file and push all six into the sandbox, and
+    reset the agent's `main` session so the conversation starts fresh too.
 
     No download and no editor: the scratch copy is overwritten with
     blank_content() and pushed with the same literal-argv upload /
     skill-install calls run_target uses. Returns True iff every push
-    succeeded.
+    succeeded (the session reset is best-effort and never fails the reset).
     """
     all_ok = True
     for target in targets:
@@ -322,6 +364,7 @@ def run_reset(
             all_ok = False
         else:
             print(f"[console] blanked and pushed {name}", file=out)
+    reset_main_session(config, run=run, out=out)
     if all_ok:
         print("[console] reset complete — all config files blanked in the sandbox.", file=out)
     return all_ok
