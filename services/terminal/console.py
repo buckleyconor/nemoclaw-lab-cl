@@ -94,7 +94,7 @@ MENU_TARGETS: tuple[MenuTarget, ...] = (
 # guided setup steps, and attendees read a seventh number as "step 7 I
 # haven't done" — reset must never look like part of the walkthrough.
 RESET_KEY = "r"
-RESET_LABEL = "Reset all config (SOUL.md, AGENTS.md, all SKILL.md files and the conversation are reset)"
+RESET_LABEL = "Reset all config (SOUL.md, AGENTS.md, all SKILL.md files, and the conversation)"
 
 QUIT_KEYS = ("q", "Q")
 
