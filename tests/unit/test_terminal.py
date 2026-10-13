@@ -85,7 +85,7 @@ def test_daemon_restricted_mode_console_menu_edit_and_push_over_the_wire(
         """,
     )
     fake_editor = tmp_path / "fake-editor"
-    _write_fake_bin(fake_editor, 'echo "edited" > "$1"')
+    _write_fake_bin(fake_editor, 'echo "edited" > "${@: -1}"')
 
     monkeypatch.setenv("TERMINAL_MODE", "restricted")
     monkeypatch.setenv("SANDBOX_NAME", "nemoclaw-lab")
