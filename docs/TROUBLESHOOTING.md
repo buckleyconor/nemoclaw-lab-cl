@@ -148,6 +148,24 @@ editor restricts itself, so that part becomes your responsibility. Set the args 
 If nothing usable is installed, install vim (`sudo apt-get install -y vim`) or point
 `TERMINAL_EDITOR_BIN`/`TERMINAL_EDITOR_ARGS` at something that can run restricted.
 
+## What `demo-browser.sh` / `demo-kiosk` can and cannot be verified by
+
+Verified from a script on this host: the health gate (healthy / unreachable / red-check
+naming), that snap Firefox can read the un-hidden `$HOME` profile directory, that the
+seeded profile renders `http://localhost:8001/lab/` (Firefox's own `--screenshot` mode
+requests `/lab/` and the dashboard's `/api/pack` and exits 200), that the installed
+`~/.config/autostart/firefox.desktop` passes `desktop-file-validate`, and — from the
+2026-10-13 boot — that gnome-session does launch autostart entries on this host at all.
+
+**Not verifiable from a script:** that the window the kiosk opens is the one you see.
+Launched from an automated context, Firefox starts, initialises GTK, and never creates a
+surface or issues a request (`sessionstore.jsonlz4` is never written; the gateway sees
+nothing); forced onto X11 it fails with `cannot open display :0`, even though a plain X11
+client (`xclock`) from the same context maps a window normally. So browser presentation is
+a **human check**: run `make demo-kiosk` on the desktop itself, or reboot, and confirm.
+If an automation ever reports the kiosk "loaded", distrust it — that signal is the
+dashboard's request log, which any other open browser tab also drives.
+
 ## "The guide shows a pack-mismatch banner / wrong vertical data"
 
 The stack serves one pack at a time (`PACK_ID`, resolved at startup).
