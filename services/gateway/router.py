@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 from collections.abc import AsyncGenerator
 from datetime import UTC
 
@@ -39,6 +40,8 @@ from libs.common.models import (
 from services.gateway.store import AssetRecord
 
 router = APIRouter()
+
+logger = logging.getLogger("nemoclaw.gateway")
 
 
 def _store(request: Request):
@@ -145,8 +148,9 @@ async def lab_health() -> dict:
         # configured host. The endpoint itself is not reachable from this
         # container by design; `make doctor` covers it host-side.
         #
-        # A 4xx (e.g. 429 rate limit) is not a failure — the proxy is alive,
-        # just throttling.  We only fail on 5xx or connection errors.
+        # A 4xx is NOT assumed benign any more: 401/403/404 mean the key or the
+        # model is wrong, which is a hard failure for the agent even though the
+        # proxy process itself is up. Only 429 stays "alive but throttled".
         # If we hit a 429, wait and retry once (Kong rate limits are per-key
         # with a short sliding window; a transient 429 likely means the
         # health probe arrived during a burst from another consumer).
@@ -175,13 +179,37 @@ async def lab_health() -> dict:
                     last_ex = e
                     continue
             if r is not None:
-                is_fail = r.status_code >= 500
-                status = "fail" if is_fail else "ok"
-                detail = f"{probe} -> {r.status_code}"
-                if r.status_code == 429:
-                    detail += " (rate-limited, but proxy is alive)"
-                elif r.status_code == 200 and attempt > 1:
-                    detail += " (retried after 429)"
+                code = r.status_code
+                # Only 2xx (or a 429 that got as far as the throttle) proves the
+                # route the agent actually uses is good — i.e. something is
+                # listening, it forwards upstream, the upstream accepts this key
+                # and serves this model. `>= 500`-is-the-only-fail let a 401
+                # (key rejected) and a 404 (model name typo) both render as
+                # healthy, and that single line is why a two-day auth+model
+                # outage looked green on this dashboard the whole way through.
+                if 200 <= code < 300:
+                    status = "ok"
+                    detail = f"{probe} -> {code}"
+                    if attempt > 1:
+                        detail += " (retried after 429)"
+                elif code == 429:
+                    status = "ok"
+                    detail = f"{probe} -> 429 (rate-limited, but auth and route are good)"
+                elif code in (401, 403):
+                    status = "fail"
+                    detail = (
+                        f"{probe} -> {code} — key rejected; check LLM_API_KEY and the "
+                        "proxy's Bearer -> x-api-key rewrite (`make doctor`)"
+                    )
+                elif code == 404:
+                    status = "fail"
+                    detail = (
+                        f"{probe} -> 404 — endpoint has no such model; check LLM_MODEL in "
+                        ".env and the sandbox's openclaw.json (`make repoint-llm`)"
+                    )
+                else:
+                    status = "fail"
+                    detail = f"{probe} -> {code}"
                 add("inference-proxy", "Agent LLM route (inference proxy)",
                     status, detail)
             else:
@@ -798,7 +826,7 @@ async def _fire_agent_webhook(scenario_id: str, asset_id: str) -> None:
         return
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            await client.post(
+            r = await client.post(
                 f"{hook_url.rstrip('/')}/hooks/wake",
                 headers={"Authorization": f"Bearer {hook_token}"},
                 json={
@@ -809,8 +837,23 @@ async def _fire_agent_webhook(scenario_id: str, asset_id: str) -> None:
                     "mode": "now",
                 },
             )
-    except httpx.HTTPError:
-        pass
+        # Record the outcome. This call used to discard the response entirely,
+        # so "the hook returned ok but nothing happened" was indistinguishable
+        # from "the hook was never reached" — the whole 2026-10-13 wake-hook
+        # investigation had no data to work from. Still best-effort: a failed
+        # wake must never fail the injection that already happened.
+        logger.info(
+            "wake hook fired for %s on %s -> HTTP %s %s",
+            scenario_id, asset_id, r.status_code, r.text[:120],
+        )
+        if r.status_code >= 400:
+            logger.warning(
+                "wake hook rejected the fault event; the agent will only learn "
+                "about it on its next heartbeat poll (HEARTBEAT.md forces a "
+                "monitor_list_events, which is the safety net)",
+            )
+    except httpx.HTTPError as e:
+        logger.warning("wake hook unreachable for %s: %s", scenario_id, e)
 
 
 @router.get("/api/presenter/scenarios")
