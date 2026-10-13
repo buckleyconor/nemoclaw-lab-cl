@@ -698,7 +698,7 @@ body.started .curtain-half.right { animation: curtain-right 1.5s cubic-bezier(.6
           <li>Scroll down to the <strong>Agent Configuration Terminal</strong> panel (below the Operator Dashboard) and pick the matching menu number, 1–6</li>
           <li>The terminal opens that file in <code>vim</code>, seeded from whatever is already in the OpenShell sandbox</li>
           <li>For <code>SOUL.md</code>/<code>AGENTS.md</code> (items 1–2) the file opens empty — just right-click anywhere in the terminal and paste</li>
-          <li>For the <code>SKILL.md</code> files (items 3–6), first clear the placeholder lines: scroll to the top and press <code>dd</code> three times, then right-click and paste</li>
+          <li>For the <code>SKILL.md</code> files (items 3–6), first clear the placeholder lines: type <code>:%d</code> and press <code>Enter</code> to erase the whole file in one command, then right-click and paste</li>
           <li>Save and quit with <code>:wq</code></li>
           <li>Made a mess? <code>:q!</code> quits without saving — pick the same menu number and start over</li>
           <li>The terminal <strong>automatically uploads</strong> the file (or installs it, for skills) into the OpenShell sandbox — there is no separate upload command to run</li>
@@ -1734,7 +1734,7 @@ or re-proposing on every wake-up instead of just checking in and stopping.
       <details class="file-collapse">
         <summary><span class="file-collapse-num">3</span> Detect <code>infra-sentinel-monitor/SKILL.md</code></summary>
         <p>Phase 1 (DETECT): on each wake-up, polls the simulator's fault-event stream and, if a fault is active, hands the affected asset off to diagnosis.</p>
-        <p>Choose terminal menu item <strong>3) Edit infra-sentinel-monitor/SKILL.md</strong>. At the top of the file, press <code>dd</code> three times to delete the placeholder lines, then right-click anywhere in the terminal and paste the content below, and save and quit with <code>:wq</code>; the terminal installs it into the agent automatically.</p>
+        <p>Choose terminal menu item <strong>3) Edit infra-sentinel-monitor/SKILL.md</strong>. Type <code>:%d</code> and press <code>Enter</code> to delete the placeholder lines in one command, then right-click anywhere in the terminal and paste the content below, and save and quit with <code>:wq</code>; the terminal installs it into the agent automatically.</p>
         <div class="codeblock" data-vertical="ai-infrastructure">
           <div class="codeblock-header"><span>infra-sentinel-monitor/SKILL.md</span><button class="copy-btn" data-copy-target="skill-monitor-src">📋 Copy</button></div>
           <pre id="skill-monitor-src"><code>---
@@ -1985,7 +1985,7 @@ Or `{ "status": "no_fault" }` when nothing is active.
       <details class="file-collapse">
         <summary><span class="file-collapse-num">4</span> Diagnose <code>infra-sentinel-diagnose/SKILL.md</code></summary>
         <p>Phase 2 (DIAGNOSE): pulls the faulted asset's log bundle, extracts the error signature from it, and searches the knowledge base for a matching remediation procedure.</p>
-        <p>Choose terminal menu item <strong>4) Edit infra-sentinel-diagnose/SKILL.md</strong>. At the top of the file, press <code>dd</code> three times to delete the placeholder lines, then right-click anywhere in the terminal and paste the content below, and save and quit with <code>:wq</code>; the terminal installs it into the agent automatically.</p>
+        <p>Choose terminal menu item <strong>4) Edit infra-sentinel-diagnose/SKILL.md</strong>. Type <code>:%d</code> and press <code>Enter</code> to delete the placeholder lines in one command, then right-click anywhere in the terminal and paste the content below, and save and quit with <code>:wq</code>; the terminal installs it into the agent automatically.</p>
         <div class="codeblock" data-vertical="ai-infrastructure">
           <div class="codeblock-header"><span>infra-sentinel-diagnose/SKILL.md</span><button class="copy-btn" data-copy-target="skill-diagnose-src">📋 Copy</button></div>
           <pre id="skill-diagnose-src"><code>---
@@ -2548,7 +2548,7 @@ Proceed to `infra-sentinel-remediate` to compose the proposal.
       <details class="file-collapse">
         <summary><span class="file-collapse-num">5</span> Narrate <code>infra-sentinel-notify/SKILL.md</code></summary>
         <p>The running commentary: defines what the agent posts to the operator dashboard feed and how it's phrased, so a human can follow the investigation as it unfolds.</p>
-        <p>Choose terminal menu item <strong>5) Edit infra-sentinel-notify/SKILL.md</strong>. At the top of the file, press <code>dd</code> three times to delete the placeholder lines, then right-click anywhere in the terminal and paste the content below, and save and quit with <code>:wq</code>; the terminal installs it into the agent automatically.</p>
+        <p>Choose terminal menu item <strong>5) Edit infra-sentinel-notify/SKILL.md</strong>. Type <code>:%d</code> and press <code>Enter</code> to delete the placeholder lines in one command, then right-click anywhere in the terminal and paste the content below, and save and quit with <code>:wq</code>; the terminal installs it into the agent automatically.</p>
         <div class="codeblock" data-vertical="ai-infrastructure">
           <div class="codeblock-header"><span>infra-sentinel-notify/SKILL.md</span><button class="copy-btn" data-copy-target="skill-notify-src">📋 Copy</button></div>
           <pre id="skill-notify-src"><code>---
@@ -2889,7 +2889,7 @@ the platform, not by you — your narration ends at `present`.
       <details class="file-collapse">
         <summary><span class="file-collapse-num">6</span> Propose <code>infra-sentinel-remediate/SKILL.md</code></summary>
         <p>Phase 3 (PROPOSE): composes the remediation proposal (what's wrong, what should be done, what to expect) and stops at the approval gate. This is the agent's last action; nothing is fixed until an operator clicks Approve.</p>
-        <p>Choose terminal menu item <strong>6) Edit infra-sentinel-remediate/SKILL.md</strong>. At the top of the file, press <code>dd</code> three times to delete the placeholder lines, then right-click anywhere in the terminal and paste the content below, and save and quit with <code>:wq</code>; the terminal installs it into the agent automatically.</p>
+        <p>Choose terminal menu item <strong>6) Edit infra-sentinel-remediate/SKILL.md</strong>. Type <code>:%d</code> and press <code>Enter</code> to delete the placeholder lines in one command, then right-click anywhere in the terminal and paste the content below, and save and quit with <code>:wq</code>; the terminal installs it into the agent automatically.</p>
         <div class="codeblock" data-vertical="ai-infrastructure">
           <div class="codeblock-header"><span>infra-sentinel-remediate/SKILL.md</span><button class="copy-btn" data-copy-target="skill-remediate-src">📋 Copy</button></div>
           <pre id="skill-remediate-src"><code>---
