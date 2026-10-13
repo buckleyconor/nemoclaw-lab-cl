@@ -9,6 +9,7 @@ deployments). When unset, state lives in process memory (single-process dev mode
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 from collections.abc import AsyncGenerator
@@ -38,6 +39,23 @@ def _resolve_pack_dir(pack_dir: Path | None) -> Path:
     pack_id = os.environ.get("PACK_ID", "datacenter-xe9680")
     root = Path(__file__).parent.parent.parent
     return (root / "packs" / pack_id).resolve()
+
+
+def _reset_state_on_start(redis_url: str | None, flag: str | None) -> bool:
+    """Should startup wipe transient demo state (faults/activity/notifications)?
+
+    A demo has to open healthy. In-memory mode already does — the store is built
+    empty — so this is a no-op there. It matters for Redis, where state outlives
+    the process and a rebooted lab would otherwise come up showing the previous
+    run's fault cards and activity feed.
+
+    Default follows that: on without Redis, off with it, because a pod
+    restarting in a shared-state deployment must not clear everyone's fault
+    events. `RESET_STATE_ON_START=1`/`=0` forces either way.
+    """
+    if flag in ("0", "1"):
+        return flag == "1"
+    return not redis_url
 
 
 def create_app(
@@ -83,6 +101,13 @@ def create_app(
                     state=AssetState.healthy,
                 )
             )
+
+        # See _reset_state_on_start. Deliberately AFTER seeding, so the invariant
+        # "startup leaves the dashboard showing healthy assets and an empty
+        # feed" holds whatever the seeding order or the backend turns out to be.
+        if _reset_state_on_start(redis_url, os.environ.get("RESET_STATE_ON_START")):
+            with contextlib.suppress(Exception):
+                await store.reset()
 
         app.state.store = store
         app.state.loaded_pack = loaded

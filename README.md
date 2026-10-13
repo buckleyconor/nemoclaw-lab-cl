@@ -288,6 +288,8 @@ See [`docs/VERTICAL-PACK-GUIDE.md`](docs/VERTICAL-PACK-GUIDE.md) to create or ex
 
 The agent is real OpenClaw running in an OpenShell sandbox managed by NemoClaw. Its identity lives in `openclaw/SOUL.md`, its standing order in `openclaw/AGENTS.md` (auto-injected every session), and four skills teach the fault workflow. The agent dynamically decides which skill/tool to invoke and in what order.
 
+`openclaw/HEARTBEAT.md` is load-bearing, not incidental. The gateway's wake hook wakes the agent but the prompt it delivers is OpenClaw's generic heartbeat poll, so the agent is never *told* a fault happened — and the built-in heartbeat rule ("if nothing needs attention, reply `HEARTBEAT_OK`") otherwise wins, leaving the agent replying `HEARTBEAT_OK` with no tool call while a fault is live. HEARTBEAT.md makes `monitor_list_events` the first call of every heartbeat and names the tool sequence that follows, which is what actually populates the dashboard. It is uploaded to `/sandbox/.openclaw/workspace/HEARTBEAT.md`; recreating the sandbox loses it and the dashboard silently stops updating.
+
 | Skill | Phase | Tools |
 |-------|-------|-------|
 | `infra-sentinel-monitor` | Detect | `monitor_list_events`, `monitor_get_asset`, `monitor_list_assets` |

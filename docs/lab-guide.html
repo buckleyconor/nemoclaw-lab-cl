@@ -3822,6 +3822,14 @@ function resetDashboard() {
       if (r.ok) {
         status.style.color = "var(--healthy)";
         status.textContent = "✓ All clear — cluster reset to healthy state";
+        // The embedded dashboard clears itself on the gateway's `reset` SSE
+        // event — but only if that stream is alive. A frame left open across a
+        // gateway restart (doctor --fix, a pack switch, a reboot) can still be
+        // rendering the *previous* process's faults and activity with no live
+        // stream left to tell it they are gone, and the operator's honest read
+        // is "reset did nothing". Reload the frame so the button always shows
+        // the server's real state, whatever the stream is doing.
+        loadDash();
       } else {
         status.style.color = "var(--critical)";
         status.textContent = `Error ${r.status} — check gateway logs`;
