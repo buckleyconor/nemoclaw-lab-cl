@@ -116,6 +116,38 @@ Log: `~/.local/state/nemoclaw-terminal.log`. Also check:
   `172.28.100.0/24 → 172.17.0.1:8005` and `→ :18790` (the compose subnet is pinned in
   `docker-compose.yaml`; `make bootstrap` prints the live-detected values).
 
+## "editor not found: 'vim' is not installed on this host" in the embedded terminal
+
+The restricted console opens persona/skill files in a **restricted** editor, because
+that editor is driven from a browser tab on a host that also holds the lab's
+credentials. It now picks the first installed editor that can actually run restricted:
+
+| Binary | Restricted flag | Notes |
+|---|---|---|
+| `vim` | `-Z` | preferred |
+| `rvim` | none | the restricted vim binary itself |
+| `vi` | `-Z` | on Debian/Ubuntu `vi` is `vim.tiny` — still Vim, `-Z` means the same |
+| `nano` | `-R` | `--restricted` |
+
+No configuration is needed if any of those exist; the common Ubuntu case where only `vi`
+is installed works out of the box. Apply with `systemctl --user restart nemoclaw-terminal`.
+
+**The flags are not interchangeable, and that is a security point, not a taste one.**
+`-Z` is vim's restricted mode *and* nano's `--zap` (erase a marked region) at the same
+time. So `TERMINAL_EDITOR_BIN=nano` while leaving the old default `-Z` behind gives an
+editor that looks configured and is in fact unrestricted — `^R`/`^O` read and write any
+file the daemon's user can reach. Likewise an unrestricted `vi` offers `:!sh`, a full
+shell. The arguments therefore travel with the binary in
+`services/terminal/console.py::EDITORS` rather than being one default applied to whichever
+editor is found.
+
+If you override the binary (`TERMINAL_EDITOR_BIN=/path/to/thing`) and do not set
+`TERMINAL_EDITOR_ARGS`, **no flag is invented for it** — the code cannot know how your
+editor restricts itself, so that part becomes your responsibility. Set the args explicitly.
+
+If nothing usable is installed, install vim (`sudo apt-get install -y vim`) or point
+`TERMINAL_EDITOR_BIN`/`TERMINAL_EDITOR_ARGS` at something that can run restricted.
+
 ## "The guide shows a pack-mismatch banner / wrong vertical data"
 
 The stack serves one pack at a time (`PACK_ID`, resolved at startup).

@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import dataclasses
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -179,11 +180,56 @@ def editor_argv(editor_bin: str, editor_args: list[str], path: Path) -> list[str
     return [editor_bin, *editor_args, str(path)]
 
 
+# Editors the restricted console can drive, preferred order, each paired with the
+# flag that puts THAT editor into restricted mode.
+#
+# This is a security boundary, not a preference list. The console runs in a
+# browser tab on a host that also runs the lab's credentials, so the editor must
+# not hand out a shell (`vim :!sh`) or arbitrary file I/O (`nano ^R/^O`).
+#
+# The flag therefore travels with the binary, which is the whole point of the
+# table: these one-letter flags are not portable. `-Z` is vim's restricted mode
+# and nano's `--zap` (erase a marked region) at the same time — so a single
+# default applied to whichever editor happens to be installed would start nano
+# looking configured while it was in fact unrestricted. `vi` is listed because on
+# Debian/Ubuntu it is `vim.tiny`: still Vim, and `-Z` means the same thing there.
+EDITORS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("vim", ("-Z",)),
+    ("rvim", ()),  # the restricted vim binary — no flag needed
+    ("vi", ("-Z",)),
+    ("nano", ("-R",)),  # --restricted
+)
+
+_RESTRICTED_BY_NAME = dict(EDITORS)
+
+
+def resolve_editor(editor_bin: str, editor_args: str | None) -> tuple[str | None, tuple[str, ...]]:
+    """Choose the editor to run, and the args that make it restricted.
+
+    Explicit config always wins and is not second-guessed — but an explicit
+    binary with no explicit args still gets the flag that means *restricted* for
+    that binary, rather than vim's `-Z` inherited blindly. Returns (None, ())
+    when nothing usable is installed; that is a better answer than launching an
+    unrestricted editor because the preferred one was missing.
+    """
+    if editor_bin:
+        if editor_args is not None:
+            return editor_bin, tuple(editor_args.split())
+        return editor_bin, _RESTRICTED_BY_NAME.get(Path(editor_bin).name, ())
+    for name, args in EDITORS:
+        if shutil.which(name):
+            return name, args
+    return None, ()
+
+
 @dataclasses.dataclass(frozen=True)
 class ConsoleConfig:
     sandbox_name: str
     workspace_dir: Path
     nemoclaw_bin: str = "nemoclaw"
+    # Only the "no usable editor anywhere" fallback: chosen so the console still
+    # reports the familiar message naming a real editor instead of launching
+    # nothing. See resolve_editor() for what is actually picked normally.
     editor_bin: str = "vim"
     editor_args: tuple[str, ...] = ("-Z",)
 
@@ -233,8 +279,11 @@ def run_target(
     except FileNotFoundError:
         print(
             f"[console] editor not found: {config.editor_bin!r} is not installed on this host.\n"
-            "[console] Install vim ('sudo apt-get install -y vim'), or set TERMINAL_EDITOR_BIN\n"
-            "[console] (e.g. 'vi' or 'nano') and restart the terminal daemon.",
+            "[console] Tried:" + ", ".join(n for n, _ in EDITORS) + " — none present.\n"
+            "[console] Install one ('sudo apt-get install -y vim'), or set TERMINAL_EDITOR_BIN\n"
+            "[console] plus TERMINAL_EDITOR_ARGS to something that can run restricted\n"
+            "[console] (nano needs '-R', NOT vim's '-Z', which nano reads as --zap),\n"
+            "[console] then restart the terminal daemon.",
             file=out,
         )
         return False
@@ -431,13 +480,16 @@ def load_config() -> ConsoleConfig:
             "TERMINAL_WORKSPACE_DIR", str(Path.home() / "nemoclaw-tenants" / sandbox_name / "work")
         )
     )
-    editor_args = tuple(os.environ.get("TERMINAL_EDITOR_ARGS", "-Z").split())
+    editor_bin, editor_args = resolve_editor(
+        os.environ.get("TERMINAL_EDITOR_BIN", ""),
+        os.environ.get("TERMINAL_EDITOR_ARGS"),
+    )
     return ConsoleConfig(
         sandbox_name=sandbox_name,
         workspace_dir=workspace_dir,
         nemoclaw_bin=os.environ.get("TERMINAL_NEMOCLAW_BIN", "nemoclaw"),
-        editor_bin=os.environ.get("TERMINAL_EDITOR_BIN", "vim"),
-        editor_args=editor_args,
+        editor_bin=editor_bin or "vim",
+        editor_args=editor_args or ConsoleConfig.editor_args,
     )
 
 
