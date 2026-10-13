@@ -211,21 +211,33 @@ async def lab_health() -> dict:
                 else:
                     status = "fail"
                     detail = f"{probe} -> {code}"
-                add("inference-proxy", "Agent LLM route (inference proxy)",
-                    status, detail)
+                add("inference-proxy", "Agent LLM route (inference proxy)", status, detail)
             else:
-                add("inference-proxy", "Agent LLM route (inference proxy)", "fail",
-                    f"{probe} unreachable ({type(last_ex).__name__}) after retry — `sudo systemctl restart nginx` / `make doctor`")
+                add(
+                    "inference-proxy",
+                    "Agent LLM route (inference proxy)",
+                    "fail",
+                    f"{probe} unreachable ({type(last_ex).__name__}) after retry — "
+                    "`sudo systemctl restart nginx` / `make doctor`",
+                )
         else:
             try:
                 r = await client.get(probe, headers=headers)
-                add("inference-proxy", "Agent LLM route (inference proxy)",
+                add(
+                    "inference-proxy",
+                    "Agent LLM route (inference proxy)",
                     "skip",
                     f"{probe} -> {r.status_code} — LLM_API_KEY unset in the gateway; "
-                    "run `make doctor` on the host")
+                    "run `make doctor` on the host",
+                )
             except httpx.HTTPError as e:
-                add("inference-proxy", "Agent LLM route (inference proxy)", "fail",
-                    f"{probe} unreachable ({type(e).__name__}) — `sudo systemctl restart nginx` / `make doctor`")
+                add(
+                    "inference-proxy",
+                    "Agent LLM route (inference proxy)",
+                    "fail",
+                    f"{probe} unreachable ({type(e).__name__}) — "
+                    "`sudo systemctl restart nginx` / `make doctor`",
+                )
 
         # Wake hook — a bad token must 401: forward alive AND auth wired.
         if hook_url:
@@ -859,7 +871,10 @@ async def _fire_agent_webhook(scenario_id: str, asset_id: str) -> None:
         # wake must never fail the injection that already happened.
         logger.info(
             "agent woken for %s on %s via wake hook (message not delivered) -> HTTP %s %s",
-            scenario_id, asset_id, r.status_code, r.text[:120],
+            scenario_id,
+            asset_id,
+            r.status_code,
+            r.text[:120],
         )
         if r.status_code >= 400:
             logger.warning(
