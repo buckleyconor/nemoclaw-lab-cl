@@ -67,6 +67,35 @@ command -v uv >/dev/null || {
   exit 1
 }
 
+# Wait for the bind address to exist before handing off to uvicorn.
+#
+# The lab binds this daemon to the docker bridge IP (TERMINAL_BIND=172.17.0.1) so
+# the sandbox can reach it, and that address does not exist until docker has
+# created the bridge — which after a boot happens *after* this unit starts. Uvicorn
+# then dies with `[Errno 99] cannot assign requested address` and
+# Restart=on-failure has to resurrect a crash certain to occur on every single
+# boot (observed 10:47:39 crash, up at 10:47:42 on this host). The sibling units
+# already guard their boot dependencies in ExecStartPre; this was the last one
+# racing boot. Guarded here rather than in the unit files because the bind
+# address is only resolved here, so the user and system units both get it free.
+#
+# Loopback binds (the default when TERMINAL_BIND is unset) always exist and skip
+# the wait. If the address never appears the loop gives up and uvicorn tries
+# anyway: same outcome as today, just later, rather than a new hard exit on a
+# path that currently recovers fine.
+if command -v ip >/dev/null 2>&1 \
+  && [[ "${BIND}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] && [[ "${BIND}" != 127.0.0.1 ]]; then
+  if ! ip -o -4 addr show 2>/dev/null | grep -qF "inet ${BIND}/"; then
+    echo "Waiting for bind address ${BIND} (docker bridge not created yet)..."
+    for _ in $(seq 1 "${BIND_WAIT_TRIES:-30}"); do
+      sleep 2
+      if ip -o -4 addr show 2>/dev/null | grep -qF "inet ${BIND}/"; then
+        break
+      fi
+    done
+  fi
+fi
+
 export TERMINAL_TOKEN
 exec uv run uvicorn --factory services.terminal.main:create_app \
   --host "${BIND}" --port "${PORT}"
