@@ -284,7 +284,7 @@ def test_run_reset_blanks_every_target_and_pushes_all_six(tmp_path: Path) -> Non
     assert ok is True
     # One push per target, no downloads and no editor invocations, followed by
     # a single best-effort session reset so the conversation starts fresh too.
-    push_calls, session_calls = calls[: len(MENU_TARGETS)], calls[len(MENU_TARGETS):]
+    push_calls, session_calls = calls[: len(MENU_TARGETS)], calls[len(MENU_TARGETS) :]
     assert len(session_calls) == 1
     assert session_calls[0][:4] == ["nemoclaw", "tenant-a", "sessions", "reset"]
     assert session_calls[0][4:] == ["main", "--reason", "new"]
