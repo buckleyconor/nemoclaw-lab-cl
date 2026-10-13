@@ -181,11 +181,17 @@ open http://localhost:8001/lab/
 if the browser starts at login: `X-GNOME-Autostart-Delay` is a GNOME 2 key that
 gnome-session on Ubuntu 24.04 ignores, so a delayed autostart entry opens the
 browser mid-boot — and the dashboard does not retry a page that loaded before
-the stack was up. `make install-demo-autostart` installs a health-gated entry
+the stack was up. Each mode runs its **own** Firefox instance and profile: on
+this host, handing a URL to an already-running snap Firefox from the command
+line is silently inert (it starts a scope, exits, and no request ever reaches
+the gateway), and a separate profile also keeps yesterday's restored tabs off
+the demo. Doing so does not disturb a Firefox window you already have open.
+`make install-demo-autostart` installs a health-gated entry
 from `deploy/desktop/lab-browser-autostart.desktop`; it boots in `qa` mode
 (chrome + devtools), and the file says which word to change to boot straight
-into the kiosk. `make demo-kiosk-stop` closes a kiosk window, which hides the
-usual exit affordances.
+into the kiosk. `make demo-kiosk-stop` closes a window this script opened —
+kiosk mode hides the usual exit affordances — and never touches your own
+Firefox.
 
 `make doctor` re-runs just the preflight — a red/green check of every moving
 part (4 services, terminal daemon, hook-relay, sandbox wake-hook, LLM
