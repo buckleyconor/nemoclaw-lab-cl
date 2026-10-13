@@ -83,11 +83,35 @@ LLM_DIRECT="$(env_get LLM_DIRECT)"
 # Fail here rather than 10 minutes later inside `nemoclaw onboard`, which bakes
 # this endpoint into the sandbox image. Authed probe: a bare one would pass on
 # any HTTP noise (or 401 on a real-auth endpoint) and hide a bad key.
+#
+# Both auth schemes are probed, because upstreams genuinely differ and neither is
+# misconfigured: OpenAI-native ones read `Authorization: Bearer`, Kong-style
+# gateways read ONLY `x-api-key` and ignore a Bearer header outright. Probing
+# Bearer alone made a correct x-api-key host look like a rejected key, on the
+# very first run, before anything else exists to diagnose against — the worst
+# possible place for a false red (doctor.sh §7 met this first and describes the
+# same trap).
+#
+# Auto-detected, deliberately NOT an LLM_AUTH_TYPE setting: a knob nobody
+# documented is a knob that gets set wrong, and a wrong value aborts bootstrap
+# before there is a lab to check it against.
+LLM_AUTH=(-H "Authorization: Bearer ${LLM_API_KEY}")
+LLM_SCHEME="Authorization: Bearer"
 LLM_CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
-  -H "Authorization: Bearer ${LLM_API_KEY}" "${LLM_BASE_URL%/}/models" || true)"
+  "${LLM_AUTH[@]}" "${LLM_BASE_URL%/}/models" || true)"
+if [[ "$LLM_CODE" != "200" ]]; then
+  ALT_CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
+    -H "x-api-key: ${LLM_API_KEY}" "${LLM_BASE_URL%/}/models" || true)"
+  if [[ "$ALT_CODE" == "200" ]]; then
+    LLM_CODE=200
+    LLM_SCHEME="x-api-key"
+    LLM_AUTH=(-H "x-api-key: ${LLM_API_KEY}")
+    echo "  ✓ LLM endpoint reads x-api-key (not Authorization: Bearer) — noted, nothing to change"
+  fi
+fi
 case "$LLM_CODE" in
   200) : ;;
-  401|403) die "LLM endpoint rejected the key (HTTP ${LLM_CODE} from ${LLM_BASE_URL%/}/models). Check LLM_API_KEY in .env." ;;
+  401|403) die "LLM endpoint rejected the key (HTTP ${LLM_CODE} from ${LLM_BASE_URL%/}/models, tried both Authorization: Bearer and x-api-key). Check LLM_API_KEY in .env." ;;
   *) die "LLM endpoint ${LLM_BASE_URL%/}/models is not answering (got '${LLM_CODE:-nothing}'). Fix it before onboarding —
     the endpoint is baked into the sandbox at onboard time, not read at runtime." ;;
 esac
@@ -97,6 +121,9 @@ esac
 # fresh host it never is — so bring it up rather than sending the operator away
 # and making them re-run the whole script (same offer-once posture demo-up.sh
 # uses for the self-heal install).
+# Bearer here on purpose, whatever the upstream turned out to read: the proxy's
+# client-facing contract is Bearer and it rewrites to the upstream scheme, which
+# is what services/gateway/router.py lab_health() probes too.
 proxy_code() {
   curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
     -H "Authorization: Bearer ${LLM_API_KEY}" \
