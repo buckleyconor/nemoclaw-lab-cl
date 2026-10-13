@@ -9,6 +9,7 @@ deployments). When unset, state lives in process memory (single-process dev mode
 
 from __future__ import annotations
 
+import logging
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -147,3 +148,17 @@ def create_app(
 
 # Module-level app for uvicorn.
 app = create_app()
+
+# App-level logging. uvicorn configures only its own `uvicorn.*` loggers, so a
+# plain getLogger("nemoclaw.gateway") inherits root's WARNING level and every
+# INFO line it emits is silently dropped — the gateway log looked healthy and
+# empty during the wake-hook incident precisely because there was nothing to
+# show. Scoped to the `nemoclaw` namespace with its own handler so third-party
+# INFO noise stays out; propagate=False keeps warnings from printing twice.
+_nemoclaw_log = logging.getLogger("nemoclaw")
+if not _nemoclaw_log.handlers:
+    _log_handler = logging.StreamHandler()
+    _log_handler.setFormatter(logging.Formatter("%(levelname)-8s %(name)s: %(message)s"))
+    _nemoclaw_log.addHandler(_log_handler)
+_nemoclaw_log.setLevel(logging.INFO)
+_nemoclaw_log.propagate = False

@@ -486,13 +486,32 @@ else
 fi
 
 # ── 7. LLM endpoint (authed — the shared lab endpoint 401s bare probes) ──────
+# Probe BOTH auth schemes before calling the key bad. Upstreams disagree on
+# which header they read: OpenAI-native ones read `Authorization: Bearer`,
+# Kong-style gateways read ONLY `x-api-key` and silently ignore a Bearer header,
+# so they 401 a perfectly good key. Probing with Bearer alone made every
+# correctly-configured host of that second class a permanent false red — and
+# sent the reader hunting for a bad key while the real fault was elsewhere.
+# The agent's actual route is the proxy in §8, which rewrites Bearer ->
+# x-api-key, so a raw-upstream 401 here says nothing about agent calls.
 LLM_AUTH=()
 [[ -n "$LLM_API_KEY" ]] && LLM_AUTH=(-H "Authorization: Bearer ${LLM_API_KEY}")
 if [[ -n "$LLM_BASE_URL" ]]; then
   LLM_CODE="$(http_code "${LLM_AUTH[@]}" "${LLM_BASE_URL%/}/models")"
+  LLM_SCHEME="Bearer"
+  if [[ "$LLM_CODE" != "200" && -n "$LLM_API_KEY" ]]; then
+    HDR_CODE="$(http_code -H "x-api-key: ${LLM_API_KEY}" "${LLM_BASE_URL%/}/models")"
+    if [[ "$HDR_CODE" == "200" ]]; then LLM_CODE=200; LLM_SCHEME="x-api-key"; fi
+  fi
   case "$LLM_CODE" in
-    200) pass "LLM endpoint" "$LLM_BASE_URL" ;;
-    401|403) fail "LLM endpoint" "key rejected (HTTP ${LLM_CODE})" \
+    # A pass via x-api-key is not a defect, but name it: it is the reason a
+    # bare Bearer probe here would otherwise contradict §8.
+    200) if [[ "$LLM_SCHEME" == "Bearer" ]]; then
+           pass "LLM endpoint" "$LLM_BASE_URL"
+         else
+           pass "LLM endpoint" "$LLM_BASE_URL (reads x-api-key only; proxy rewrites Bearer)"
+         fi ;;
+    401|403) fail "LLM endpoint" "key rejected (HTTP ${LLM_CODE}, Bearer and x-api-key both)" \
       "check LLM_API_KEY in .env against the endpoint's real key" ;;
     *) fail "LLM endpoint" "no response from ${LLM_BASE_URL%/}/models" \
       "check the endpoint host is up and LLM_BASE_URL in .env is right" ;;
