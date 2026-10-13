@@ -122,8 +122,12 @@ PREFS
   log "created profile ${dir}"
 }
 
-install_autostart() {
-  local template="$REPO/deploy/desktop/lab-browser-autostart.desktop" out
+install_autostart() { # $1 = mode to boot into: qa (default) | kiosk
+  local mode="${1:-qa}" template="$REPO/deploy/desktop/lab-browser-autostart.desktop" out
+  case "$mode" in
+    qa|kiosk) ;;
+    *) echo "✗ boot mode must be qa or kiosk (got '${mode}')" >&2; return 2 ;;
+  esac
   [[ -f "$template" ]] || { echo "✗ missing template $template" >&2; return 1; }
   mkdir -p "$HOME/.config/autostart"
   if [[ -f "$AUTOSTART" && ! -s "$AUTOSTART" ]]; then rm -f "$AUTOSTART"; fi
@@ -132,10 +136,11 @@ install_autostart() {
     cp -a "$AUTOSTART" "$out"
     log "kept the existing entry at $out"
   fi
-  sed "s|__NEMOCLAW_REPO__|$REPO|g" "$template" > "$AUTOSTART"
+  sed -e "s|__NEMOCLAW_REPO__|$REPO|g" -e "s|__NEMOCLAW_BROWSER_MODE__|$mode|g" "$template" > "$AUTOSTART"
   command -v desktop-file-validate >/dev/null && desktop-file-validate "$AUTOSTART" \
     && log "validated"
-  log "installed $AUTOSTART (mode: qa — see the file to make kiosk the boot default)"
+  log "installed $AUTOSTART — boots into ${mode} mode"
+  log "(change it with: make install-demo-autostart BOOT_MODE=qa|kiosk, not by hand)"
 }
 
 case "${1:-qa}" in
@@ -152,7 +157,7 @@ case "${1:-qa}" in
     done
     (( stopped )) || log "no lab browser running"
     ;;
-  --install-autostart) install_autostart ;;
+  --install-autostart) install_autostart "${2:-qa}" ;;
   qa)
     wait_for_lab
     seed_profile "$QA_PROFILE"
@@ -163,7 +168,11 @@ case "${1:-qa}" in
   kiosk)
     wait_for_lab
     seed_profile "$KIOSK_PROFILE"
-    args=(-no-remote -profile "$KIOSK_PROFILE" --kiosk "$DASHBOARD_URL")
+    # --kiosk leading, URL trailing the -profile argument (the documented form).
+    # NOTE: whether the launched window actually appears has NOT been verified
+    # from an automated context — see docs/TROUBLESHOOTING.md; the check is a human
+    # one (`make demo-kiosk` on the desktop, or a reboot).
+    args=(--kiosk -no-remote -profile "$KIOSK_PROFILE" "$DASHBOARD_URL")
     [[ -n "$KIOSK_MONITOR" ]] && args+=(--kiosk-monitor "$KIOSK_MONITOR")
     # exec, not a child: `make demo-kiosk` in a terminal then ends the browser
     # when the terminal does, and Ctrl-C reaches Firefox rather than a shell.

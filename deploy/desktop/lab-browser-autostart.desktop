@@ -8,13 +8,16 @@
 # retry). demo-browser.sh waits on /api/lab-health instead, which is the thing
 # the delay was standing in for.
 #
-# Boot mode stays `qa`: a kiosk window strips chrome and blocks devtools, which
-# is right for presenting and useless for testing. To make the demo machine boot
-# straight into the presentation, change the trailing word to `kiosk`.
+# Boot mode is substituted by the installer: `make install-demo-autostart` for a QA box
+# (chrome + devtools), `make install-demo-autostart BOOT_MODE=kiosk` for a machine that
+# should boot straight into the presentation. Edit __NEMOCLAW_BROWSER_MODE__ by hand in
+# ~/.config/autostart/firefox.desktop and it works — but the repo no longer describes the
+# host, which is the trap this layout hit twice on 2026-10-13 (the terminal unit, and the
+# delay above). Re-run the installer instead.
 [Desktop Entry]
 Type=Application
 Name=NemoClaw lab dashboard
 Comment=Opens the lab dashboard once the lab reports healthy
-Exec=__NEMOCLAW_REPO__/deploy/scripts/demo-browser.sh qa
+Exec=__NEMOCLAW_REPO__/deploy/scripts/demo-browser.sh __NEMOCLAW_BROWSER_MODE__
 Terminal=false
 X-GNOME-Autostart-enabled=true

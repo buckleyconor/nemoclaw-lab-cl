@@ -167,9 +167,11 @@ demo-kiosk-stop:
 
 # Writes ~/.config/autostart/firefox.desktop from
 # deploy/desktop/lab-browser-autostart.desktop (backing up any hand-made entry).
-# Boots in qa mode; edit the file's trailing word to `kiosk` to boot presenting.
+# Boots in qa mode (chrome + devtools); BOOT_MODE=kiosk boots straight into the
+# presentation. Set it here rather than editing the installed file, so the repo
+# still describes the host.
 install-demo-autostart:
-	./deploy/scripts/demo-browser.sh --install-autostart
+	./deploy/scripts/demo-browser.sh --install-autostart "$(BOOT_MODE)"
 
 # Red/green preflight of every demo dependency, with the fix for anything down.
 doctor:
