@@ -43,7 +43,7 @@ help:
 	@echo "  demo-browser   Open the dashboard once /api/lab-health is green (window with devtools)"
 	@echo "  demo-kiosk     Same, but fullscreen and chromeless — for presenting, not testing"
 	@echo "  demo-kiosk-stop  Close the kiosk window (kiosk mode hides the usual exit affordances)"
-	@echo "  install-demo-autostart  Boot-time browser launch, health-gated (replaces the ignored delay)"
+	@echo "  install-demo-autostart  Boot-time browser launch (BOOT_MODE=qa|kiosk), health-gated"
 	@echo "  doctor         Preflight: red/green check of all demo dependencies with fixes"
 	@echo "  doctor-fix     Preflight + apply the fixes automatically (what the self-heal timer runs)"
 	@echo "  repoint-llm    Repoint the live agent at the LLM_* values in .env — no rebuild (ADR-014)"
