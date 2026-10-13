@@ -11,6 +11,9 @@
 #   5. Locks down OpenClaw built-in tools and enables the webhook wake-up
 #   6. Writes OPENCLAW_HOOK_URL / OPENCLAW_HOOK_TOKEN into .env, resolving the
 #      real webhook port from the sandbox config (it self-reassigns off 18789)
+#   7. Pins the sandbox container's restart policy to `always` — OpenShell's own
+#      default is `unless-stopped`, which does not come back after a reboot if
+#      the container was last stopped administratively
 #
 # Requirements: nemoclaw CLI on a SUPPORTED host (Linux x86_64/aarch64 or
 # Apple Silicon macOS — Intel macOS is unsupported by OpenShell), Docker,
@@ -327,6 +330,38 @@ if nemoclaw "$SANDBOX_NAME" download /sandbox/.openclaw/openclaw.json "$OC_JSON"
     "$OC_JSON" 2>/dev/null || true)"
 fi
 rm -f "$OC_JSON"
+
+# ── 7. Pin the sandbox container's restart policy ─────────────────────────
+# The Compose lab services declare `restart: always`. The sandbox is not a
+# Compose service: OpenShell creates it as `unless-stopped`, which is identical
+# to `always` except at daemon start, where it refuses to start a container whose
+# last stop was administrative (see the compose file header). A sandbox stopped
+# before a shutdown therefore stays down after the reboot — and unlike a lab
+# service there is nothing to recover it, because the agent, its persona and its
+# session all live inside that one container.
+#
+# Re-applied on every run, deliberately: OpenShell chooses its own policy
+# whenever it recreates the sandbox, so anything set once is silently dropped by
+# the next recreate. `docker update` rewrites HostConfig without restarting, so
+# an already-onboarded and configured sandbox is not disturbed. Best-effort: a
+# failure warns, it must never fail an otherwise-good onboarding.
+SB_CONTAINER=""
+if command -v docker >/dev/null 2>&1; then
+  # `|| true` is load-bearing: this script runs under `set -euo pipefail`, and a
+  # no-match grep exits 1, which would abort the whole onboarding right here —
+  # i.e. the failure path would kill the script instead of warning on it.
+  SB_CONTAINER="$(docker ps -a --format '{{.Names}}' 2>/dev/null \
+    | { grep -E "^openshell-.*--${SANDBOX_NAME}-" || true; } | head -1)"
+  if [[ -z "$SB_CONTAINER" ]]; then
+    echo "  ! sandbox container not found — could not pin its restart policy"
+    echo "    fix: docker update --restart=always <openshell-...--${SANDBOX_NAME}-...>"
+  elif docker update --restart=always "$SB_CONTAINER" >/dev/null 2>&1; then
+    echo "Sandbox restart:  always  (${SB_CONTAINER})"
+  else
+    echo "  ! could not set restart=always on $SB_CONTAINER"
+    echo "    risk: if it is stopped before a shutdown it stays down after the reboot"
+  fi
+fi
 
 echo
 echo "── Onboarding complete ─────────────────────────────────────────────"
