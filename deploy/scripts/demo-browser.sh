@@ -26,6 +26,16 @@
 # The profile lives under $HOME un-hidden on purpose: snap Firefox's `home`
 # interface does not expose dotfiles, so ~/.config/... is unreadable to it.
 #
+# QA mode gets the same treatment, for a different reason. On this host, handing
+# a URL to an already-running snap Firefox from the CLI does nothing at all:
+# `--new-window URL` and a bare `URL` both start a scope, burn a few seconds of
+# CPU, exit, and the gateway never sees a single request for /lab/ (measured —
+# hit count unchanged across three attempts). Silent no-ops are the worst
+# possible failure for a demo launcher, so both modes always start their own
+# instance instead of relying on snap's cross-scope remote handoff. Verified
+# separately: doing this does NOT disturb an existing Firefox window — a normal
+# instance was left running through a kiosk start and stop and survived.
+#
 # Kiosk is deliberately NOT the default: it strips chrome and blocks devtools,
 # which is right for presenting and wrong for testing.
 set -euo pipefail
@@ -41,6 +51,7 @@ DASHBOARD_URL="${DASHBOARD_URL:-http://localhost:${GATEWAY_PORT}/lab/}"
 HEALTH_URL="http://localhost:${GATEWAY_PORT}/api/lab-health"
 WAIT_MAX="${DEMO_BROWSER_WAIT:-90}"
 KIOSK_PROFILE="${KIOSK_PROFILE:-$HOME/nemoclaw-kiosk-profile}"
+QA_PROFILE="${QA_PROFILE:-$HOME/nemoclaw-qa-profile}"
 KIOSK_MONITOR="${DEMO_KIOSK_MONITOR:-}"
 AUTOSTART="$HOME/.config/autostart/firefox.desktop"
 
@@ -83,11 +94,12 @@ wait_for_lab() {
   return 0
 }
 
-# ── kiosk profile, seeded so the first thing on screen is the dashboard ──────
-seed_kiosk_profile() {
-  [[ -f "$KIOSK_PROFILE/prefs.js" ]] && return 0
-  mkdir -p "$KIOSK_PROFILE"
-  cat > "$KIOSK_PROFILE/prefs.js" <<PREFS
+# ── profile, seeded so the first thing on screen is the dashboard ────────────
+seed_profile() {
+  local dir="$1"
+  [[ -f "$dir/prefs.js" ]] && return 0
+  mkdir -p "$dir"
+  cat > "$dir/prefs.js" <<PREFS
 user_pref("browser.aboutwelcome.enabled", false);
 user_pref("startup.homepage_welcome_url", "");
 user_pref("startup.homepage_welcome_url.additional", "");
@@ -107,7 +119,7 @@ user_pref("browser.urlbar.quicksuggest.enabled", false);
 user_pref("extensions.getAddons.showPane", false);
 user_pref("browser.migrate.ignoreShortcuts.enabled", true);
 PREFS
-  log "created kiosk profile ${KIOSK_PROFILE}"
+  log "created profile ${dir}"
 }
 
 install_autostart() {
@@ -129,23 +141,29 @@ install_autostart() {
 case "${1:-qa}" in
   --stop)
     # Kiosk mode swallows the usual exit affordances, so stopping is by profile.
-    if pkill -f -- "-profile $KIOSK_PROFILE" 2>/dev/null; then
-      log "closed the kiosk browser"
-    else
-      log "no kiosk browser running"
-    fi
+    # These patterns can only ever match the two profiles this script creates —
+    # never the operator's own Firefox, which carries no -profile argument.
+    stopped=0
+    for p in "$KIOSK_PROFILE" "$QA_PROFILE"; do
+      if pkill -f -- "-profile $p" 2>/dev/null; then
+        log "closed the browser using ${p}"
+        stopped=1
+      fi
+    done
+    (( stopped )) || log "no lab browser running"
     ;;
   --install-autostart) install_autostart ;;
   qa)
     wait_for_lab
-    # Attach to the operator's own Firefox when one is open: QA needs bookmarks
-    # and devtools, which the kiosk profile deliberately does not carry.
-    exec /bin/firefox --new-window "$DASHBOARD_URL"
+    seed_profile "$QA_PROFILE"
+    # Own instance, not the operator's: see the header on why CLI handoff to a
+    # running snap Firefox is not an option here.
+    exec /bin/firefox -no-remote -profile "$QA_PROFILE" "$DASHBOARD_URL"
     ;;
   kiosk)
     wait_for_lab
-    seed_kiosk_profile
-    args=(--kiosk -no-remote -profile "$KIOSK_PROFILE" "$DASHBOARD_URL")
+    seed_profile "$KIOSK_PROFILE"
+    args=(-no-remote -profile "$KIOSK_PROFILE" --kiosk "$DASHBOARD_URL")
     [[ -n "$KIOSK_MONITOR" ]] && args+=(--kiosk-monitor "$KIOSK_MONITOR")
     # exec, not a child: `make demo-kiosk` in a terminal then ends the browser
     # when the terminal does, and Ctrl-C reaches Firefox rather than a shell.
