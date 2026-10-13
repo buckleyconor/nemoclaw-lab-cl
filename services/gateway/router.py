@@ -38,6 +38,7 @@ from libs.common.models import (
     ScenarioImpact,
 )
 from services.gateway.store import AssetRecord
+from services.gateway.terminal import wake_agent as _wake_agent_via_terminal
 
 router = APIRouter()
 
@@ -811,14 +812,28 @@ async def events_stream(request: Request) -> StreamingResponse:
 
 
 async def _fire_agent_webhook(scenario_id: str, asset_id: str) -> None:
-    """Wake the OpenClaw agent the instant a scenario is injected (ADR-011).
+    """Tell the agent a scenario was injected, the instant it happens (ADR-011).
 
-    Event-driven replacement for the retired agent's fixed-interval poll; a
-    cron job on the agent side remains as the safety net. Best-effort: an
-    unreachable agent must never fail scenario injection. No-op unless
-    OPENCLAW_HOOK_URL and OPENCLAW_HOOK_TOKEN are configured.
+    Two channels, best one first:
+
+      1. the terminal daemon's /wake-agent, which runs `nemoclaw <sandbox> agent
+         -m …` on the host and hands the agent the actual fault message;
+      2. `/hooks/wake`, which OpenClaw defines as "run the heartbeat now" and
+         which therefore carries no prompt at all — the agent has to rediscover
+         the fault via monitor_list_events, a path that depends on HEARTBEAT.md
+         keeping it compliant. Retained as the fallback for hosts with no
+         terminal daemon: shell mode, TERMINAL_ENABLED=0, or the M9 layout where
+         it is deliberately off.
+
+    Event-driven replacement for the retired agent's fixed-interval poll; the
+    agent's heartbeat remains the safety net. Best-effort throughout — an
+    unreachable agent must never fail an injection that already happened.
     """
     import os
+
+    if scenario_id and asset_id and await _wake_agent_via_terminal(scenario_id, asset_id):
+        logger.info("agent told about %s on %s via terminal daemon", scenario_id, asset_id)
+        return
 
     hook_url = os.environ.get("OPENCLAW_HOOK_URL")
     hook_token = os.environ.get("OPENCLAW_HOOK_TOKEN")
@@ -843,7 +858,7 @@ async def _fire_agent_webhook(scenario_id: str, asset_id: str) -> None:
         # investigation had no data to work from. Still best-effort: a failed
         # wake must never fail the injection that already happened.
         logger.info(
-            "wake hook fired for %s on %s -> HTTP %s %s",
+            "agent woken for %s on %s via wake hook (message not delivered) -> HTTP %s %s",
             scenario_id, asset_id, r.status_code, r.text[:120],
         )
         if r.status_code >= 400:

@@ -21,6 +21,9 @@ Endpoints:
                                      fault-injection gate calls this before
                                      POSTing /api/presenter/inject
 
+Also exports `wake_agent()` — not a route, a helper the presenter inject path
+calls to reach the daemon's /wake-agent (see services/terminal/main.py).
+
 Fail-safe: enabled only when TERMINAL_WS_URL and TERMINAL_TOKEN are both set
 and TERMINAL_ENABLED != "0". The M9 shared deployment MUST keep this off.
 """
@@ -59,6 +62,38 @@ def _daemon_http_url(ws_url: str, path: str) -> str:
     if http_url.endswith("/ws"):
         http_url = http_url[: -len("/ws")]
     return f"{http_url}/{path.lstrip('/')}"
+
+
+async def wake_agent(scenario_id: str, asset_id: str) -> bool:
+    """Proxy the fault to the daemon's /wake-agent, which runs a real agent turn.
+
+    A module function rather than a route: nothing in the browser needs it, and
+    keeping it off the public surface means the message the agent receives is
+    always composed here from ids the Gateway already trusts (the daemon
+    re-validates them) instead of being supplied by a caller.
+
+    True only when the daemon confirmed it started the turn. Everything else —
+    terminal disabled, daemon unreachable, a 404 from a daemon older than this
+    endpoint, an auth refusal — is False, so the caller falls back to
+    /hooks/wake, which still works; it just cannot say what happened.
+    """
+    url, token, enabled = _config()
+    if not enabled:
+        return False
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.post(
+                _daemon_http_url(url, "wake-agent"),
+                headers={"Authorization": f"Bearer {token}"},
+                json={"scenario_id": scenario_id, "asset_id": asset_id},
+            )
+    except httpx.HTTPError:
+        return False
+    if resp.status_code >= 400:
+        return False
+    with contextlib.suppress(ValueError):
+        return bool(resp.json().get("ok"))
+    return False
 
 
 @terminal_router.post("/api/terminal/reset")
