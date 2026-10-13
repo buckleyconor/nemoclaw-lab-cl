@@ -172,8 +172,20 @@ Once onboarded, this is all you need:
 
 ```bash
 make demo-up                  # compose stack + terminal daemon + hook-relay, then preflight
+make demo-kiosk               # fullscreen, chromeless dashboard — once the lab is green
 open http://localhost:8001/lab/
 ```
+
+`make demo-browser` / `make demo-kiosk` open the dashboard only once
+`/api/lab-health` reports healthy, rather than after a fixed delay. That matters
+if the browser starts at login: `X-GNOME-Autostart-Delay` is a GNOME 2 key that
+gnome-session on Ubuntu 24.04 ignores, so a delayed autostart entry opens the
+browser mid-boot — and the dashboard does not retry a page that loaded before
+the stack was up. `make install-demo-autostart` installs a health-gated entry
+from `deploy/desktop/lab-browser-autostart.desktop`; it boots in `qa` mode
+(chrome + devtools), and the file says which word to change to boot straight
+into the kiosk. `make demo-kiosk-stop` closes a kiosk window, which hides the
+usual exit affordances.
 
 `make doctor` re-runs just the preflight — a red/green check of every moving
 part (4 services, terminal daemon, hook-relay, sandbox wake-hook, LLM

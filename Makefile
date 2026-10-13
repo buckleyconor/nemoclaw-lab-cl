@@ -34,12 +34,16 @@ VALUES      ?=               # optional extra helm values file, e.g. values.prod
 BACKEND_IMAGE := $(REGISTRY)/nemoclaw-backend:$(TAG)
 GATEWAY_IMAGE := $(REGISTRY)/nemoclaw-gateway:$(TAG)
 
-.PHONY: help build push push-multiarch deploy undeploy up down logs switch-pack terminal hook-relay bootstrap demo-up doctor doctor-fix repoint-llm install-inference-watchdog install-selfheal test lint
+.PHONY: help build push push-multiarch deploy undeploy up down logs switch-pack terminal hook-relay bootstrap demo-up demo-browser demo-kiosk demo-kiosk-stop install-demo-autostart doctor doctor-fix repoint-llm install-inference-watchdog install-selfheal test lint
 
 help:
 	@echo "Targets:"
 	@echo "  bootstrap      FIRST RUN on a fresh host: preflight + build + onboard, then demo-up"
 	@echo "  demo-up        Bring up EVERYTHING the demo needs (stack + host daemons), then doctor"
+	@echo "  demo-browser   Open the dashboard once /api/lab-health is green (window with devtools)"
+	@echo "  demo-kiosk     Same, but fullscreen and chromeless — for presenting, not testing"
+	@echo "  demo-kiosk-stop  Close the kiosk window (kiosk mode hides the usual exit affordances)"
+	@echo "  install-demo-autostart  Boot-time browser launch, health-gated (replaces the ignored delay)"
 	@echo "  doctor         Preflight: red/green check of all demo dependencies with fixes"
 	@echo "  doctor-fix     Preflight + apply the fixes automatically (what the self-heal timer runs)"
 	@echo "  repoint-llm    Repoint the live agent at the LLM_* values in .env — no rebuild (ADR-014)"
@@ -145,6 +149,27 @@ bootstrap:
 # (started in the background if not already running), then the doctor preflight.
 demo-up:
 	./deploy/scripts/demo-up.sh
+
+# Open the dashboard only when the lab actually reports healthy. Exists because
+# the autostart X-GNOME-Autostart-Delay key is ignored by gnome-session on
+# Ubuntu 24.04, so a boot-time browser lands mid-boot and sits on a dead
+# dashboard (which does not retry).
+demo-browser:
+	./deploy/scripts/demo-browser.sh qa
+
+# Fullscreen, chromeless, own Firefox profile so yesterday's tabs cannot restore
+# over the demo. Blocks devtools on purpose — use demo-browser while testing.
+demo-kiosk:
+	./deploy/scripts/demo-browser.sh kiosk
+
+demo-kiosk-stop:
+	./deploy/scripts/demo-browser.sh --stop
+
+# Writes ~/.config/autostart/firefox.desktop from
+# deploy/desktop/lab-browser-autostart.desktop (backing up any hand-made entry).
+# Boots in qa mode; edit the file's trailing word to `kiosk` to boot presenting.
+install-demo-autostart:
+	./deploy/scripts/demo-browser.sh --install-autostart
 
 # Red/green preflight of every demo dependency, with the fix for anything down.
 doctor:

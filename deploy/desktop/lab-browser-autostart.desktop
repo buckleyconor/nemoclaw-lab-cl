@@ -1,0 +1,20 @@
+# Installed by: deploy/scripts/demo-browser.sh --install-autostart
+#   → ~/.config/autostart/firefox.desktop
+#
+# Do NOT add X-GNOME-Autostart-Delay back. It is a GNOME 2 key that
+# gnome-session on Ubuntu 24.04 ignores — measured 2026-10-13: session up at
+# 10:47:33, browser started at 10:47:40 with `Delay=120` set, so the wait never
+# happened and the dashboard loaded mid-boot and sat on a dead page (it does not
+# retry). demo-browser.sh waits on /api/lab-health instead, which is the thing
+# the delay was standing in for.
+#
+# Boot mode stays `qa`: a kiosk window strips chrome and blocks devtools, which
+# is right for presenting and useless for testing. To make the demo machine boot
+# straight into the presentation, change the trailing word to `kiosk`.
+[Desktop Entry]
+Type=Application
+Name=NemoClaw lab dashboard
+Comment=Opens the lab dashboard once the lab reports healthy
+Exec=__NEMOCLAW_REPO__/deploy/scripts/demo-browser.sh qa
+Terminal=false
+X-GNOME-Autostart-enabled=true
