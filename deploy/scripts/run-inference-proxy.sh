@@ -14,6 +14,10 @@
 #
 # Environment (env wins over .env):
 #   LLM_BASE_URL     (required) the real OpenAI-compatible endpoint, incl. path
+#   LLM_API_KEY      the endpoint's key. Used two ways: to authenticate the
+#                    smoke test, and — rendered into the conf — to rewrite the
+#                    sandbox's `Authorization: Bearer` into an `x-api-key` for
+#                    gateways that authenticate only on that header.
 #   LLM_PROXY_PORT   host port the sandbox reaches the LLM on  (default 18100)
 #   LLM_CA           path to the CA bundle for the endpoint's TLS cert;
 #                    unset = proxy_ssl_verify off (demo posture, warned)
@@ -65,7 +69,7 @@ fi
 # Set BRIDGE_IP=<ip> to bind a single interface instead.
 BRIDGE_IP="${BRIDGE_IP:-0.0.0.0}"
 
-export LLM_BASE_URL LLM_PROXY_PORT BRIDGE_IP PROXY_SSL_CONF
+export LLM_BASE_URL LLM_PROXY_PORT BRIDGE_IP PROXY_SSL_CONF LLM_API_KEY
 
 TEMPLATE="deploy/proxy/nemoclaw-inference-proxy.conf.template"
 CONF="/etc/nginx/conf.d/nemoclaw-inference-proxy-${LLM_PROXY_PORT}.conf"
@@ -73,12 +77,29 @@ RENDERED="$(mktemp)"
 trap 'rm -f "$RENDERED"' EXIT
 
 # Restrict envsubst to our variables so nginx's own $vars survive untouched.
+# LLM_API_KEY is substituted for the conditional Bearer -> x-api-key rewrite the
+# template documents; that makes the rendered conf secret-bearing, hence the
+# 0600 install below (nginx's master reads it as root, so workers never need it).
 # shellcheck disable=SC2016  # literal on purpose: this is envsubst's
 # allowlist of names to substitute, not a string to expand here.
-envsubst '${LLM_BASE_URL} ${LLM_PROXY_PORT} ${BRIDGE_IP} ${PROXY_SSL_CONF}' \
+envsubst '${LLM_BASE_URL} ${LLM_PROXY_PORT} ${BRIDGE_IP} ${PROXY_SSL_CONF} ${LLM_API_KEY}' \
   < "$TEMPLATE" > "$RENDERED"
 
-if [[ -r "$CONF" ]] && cmp -s "$RENDERED" "$CONF"; then
+# The conf carries LLM_API_KEY, so it is 0600 root — which means this script,
+# running as the operator, can no longer read it back to decide whether anything
+# changed. Comparing against the installed file directly therefore degraded into
+# "always reinstall", and every no-op run of `make repoint-llm` began demanding
+# sudo. Compare against a checksum of what this script last installed instead.
+# Safe to expose (it is a digest, not the key) and safe to trust: the listener
+# probe and the authenticated smoke test below still verify the LIVE behaviour,
+# so a stale stamp — say a hand-edit under /etc/nginx/conf.d — cannot quietly
+# pass as healthy.
+STAMP="${XDG_STATE_HOME:-$HOME/.local/state}/nemoclaw/inference-proxy-${LLM_PROXY_PORT}.sha256"
+WANT_SUM="$(sha256sum "$RENDERED" | cut -d' ' -f1)"
+HAVE_SUM="$(cat "$STAMP" 2>/dev/null || true)"
+
+if [[ -n "$HAVE_SUM" && "$HAVE_SUM" == "$WANT_SUM" ]] \
+  && ss -tln 2>/dev/null | awk '{print $4}' | grep -q ":${LLM_PROXY_PORT}$"; then
   echo "${CONF} already up to date (port ${LLM_PROXY_PORT} -> ${LLM_BASE_URL}) — nothing to install."
 else
   # A hand-written conf on the same port (the pre-ADR-014 GB10 setup) would
@@ -89,13 +110,14 @@ else
 ${OTHER}" >&2
 
   echo "Installing ${CONF} (port ${LLM_PROXY_PORT} -> ${LLM_BASE_URL})"
-  sudo install -m 0644 "$RENDERED" "$CONF"
+  sudo install -m 0600 "$RENDERED" "$CONF"
   sudo nginx -t
   # A reload CANNOT change listen addresses: with the old sockets still up,
   # the new (e.g. 0.0.0.0) bind dies with EADDRINUSE, the reload aborts, and
   # the previous conf keeps serving — a silent no-op. Any conf change is
   # therefore applied with a full restart (sub-second drop, idempotent).
   sudo systemctl restart nginx
+  mkdir -p "$(dirname "$STAMP")" && printf '%s\n' "$WANT_SUM" > "$STAMP"
 fi
 
 # Assert the listener actually exists before the smoke test: catches the
@@ -132,7 +154,8 @@ if [[ "$BRIDGE_IP" == "0.0.0.0" ]]; then
 
 This listener binds ALL interfaces (BRIDGE_IP=0.0.0.0, the default — the
 OpenShell sandbox is not on docker0, so its address is not known ahead of
-time) and it adds no auth of its own. On a host with a public NIC the firewall
+time) and it adds no auth of its own: it only relays a key the caller already
+presented. On a host with a public NIC the firewall
 is what keeps :${LLM_PROXY_PORT} private. If ufw is active, allow only the
 bridge ranges:
 

@@ -23,11 +23,31 @@
 # single-interface bind.
 #
 # Consequence to be aware of on a host with a public NIC: this listener has NO
-# auth of its own — it forwards whatever Authorization header it is given, and
-# the API key is NOT injected here (the sandbox sends its own
-# COMPATIBLE_API_KEY credential). What keeps the outside world out is the
-# firewall: run-inference-proxy.sh prints the ufw rule that limits :PORT to
-# the docker/OpenShell bridge ranges. Apply it, or bind a specific interface.
+# auth of its own — what it does is translate the credential a caller already
+# presented (see the auth translation below). What keeps the outside world out
+# is the firewall: run-inference-proxy.sh prints the ufw rule that limits :PORT
+# to the docker/OpenShell bridge ranges. Apply it, or bind a specific interface.
+#
+# Auth translation. NemoClaw's `inference` provider is OpenAI-compatible and
+# always sends `Authorization: Bearer <key>` (from COMPATIBLE_API_KEY), but some
+# lab gateways (Kong-style) authenticate ONLY on an `x-api-key` header and
+# report "No API key found in request" on a Bearer one — the agent then dies on
+# every LLM call with `401 status code (no body)` and the dashboard silently
+# shows nothing, because lab-health's probe treats any <500 as healthy.
+# So rewrite Bearer -> x-api-key for the upstream.
+#
+# The rewrite is CONDITIONAL on the caller already holding the key: this listener
+# binds 0.0.0.0, and an unconditional `proxy_set_header x-api-key <key>` would
+# make it lend the lab credential to callers that never had it. The map below
+# matches the key in either incoming header; a caller that presented it gets the
+# translated header, one that did not gets an empty x-api-key and the upstream's
+# own 401 — i.e. exactly the access it has today.
+# (With LLM_API_KEY unset the pattern degrades to matching an empty key, so the
+# upstream still 401s; run-inference-proxy.sh's smoke test fails loudly on that.)
+map "$http_authorization$http_x_api_key" $lab_key_${LLM_PROXY_PORT} {
+    "~*${LLM_API_KEY}" "${LLM_API_KEY}";
+    default            "";
+}
 #
 # Buffering stays off: chat completions stream as long-lived SSE responses.
 
@@ -44,5 +64,9 @@ server {
         proxy_send_timeout 3600s;
         proxy_ssl_server_name on;
         ${PROXY_SSL_CONF}
+        # Translate the credential style; strip the Bearer form so the upstream
+        # never sees a header it ignores. Setting a header to "" removes it.
+        proxy_set_header x-api-key $lab_key_${LLM_PROXY_PORT};
+        proxy_set_header Authorization "";
     }
 }
