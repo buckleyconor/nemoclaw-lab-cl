@@ -6,6 +6,15 @@
 # stack runs as a peer host process. After the stack is up, onboard it with:
 #   deploy/scripts/onboard-openclaw.sh
 # The agent's LLM endpoint is configured during onboarding, not here.
+#
+# Restart policy is `always`, deliberately, not `unless-stopped`. The two differ
+# only at daemon start, where `unless-stopped` refuses to start a container that
+# was last stopped administratively — so `docker stop`/`kill` a service before a
+# shutdown and it stays down after the reboot, silently, until `doctor --fix`
+# notices (<=5 min). `always` comes back regardless. The trade-off is accepted:
+# a container deliberately kept down on this demo host returns at the next
+# reboot. The sandbox is outside Compose (above) and needs the same policy via
+# `docker update --restart=always`.
 
 x-backend-build: &backend-build
   context: .
@@ -25,7 +34,7 @@ services:
 
   # ── Simulator ────────────────────────────────────────────────────────────────
   simulator:
-    restart: unless-stopped
+    restart: always
     build: *backend-build
     command: >
       python -m uvicorn services.simulator.main:app
@@ -43,7 +52,7 @@ services:
 
   # ── Orchestrator ─────────────────────────────────────────────────────────────
   orchestrator:
-    restart: unless-stopped
+    restart: always
     build: *backend-build
     command: >
       python -m uvicorn services.orchestrator.main:app
@@ -65,7 +74,7 @@ services:
 
   # ── MCP Tools ────────────────────────────────────────────────────────────────
   mcp-tools:
-    restart: unless-stopped
+    restart: always
     build: *backend-build
     command: >
       python -m uvicorn services.mcp_tools.main:app
@@ -91,7 +100,7 @@ services:
 
   # ── Gateway (API + React SPA) ─────────────────────────────────────────────────
   gateway:
-    restart: unless-stopped
+    restart: always
     build:
       context: .
       dockerfile: docker/Dockerfile.gateway
