@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from services.terminal import console as console_mod
 from services.terminal.console import (
     MENU_TARGETS,
     RESET_KEY,
@@ -22,7 +23,9 @@ from services.terminal.console import (
     editor_argv,
     find_target,
     format_menu,
+    load_config,
     push_argv,
+    resolve_editor,
     run_reset,
     run_target,
     validate_skill_content,
@@ -114,6 +117,97 @@ def test_push_argv_uses_upload_for_files_and_skill_install_for_skills(
 def test_editor_argv_is_restricted_vim_by_default() -> None:
     argv = editor_argv("vim", ["-Z"], Path("/tmp/SOUL.md"))
     assert argv == ["vim", "-Z", "/tmp/SOUL.md"]
+
+
+# ── editor resolution ────────────────────────────────────────────────────────
+# The console editor runs in a browser tab, so "restricted" is the property that
+# matters — and these flags are not portable between editors.
+
+
+def _which_only(*present: str):
+    def fake(name: str) -> str | None:
+        return f"/usr/bin/{name}" if name in present else None
+
+    return fake
+
+
+def test_resolve_editor_prefers_restricted_vim(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(console_mod.shutil, "which", _which_only("vim", "vi", "nano"))
+    assert resolve_editor("", None) == ("vim", ("-Z",))
+
+
+def test_resolve_editor_falls_back_to_vi_with_vims_own_flag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`vi` is vim.tiny on Debian/Ubuntu — still Vim, so -Z still restricts it.
+    This is the host that has no `vim` binary but has a perfectly good editor."""
+    monkeypatch.setattr(console_mod.shutil, "which", _which_only("vi", "nano"))
+    assert resolve_editor("", None) == ("vi", ("-Z",))
+
+
+def test_resolve_editor_never_hands_nano_vims_z_flag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The security case. -Z is nano's --zap (erase a marked region), so passing
+    the vim default to nano starts it UNRESTRICTED while looking configured."""
+    monkeypatch.setattr(console_mod.shutil, "which", _which_only("nano"))
+    assert resolve_editor("", None) == ("nano", ("-R",))
+
+
+def test_resolve_editor_uses_rvim_without_a_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(console_mod.shutil, "which", _which_only("rvim", "nano"))
+    assert resolve_editor("", None) == ("rvim", ())
+
+
+def test_resolve_editor_explicit_binary_keeps_explicit_args(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(console_mod.shutil, "which", _which_only())
+    assert resolve_editor("/usr/local/bin/ed2", "--safe --nosave") == (
+        "/usr/local/bin/ed2",
+        ("--safe", "--nosave"),
+    )
+
+
+def test_resolve_editor_explicit_binary_does_not_inherit_the_vim_flag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Unknown binary + no args: inventing `-Z` for it would be the same mistake
+    in the other direction. Restrictedness is the operator's call here."""
+    monkeypatch.setattr(console_mod.shutil, "which", _which_only("vim"))
+    assert resolve_editor("/opt/bin/whatever", None) == ("/opt/bin/whatever", ())
+
+
+def test_resolve_editor_explicit_binary_gets_the_right_flag_by_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(console_mod.shutil, "which", _which_only())
+    assert resolve_editor("/usr/bin/nano", None) == ("/usr/bin/nano", ("-R",))
+
+
+def test_resolve_editor_reports_nothing_available(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(console_mod.shutil, "which", _which_only())
+    assert resolve_editor("", None) == (None, ())
+
+
+def test_load_config_falls_back_so_the_console_still_explains(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With nothing installed the console must reach its 'install an editor'
+    message — not run with an empty binary and fail as something unrelated."""
+    monkeypatch.setenv("SANDBOX_NAME", "infra-sentinel")
+    monkeypatch.setattr(console_mod.shutil, "which", _which_only())
+    config = load_config()
+    assert (config.editor_bin, config.editor_args) == ("vim", ("-Z",))
+
+
+def test_load_config_uses_the_resolved_editor(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SANDBOX_NAME", "infra-sentinel")
+    monkeypatch.delenv("TERMINAL_EDITOR_BIN", raising=False)
+    monkeypatch.delenv("TERMINAL_EDITOR_ARGS", raising=False)
+    monkeypatch.setattr(console_mod.shutil, "which", _which_only("vi"))
+    config = load_config()
+    assert (config.editor_bin, config.editor_args) == ("vi", ("-Z",))
 
 
 def test_format_menu_lists_all_targets_reset_and_quit() -> None:
