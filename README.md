@@ -136,8 +136,8 @@ That one command installs and enables:
 | Unit | Domain | What it does |
 |------|--------|--------------|
 | `nemoclaw-inference-watchdog.timer` | system | Every 60s: restarts nginx if the inference proxy is down or on stale sockets |
-| `nemoclaw-terminal.service` | system | The embedded-terminal daemon (ADR-012), `Restart=on-failure` |
 | `nemoclaw-gateway-<port>.service` | user | Boot-takeover of the OpenShell gateway |
+| `nemoclaw-terminal.service` | user | The embedded-terminal daemon (ADR-012), `Restart=on-failure`. **user, never system** — the console's `nemoclaw <sandbox> …` calls and `POST /wake-agent` need this user's D-Bus session |
 | `nemoclaw-hook-forward.service` | user | Keeps openshell's sandbox port-forward alive |
 | `nemoclaw-hook-relay.service` | user | Bridges that forward onto the docker bridge |
 | `nemoclaw-doctor.timer` | user | Every 5 min: `make doctor-fix`, so a dead daemon self-heals |

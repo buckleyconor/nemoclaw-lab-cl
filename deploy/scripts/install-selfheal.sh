@@ -8,7 +8,6 @@
 # System units (/etc/systemd/system/):
 #   - nemoclaw-inference-watchdog.timer (root, 60s) — restarts nginx when the
 #     inference proxy is down or running stale sockets
-#   - nemoclaw-terminal.service (lab user, Restart=on-failure)
 #
 # USER units (~/.config/systemd/user/ of the lab user, linger enabled) — the
 # whole wake-hook chain lives here because (a) the nemoclaw CLI needs the
@@ -22,6 +21,10 @@
 #     forward; owns the stop-relay/recreate/start-relay dance
 #   - nemoclaw-hook-relay.service — bridge relay, gated on the forward
 #   - nemoclaw-doctor.timer (5 min) — doctor.sh --fix as a safety net
+#   - nemoclaw-terminal.service — embedded-terminal daemon, for the same D-Bus
+#     reason: the restricted console's `nemoclaw <sandbox> download/upload/skill
+#     install` and POST /wake-agent's `nemoclaw <sandbox> agent` all fail from a
+#     system unit. It must NEVER be a system unit; see the template header.
 #
 # No sudoers drop-in any more: the old scoped systemctl verbs existed only so
 # an unprivileged doctor could stop/start the SYSTEM relay unit — the relay
@@ -111,10 +114,12 @@ fi
 GATEWAY_UNIT="nemoclaw-gateway-${GATEWAY_PORT}.service"
 
 # ── System units ─────────────────────────────────────────────────────────────
+# nemoclaw-terminal is deliberately NOT here — see the header; it is installed
+# as a user unit below. Having it in both domains is what caused the boot-time
+# port race described in deploy/systemd/user/nemoclaw-terminal.service.
 SYSTEM_UNITS=(
   nemoclaw-inference-watchdog.service
   nemoclaw-inference-watchdog.timer
-  nemoclaw-terminal.service
 )
 for u in "${SYSTEM_UNITS[@]}"; do
   OUT="$(mktemp)"
@@ -155,6 +160,7 @@ install_user_unit nemoclaw-hook-forward.service nemoclaw-hook-forward.service
 install_user_unit nemoclaw-hook-relay.service   nemoclaw-hook-relay.service
 install_user_unit nemoclaw-doctor.service       nemoclaw-doctor.service
 install_user_unit nemoclaw-doctor.timer         nemoclaw-doctor.timer
+install_user_unit nemoclaw-terminal.service     nemoclaw-terminal.service
 
 # The gateway boot-takeover unit needs the env captured from the running
 # gateway process (see the template header) — install only when it exists.
@@ -169,10 +175,13 @@ else
   echo "  then re-run: sudo make install-selfheal" >&2
 fi
 
-# Stale hand-written user units this layout supersedes. The terminal daemon
-# is a SYSTEM unit; nemoclaw-openshell-gateway.service was an untagged unit
-# that spawns a rogue DEFAULT gateway (empty DB) — never enable it.
-for stale in nemoclaw-openshell-gateway.service nemoclaw-terminal.service; do
+# Stale hand-written user units this layout supersedes.
+# nemoclaw-terminal.service is NOT in this list: it belongs in the user domain
+# now (installed just above), and deleting it here was what silently reverted
+# the 2026-08-28 incident #2 fix — with it gone, the daemon fell back to a
+# system unit, every `nemoclaw <sandbox> …` it runs failed with "Sandbox … does
+# not exist", and POST /wake-agent degraded to the messageless wake hook.
+for stale in nemoclaw-openshell-gateway.service; do
   if [[ -f "${USER_UNIT_DIR}/${stale}" ]]; then
     as_user systemctl --user disable --now "$stale" >/dev/null 2>&1 || true
     rm -f "${USER_UNIT_DIR}/${stale}"
@@ -201,21 +210,33 @@ as_user systemctl --user restart nemoclaw-hook-forward.service || \
   echo "✗ forward keeper failed to start — journalctl --user -u nemoclaw-hook-forward -e" >&2
 
 # ── Terminal daemon: never fight a nohup'd demo instance for the port ────────
+# Retire the legacy SYSTEM copy first, and before the port check below: on a
+# host that ran an older installer it is enabled and holding TERMINAL_PORT, so
+# installing the user unit alongside it puts two daemons in two domains on one
+# port — the boot race the template header warns about. Stopping it here frees
+# the port for the user unit that starts a moment later.
+if [[ -f /etc/systemd/system/nemoclaw-terminal.service ]]; then
+  systemctl disable --now nemoclaw-terminal.service >/dev/null 2>&1 || true
+  rm -f /etc/systemd/system/nemoclaw-terminal.service
+  systemctl daemon-reload
+  echo "✓ migrated: system terminal unit removed (now a user unit)"
+fi
+
 port_held() { ss -tln 2>/dev/null | awk '{print $4}' | grep -qE "[:.]${1}$"; }
 if port_held "$TERMINAL_PORT"; then
-  if systemctl is-active --quiet nemoclaw-terminal; then
+  if as_user systemctl --user is-active --quiet nemoclaw-terminal; then
     echo "✓ nemoclaw-terminal already running"
   else
-    systemctl enable nemoclaw-terminal >/dev/null
-    echo "✓ nemoclaw-terminal enabled (port ${TERMINAL_PORT} held by a non-systemd instance — it keeps serving; the unit takes over at next boot, or: sudo systemctl restart nemoclaw-terminal)"
+    as_user systemctl --user enable nemoclaw-terminal >/dev/null
+    echo "✓ nemoclaw-terminal enabled (port ${TERMINAL_PORT} held by a non-systemd instance — it keeps serving; the unit takes over at next boot, or: systemctl --user restart nemoclaw-terminal)"
   fi
 else
-  systemctl enable --now nemoclaw-terminal >/dev/null
+  as_user systemctl --user enable --now nemoclaw-terminal >/dev/null
   sleep 1
-  if systemctl is-active --quiet nemoclaw-terminal; then
+  if as_user systemctl --user is-active --quiet nemoclaw-terminal; then
     echo "✓ nemoclaw-terminal started"
   else
-    echo "✗ nemoclaw-terminal failed to start — journalctl -u nemoclaw-terminal -e" >&2
+    echo "✗ nemoclaw-terminal failed to start — journalctl --user -u nemoclaw-terminal -e" >&2
   fi
 fi
 

@@ -253,11 +253,18 @@ if [[ -n "$TERMINAL_WS_URL" ]]; then
   terminal_up() { [[ "$(http_code "${TERM_HTTP}/healthz")" == "200" ]]; }
 
   if ! terminal_up && [[ "$FIX" -eq 1 ]]; then
-    if systemctl is-enabled --quiet nemoclaw-terminal 2>/dev/null; then
-      # systemd owns the daemon (sudo make install-selfheal): a nohup here
-      # would fight it for the port, and Restart=on-failure already covers
-      # crashes — the only thing a non-root doctor can do is point at it.
-      fixing "systemd owns the daemon — sudo systemctl restart nemoclaw-terminal"
+    if systemctl --user is-enabled --quiet nemoclaw-terminal 2>/dev/null; then
+      # The daemon is a USER unit (deploy/systemd/user/nemoclaw-terminal.service)
+      # and `doctor.sh --fix` runs as that same user via nemoclaw-doctor.timer, so
+      # this heals it outright — no human with sudo, unlike the system-unit era
+      # where the only verb was `sudo systemctl restart`. A nohup here would
+      # instead fight the unit for the port.
+      fixing "systemctl --user restart nemoclaw-terminal"
+      systemctl --user restart nemoclaw-terminal 2>/dev/null || true
+    elif systemctl is-enabled --quiet nemoclaw-terminal 2>/dev/null; then
+      # Legacy layout: still a system unit here. `sudo make install-selfheal`
+      # migrates it to the user domain.
+      fixing "system unit owns the daemon — sudo systemctl restart nemoclaw-terminal"
     else
       fixing "TERMINAL_MODE=restricted SANDBOX_NAME=$SANDBOX_NAME make terminal"
       TERMINAL_MODE=restricted SANDBOX_NAME="$SANDBOX_NAME" \

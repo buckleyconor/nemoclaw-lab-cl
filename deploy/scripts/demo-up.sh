@@ -71,7 +71,11 @@ echo "── 3/5 terminal daemon (restricted console) ────────�
 # (M9 shared deployments) set TERMINAL_ENABLED=0.
 if [[ "$TERMINAL_ENABLED" == "0" ]]; then
   echo "TERMINAL_ENABLED=0 — terminal feature intentionally off, skipping."
-elif systemctl is-enabled --quiet nemoclaw-terminal 2>/dev/null; then
+elif systemctl --user is-enabled --quiet nemoclaw-terminal 2>/dev/null \
+  || systemctl is-enabled --quiet nemoclaw-terminal 2>/dev/null; then
+  # The user unit is the layout install-selfheal installs; the system check only
+  # covers a host that has not been migrated yet. Either way the unit owns the
+  # port, and nohup-ing a second daemon here would race it for :8005.
   echo "Managed by the nemoclaw-terminal systemd unit (sudo make install-selfheal) — skipping nohup."
 elif alive "http://${TERMINAL_BIND}:8005/healthz"; then
   echo "Already running on ${TERMINAL_BIND}:8005."

@@ -1,0 +1,41 @@
+# Embedded-terminal daemon (ADR-012/013) as a USER service (2026-08-28
+# incident #2): it was a SYSTEM unit until this fix, which was fine for
+# surviving reboots (linger covers that for user units too) but broke every
+# `nemoclaw <sandbox> download/upload/skill install` the restricted console
+# (services/terminal/console.py) runs — same root cause already documented
+# for the wake-hook chain (nemoclaw-doctor.service, this directory): the CLI
+# needs the user session's D-Bus to drive the gateway unit, and a system unit
+# falls back to a rogue standalone gateway with an empty DB, so every push
+# fails with "Sandbox '<name>' does not exist. Run 'nemoclaw onboard' to
+# create one." even though the sandbox is right there.
+#
+# Do NOT hand-copy this into ~/.config/systemd/user/ (an old README section
+# said to) — that is exactly how the *previous* incident happened: a
+# stray hand-installed user unit raced the system unit at boot for the port
+# and tore `.env` reads. Installed by deploy/scripts/install-selfheal.sh,
+# which substitutes the __NEMOCLAW_*__ placeholders and *removes* any legacy
+# /etc/systemd/system/nemoclaw-terminal.service first — one daemon, one
+# domain, always through the installer.
+#
+# Requires TERMINAL_TOKEN/TERMINAL_BIND in the repo's .env (run-terminal.sh
+# reads them; same as the system-unit era).
+[Unit]
+Description=NemoClaw embedded-terminal daemon (restricted console)
+After=network-online.target __NEMOCLAW_GATEWAY_UNIT__
+Wants=network-online.target __NEMOCLAW_GATEWAY_UNIT__
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=__NEMOCLAW_REPO__
+Environment=PATH=%h/.local/bin:/snap/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=TERMINAL_MODE=restricted
+Environment=SANDBOX_NAME=__NEMOCLAW_SANDBOX__
+Environment=NEMOCLAW_GATEWAY_PORT=__NEMOCLAW_GATEWAY_PORT__
+Environment=NEMOCLAW_SANDBOX_GPU=0
+ExecStart=__NEMOCLAW_REPO__/deploy/scripts/run-terminal.sh
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

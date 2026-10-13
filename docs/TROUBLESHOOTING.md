@@ -100,11 +100,17 @@ Log: `~/.local/state/nemoclaw-terminal.log`. Also check:
   generates one if it is missing — a generated token means the gateway
   container (which bakes the token at creation) holds the stale one:
   `docker compose up -d gateway`. This race is closed for reboots: `.env`
-  writes are atomic (`lib/envfile.sh`, 2026-08-28) and only the SYSTEM
-  `nemoclaw-terminal` unit runs the daemon — duplicate user-level terminal
-  units racing at boot (torn `.env` reads + a second daemon on the bridge
-  IP) were the original cause. If it recurs, check
-  `systemctl --user list-units | grep nemoclaw` for a re-appearing user unit.
+  writes are atomic (`lib/envfile.sh`, 2026-08-28) and **exactly one unit, in
+  one domain, runs the daemon — always installed by `install-selfheal.sh`, never
+  hand-copied**. Which domain has flip-flopped twice, so check it rather than
+  trusting it: the unit must be a USER one (`systemctl --user is-enabled
+  nemoclaw-terminal`), because the daemon has to run `nemoclaw <sandbox> …` and
+  the CLI cannot reach the sandbox gateway from a system unit; and there must be
+  **no** system copy (`systemctl is-enabled nemoclaw-terminal` should say
+  `not-found`), because two daemons in two domains race for `:8005` at boot —
+  which is what originally produced torn `.env` reads and a second daemon on the
+  bridge IP. If both appear, re-run `sudo make install-selfheal`; it installs
+  the user unit and removes the system one.
 - On Linux with ufw, the compose subnet needs allow rules to reach the
   bridge-bound daemon and relay (SPEC-EMBEDDED-TERMINAL.md §6):
   `172.28.100.0/24 → 172.17.0.1:8005` and `→ :18790` (the compose subnet is pinned in
