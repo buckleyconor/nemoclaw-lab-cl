@@ -84,6 +84,13 @@ def _authorized_request(request: Request, token: str) -> bool:
 
 
 _PACK_ID_RE = re.compile(r"^[a-z0-9-]+$")
+# Scenario/asset ids as they appear in a pack. Validated rather than passed
+# through, so no caller can hand arbitrary prose to the agent (see /wake-agent).
+_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+# OpenClaw's main conversation — the session the heartbeat polls land in and the
+# one the dashboard's activity feed describes (agents/main/sessions/sessions.json
+# keys it exactly this way).
+_AGENT_SESSION_KEY = "agent:main:main"
 
 
 def _require_sandbox_name() -> None:
@@ -273,6 +280,66 @@ def create_app(token: str | None = None) -> FastAPI:
             loop = asyncio.get_running_loop()
             ok = await loop.run_in_executor(None, console.run_reset, config)
             return {"ok": ok}
+
+        # Tell the agent what actually happened, instead of only nudging it.
+        #
+        # `/hooks/wake mode=now` is documented in OpenClaw's own wake-reason matrix
+        # as "run the heartbeat immediately" — it carries no prompt, so the agent is
+        # never told which fault landed on which asset and has to rediscover it via
+        # monitor_list_events. That path works only while HEARTBEAT.md keeps the
+        # agent compliant, and it has already been observed talking itself out of a
+        # live fault ("Same state — … no further action") while the dashboard sat
+        # empty. This runs the supported text channel instead: `nemoclaw <sandbox>
+        # agent -m … --session-key agent:main:main`, a verbatim pass-through to
+        # `openclaw agent -m`, into the same session the heartbeats use.
+        #
+        # It has to run here on the host: the Gateway container has no nemoclaw CLI
+        # (precisely why hook-relay exists), and the CLI needs this user's session to
+        # reach the sandbox gateway. SANDBOX_NAME and NEMOCLAW_GATEWAY_PORT already
+        # come from the unit, whose PATH carries ~/.local/bin.
+        #
+        # Detached with an immediate ack, like /switch-pack: an agent turn is a
+        # synchronous LLM conversation that can outlast the request that started it,
+        # and injecting a fault must never block on the model. Logged rather than
+        # DEVNULL for the same reason switch-pack is (2026-08-28 note).
+        @app.post("/wake-agent")
+        async def wake_agent(request: Request) -> dict[str, object]:
+            if not _authorized_request(request, resolved_token):
+                raise HTTPException(status_code=401)
+            body = await request.json()
+            # Structured ids, deliberately not a free-text message: a lab endpoint
+            # must not be able to hand arbitrary prose to the agent. The sentence
+            # composed here is the same one /hooks/wake already sends.
+            scenario_id = body.get("scenario_id", "")
+            asset_id = body.get("asset_id", "")
+            for field, value in (("scenario_id", scenario_id), ("asset_id", asset_id)):
+                if not isinstance(value, str) or not _ID_RE.fullmatch(value):
+                    raise HTTPException(status_code=400, detail=f"invalid {field}")
+            sandbox = os.environ.get("SANDBOX_NAME", "")
+            if not sandbox:
+                raise HTTPException(status_code=503, detail="SANDBOX_NAME is not set")
+            log_dir = Path.home() / ".local" / "state"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            with (log_dir / "nemoclaw-wake-agent.log").open("ab") as log:
+                proc = subprocess.Popen(  # noqa: S603 — literal argv, ids validated above
+                    [
+                        "nemoclaw",
+                        sandbox,
+                        "agent",
+                        "-m",
+                        (
+                            f"fault-event: scenario {scenario_id} injected on {asset_id} — "
+                            "run the Infrastructure Fault Response program now"
+                        ),
+                        "--session-key",
+                        _AGENT_SESSION_KEY,
+                    ],
+                    cwd=_REPO_ROOT,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    start_new_session=True,
+                )
+            return {"ok": True, "status": "agent-turn-started", "pid": proc.pid}
 
         # Backs the lab guide's fault-injection gate: "Inject a fault" should
         # refuse (with a warning, not silence) until all six files are
