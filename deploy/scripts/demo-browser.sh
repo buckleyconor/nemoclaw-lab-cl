@@ -73,7 +73,13 @@ wait_for_lab() {
   local waited=0 shown=0 detail
   while :; do
     if curl -sf --max-time 3 "$HEALTH_URL" 2>/dev/null | grep -q '"healthy"[[:space:]]*:[[:space:]]*true'; then
-      (( waited > 0 )) && log "lab healthy after ${waited}s" || log "lab healthy"
+      # if/then rather than A && B || C (shellcheck SC2015): with && ||, the
+      # fallback line would also print if the first log itself failed.
+      if (( waited > 0 )); then
+        log "lab healthy after ${waited}s"
+      else
+        log "lab healthy"
+      fi
       log "opening ${DASHBOARD_URL}"
       return 0
     fi
