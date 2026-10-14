@@ -366,7 +366,13 @@ if [[ -n "$HOOK_URL" ]]; then
       # kill then races the ~3s Restart=on-failure revival — by design, the
       # recovery must land inside the window, and the retry loop re-runs it.)
       RELAY_PID="$(bridge_port_pid "$BRIDGE_IP" "$HOOK_PORT")"
-      [[ -n "$RELAY_PID" ]] && kill -9 "$RELAY_PID" 2>/dev/null || true
+      # if/then rather than `[[ … ]] && kill … || true`. Behaviour is
+      # unchanged (best-effort SIGKILL, failure ignored); the && || shape is
+      # what the CI runner's shellcheck 0.9.0 objects to as SC2015 — 0.11
+      # dropped the rule for `|| true` tails, which is why it stays quiet here.
+      if [[ -n "$RELAY_PID" ]]; then
+        kill -9 "$RELAY_PID" 2>/dev/null || true
+      fi
       if [[ "$RELAY_STOPPED" -eq 1 ]]; then
         # Deterministic path: wait for the socket to actually free (teardown
         # can lag a moment). Nothing respawns the relay here, so a short
@@ -404,7 +410,10 @@ if [[ -n "$HOOK_URL" ]]; then
           continue
         fi
         RELAY_PID="$(bridge_port_pid "$BRIDGE_IP" "$HOOK_PORT")"
-        [[ -n "$RELAY_PID" ]] && kill -9 "$RELAY_PID" 2>/dev/null || true
+        # same if/then shape as the first kill above (SC2015)
+        if [[ -n "$RELAY_PID" ]]; then
+          kill -9 "$RELAY_PID" 2>/dev/null || true
+        fi
         forward_start
         sleep 5
       done
