@@ -2,8 +2,8 @@
 # Open the lab dashboard in the browser — after the lab is actually ready.
 #
 #   ./deploy/scripts/demo-browser.sh              qa (default): normal window
-#   ./deploy/scripts/demo-browser.sh kiosk        fullscreen, chromeless, presenting
-#   ./deploy/scripts/demo-browser.sh --stop       close the kiosk window
+#   ./deploy/scripts/demo-browser.sh fullscreen   fullscreen presentation mode
+#   ./deploy/scripts/demo-browser.sh --stop       close the browser window
 #   ./deploy/scripts/demo-browser.sh --install-autostart
 #
 # Why this is a script and not an autostart line with a delay: the host's entry
@@ -17,8 +17,9 @@
 # seconds; a wrong guess is invisible, which is the same shape as every other
 # false-green in this repo's history.
 #
-# Kiosk mode uses its OWN profile (~/nemoclaw-kiosk-profile) plus -no-remote:
-#   -no-remote  — without it the kiosk flags are forwarded to whatever Firefox
+# Fullscreen mode uses its OWN profile (~/nemoclaw-fullscreen-profile) plus
+# -no-remote:
+#   -no-remote  — without it the flags are forwarded to whatever Firefox
 #                 window is already open, i.e. the operator's own session;
 #   own profile — no session-restore of yesterday's tabs over the demo, and a
 #                 seeded prefs.js skips the first-run onboarding that would
@@ -34,10 +35,10 @@
 # possible failure for a demo launcher, so both modes always start their own
 # instance instead of relying on snap's cross-scope remote handoff. Verified
 # separately: doing this does NOT disturb an existing Firefox window — a normal
-# instance was left running through a kiosk start and stop and survived.
+# instance was left running through a fullscreen start and stop and survived.
 #
-# Kiosk is deliberately NOT the default: it strips chrome and blocks devtools,
-# which is right for presenting and wrong for testing.
+# Fullscreen is deliberately NOT the default: it blocks devtools, which is
+# right for presenting and wrong for testing.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -50,9 +51,8 @@ DASHBOARD_URL="${DASHBOARD_URL:-$(env_get DASHBOARD_URL "$REPO/.env")}"
 DASHBOARD_URL="${DASHBOARD_URL:-http://localhost:${GATEWAY_PORT}/lab/}"
 HEALTH_URL="http://localhost:${GATEWAY_PORT}/api/lab-health"
 WAIT_MAX="${DEMO_BROWSER_WAIT:-90}"
-KIOSK_PROFILE="${KIOSK_PROFILE:-$HOME/nemoclaw-kiosk-profile}"
+FULLSCREEN_PROFILE="${FULLSCREEN_PROFILE:-$HOME/nemoclaw-fullscreen-profile}"
 QA_PROFILE="${QA_PROFILE:-$HOME/nemoclaw-qa-profile}"
-KIOSK_MONITOR="${DEMO_KIOSK_MONITOR:-}"
 AUTOSTART="$HOME/.config/autostart/firefox.desktop"
 
 log() { printf '  %s\n' "$*"; }
@@ -122,11 +122,11 @@ PREFS
   log "created profile ${dir}"
 }
 
-install_autostart() { # $1 = mode to boot into: qa (default) | kiosk
+install_autostart() { # $1 = mode to boot into: qa (default) | fullscreen
   local mode="${1:-qa}" template="$REPO/deploy/desktop/lab-browser-autostart.desktop" out
   case "$mode" in
-    qa|kiosk) ;;
-    *) echo "✗ boot mode must be qa or kiosk (got '${mode}')" >&2; return 2 ;;
+    qa|fullscreen) ;;
+    *) echo "✗ boot mode must be qa or fullscreen (got '${mode}')" >&2; return 2 ;;
   esac
   [[ -f "$template" ]] || { echo "✗ missing template $template" >&2; return 1; }
   mkdir -p "$HOME/.config/autostart"
@@ -140,16 +140,15 @@ install_autostart() { # $1 = mode to boot into: qa (default) | kiosk
   command -v desktop-file-validate >/dev/null && desktop-file-validate "$AUTOSTART" \
     && log "validated"
   log "installed $AUTOSTART — boots into ${mode} mode"
-  log "(change it with: make install-demo-autostart BOOT_MODE=qa|kiosk, not by hand)"
+  log "(change it with: make install-demo-autostart BOOT_MODE=qa|fullscreen, not by hand)"
 }
 
 case "${1:-qa}" in
   --stop)
-    # Kiosk mode swallows the usual exit affordances, so stopping is by profile.
-    # These patterns can only ever match the two profiles this script creates —
-    # never the operator's own Firefox, which carries no -profile argument.
+    # Stopping is by profile — these patterns can only ever match the two
+    # profiles this script creates, never the operator's own Firefox.
     stopped=0
-    for p in "$KIOSK_PROFILE" "$QA_PROFILE"; do
+    for p in "$FULLSCREEN_PROFILE" "$QA_PROFILE"; do
       if pkill -f -- "-profile $p" 2>/dev/null; then
         log "closed the browser using ${p}"
         stopped=1
@@ -165,21 +164,17 @@ case "${1:-qa}" in
     # running snap Firefox is not an option here.
     exec /bin/firefox -no-remote -profile "$QA_PROFILE" "$DASHBOARD_URL"
     ;;
-  kiosk)
+  fullscreen)
     wait_for_lab
-    seed_profile "$KIOSK_PROFILE"
-    # --kiosk leading, URL trailing the -profile argument (the documented form).
-    # NOTE: whether the launched window actually appears has NOT been verified
-    # from an automated context — see docs/TROUBLESHOOTING.md; the check is a human
-    # one (`make demo-kiosk` on the desktop, or a reboot).
-    args=(--kiosk -no-remote -profile "$KIOSK_PROFILE" "$DASHBOARD_URL")
-    [[ -n "$KIOSK_MONITOR" ]] && args+=(--kiosk-monitor "$KIOSK_MONITOR")
-    # exec, not a child: `make demo-kiosk` in a terminal then ends the browser
-    # when the terminal does, and Ctrl-C reaches Firefox rather than a shell.
-    exec /bin/firefox "${args[@]}"
+    seed_profile "$FULLSCREEN_PROFILE"
+    # --fullscreen gives normal Firefox fullscreen (F11-style) but keeps the
+    # window chrome visible in the WM (so the user can still alt-tab, etc.).
+    # exec, not a child: `make demo-fullscreen` in a terminal then ends the
+    # browser when the terminal does, and Ctrl-C reaches Firefox.
+    exec /bin/firefox -no-remote -profile "$FULLSCREEN_PROFILE" --fullscreen "$DASHBOARD_URL"
     ;;
   *)
-    echo "usage: $0 [qa|kiosk|--stop|--install-autostart]" >&2
+    echo "usage: $0 [qa|fullscreen|--stop|--install-autostart]" >&2
     exit 2
     ;;
 esac
