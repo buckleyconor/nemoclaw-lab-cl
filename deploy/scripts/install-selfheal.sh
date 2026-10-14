@@ -176,12 +176,14 @@ else
 fi
 
 # Stale hand-written user units this layout supersedes.
-# nemoclaw-terminal.service is NOT in this list: it belongs in the user domain
-# now (installed just above), and deleting it here was what silently reverted
-# the 2026-08-28 incident #2 fix — with it gone, the daemon fell back to a
-# system unit, every `nemoclaw <sandbox> …` it runs failed with "Sandbox … does
-# not exist", and POST /wake-agent degraded to the messageless wake hook.
-for stale in nemoclaw-openshell-gateway.service; do
+# nemoclaw-terminal.service is NOT in stale_user_units: it belongs in the
+# user domain now (installed just above), and deleting it here was what
+# silently reverted the 2026-08-28 incident #2 fix — with it gone, the daemon
+# fell back to a system unit, every `nemoclaw <sandbox> …` it runs failed with
+# "Sandbox … does not exist", and POST /wake-agent degraded to the messageless
+# wake hook.
+stale_user_units=(nemoclaw-openshell-gateway.service)
+for stale in "${stale_user_units[@]}"; do
   if [[ -f "${USER_UNIT_DIR}/${stale}" ]]; then
     as_user systemctl --user disable --now "$stale" >/dev/null 2>&1 || true
     rm -f "${USER_UNIT_DIR}/${stale}"

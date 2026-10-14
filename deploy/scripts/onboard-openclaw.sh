@@ -121,6 +121,8 @@ cat > "$BUILD_DIR/Dockerfile" <<'DOCKERFILE_HEADER'
 # (deploy/scripts/lib/nemoclaw.sh; SANDBOX_BASE overrides).
 DOCKERFILE_HEADER
 
+# One append per block, so each block keeps its own heredoc delimiter.
+# shellcheck disable=SC2129
 printf 'ARG SANDBOX_BASE=%s\n' "$SANDBOX_BASE" >> "$BUILD_DIR/Dockerfile"
 
 cat >> "$BUILD_DIR/Dockerfile" <<'DOCKERFILE'

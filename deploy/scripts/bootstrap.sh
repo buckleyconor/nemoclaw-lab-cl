@@ -95,8 +95,10 @@ LLM_DIRECT="$(env_get LLM_DIRECT)"
 # Auto-detected, deliberately NOT an LLM_AUTH_TYPE setting: a knob nobody
 # documented is a knob that gets set wrong, and a wrong value aborts bootstrap
 # before there is a lab to check it against.
+# Which scheme the endpoint takes is reported where it is detected (below), so
+# nothing carries the scheme name in a variable — the array is the only state
+# the rest of the script needs.
 LLM_AUTH=(-H "Authorization: Bearer ${LLM_API_KEY}")
-LLM_SCHEME="Authorization: Bearer"
 LLM_CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
   "${LLM_AUTH[@]}" "${LLM_BASE_URL%/}/models" || true)"
 if [[ "$LLM_CODE" != "200" ]]; then
@@ -104,7 +106,6 @@ if [[ "$LLM_CODE" != "200" ]]; then
     -H "x-api-key: ${LLM_API_KEY}" "${LLM_BASE_URL%/}/models" || true)"
   if [[ "$ALT_CODE" == "200" ]]; then
     LLM_CODE=200
-    LLM_SCHEME="x-api-key"
     LLM_AUTH=(-H "x-api-key: ${LLM_API_KEY}")
     echo "  ✓ LLM endpoint reads x-api-key (not Authorization: Bearer) — noted, nothing to change"
   fi
