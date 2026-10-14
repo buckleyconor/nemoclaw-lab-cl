@@ -34,16 +34,15 @@ VALUES      ?=               # optional extra helm values file, e.g. values.prod
 BACKEND_IMAGE := $(REGISTRY)/nemoclaw-backend:$(TAG)
 GATEWAY_IMAGE := $(REGISTRY)/nemoclaw-gateway:$(TAG)
 
-.PHONY: help build push push-multiarch deploy undeploy up down logs switch-pack terminal hook-relay bootstrap demo-up demo-browser demo-kiosk demo-kiosk-stop install-demo-autostart doctor doctor-fix repoint-llm install-inference-watchdog install-selfheal test lint
+.PHONY: help build push push-multiarch deploy undeploy up down logs switch-pack terminal hook-relay bootstrap demo-up demo-browser demo-fullscreen install-demo-autostart doctor doctor-fix repoint-llm install-inference-watchdog install-selfheal test lint
 
 help:
 	@echo "Targets:"
 	@echo "  bootstrap      FIRST RUN on a fresh host: preflight + build + onboard, then demo-up"
 	@echo "  demo-up        Bring up EVERYTHING the demo needs (stack + host daemons), then doctor"
 	@echo "  demo-browser   Open the dashboard once /api/lab-health is green (window with devtools)"
-	@echo "  demo-kiosk     Same, but fullscreen and chromeless — for presenting, not testing"
-	@echo "  demo-kiosk-stop  Close the kiosk window (kiosk mode hides the usual exit affordances)"
-	@echo "  install-demo-autostart  Boot-time browser launch (BOOT_MODE=qa|kiosk), health-gated"
+	@echo "  demo-fullscreen  Same, but fullscreen — for presenting"
+	@echo "  install-demo-autostart  Boot-time browser launch (BOOT_MODE=qa|fullscreen), health-gated"
 	@echo "  doctor         Preflight: red/green check of all demo dependencies with fixes"
 	@echo "  doctor-fix     Preflight + apply the fixes automatically (what the self-heal timer runs)"
 	@echo "  repoint-llm    Repoint the live agent at the LLM_* values in .env — no rebuild (ADR-014)"
@@ -157,18 +156,15 @@ demo-up:
 demo-browser:
 	./deploy/scripts/demo-browser.sh qa
 
-# Fullscreen, chromeless, own Firefox profile so yesterday's tabs cannot restore
-# over the demo. Blocks devtools on purpose — use demo-browser while testing.
-demo-kiosk:
-	./deploy/scripts/demo-browser.sh kiosk
-
-demo-kiosk-stop:
-	./deploy/scripts/demo-browser.sh --stop
+# Fullscreen presentation mode — own Firefox profile so yesterday's tabs cannot
+# restore over the demo. Blocks devtools on purpose — use demo-browser while testing.
+demo-fullscreen:
+	./deploy/scripts/demo-browser.sh fullscreen
 
 # Writes ~/.config/autostart/firefox.desktop from
 # deploy/desktop/lab-browser-autostart.desktop (backing up any hand-made entry).
-# Boots in qa mode (chrome + devtools); BOOT_MODE=kiosk boots straight into the
-# presentation. Set it here rather than editing the installed file, so the repo
+# Boots in qa mode (chrome + devtools); BOOT_MODE=fullscreen boots straight into
+# fullscreen. Set it here rather than editing the installed file, so the repo
 # still describes the host.
 install-demo-autostart:
 	./deploy/scripts/demo-browser.sh --install-autostart "$(BOOT_MODE)"

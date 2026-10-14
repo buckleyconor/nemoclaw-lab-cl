@@ -9,8 +9,8 @@
 # the delay was standing in for.
 #
 # Boot mode is substituted by the installer: `make install-demo-autostart` for a QA box
-# (chrome + devtools), `make install-demo-autostart BOOT_MODE=kiosk` for a machine that
-# should boot straight into the presentation. Edit __NEMOCLAW_BROWSER_MODE__ by hand in
+# (chrome + devtools), `make install-demo-autostart BOOT_MODE=fullscreen` for a machine that
+# should boot straight into fullscreen presentation. Edit __NEMOCLAW_BROWSER_MODE__ by hand in
 # ~/.config/autostart/firefox.desktop and it works — but the repo no longer describes the
 # host, which is the trap this layout hit twice on 2026-10-13 (the terminal unit, and the
 # delay above). Re-run the installer instead.

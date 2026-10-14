@@ -172,11 +172,11 @@ Once onboarded, this is all you need:
 
 ```bash
 make demo-up                  # compose stack + terminal daemon + hook-relay, then preflight
-make demo-kiosk               # fullscreen, chromeless dashboard — once the lab is green
+make demo-fullscreen          # fullscreen dashboard — once the lab is green
 open http://localhost:8001/lab/
 ```
 
-`make demo-browser` / `make demo-kiosk` open the dashboard only once
+`make demo-browser` / `make demo-fullscreen` open the dashboard only once
 `/api/lab-health` reports healthy, rather than after a fixed delay. That matters
 if the browser starts at login: `X-GNOME-Autostart-Delay` is a GNOME 2 key that
 gnome-session on Ubuntu 24.04 ignores, so a delayed autostart entry opens the
@@ -188,10 +188,10 @@ the gateway), and a separate profile also keeps yesterday's restored tabs off
 the demo. Doing so does not disturb a Firefox window you already have open.
 `make install-demo-autostart` installs a health-gated entry
 from `deploy/desktop/lab-browser-autostart.desktop`; it boots in `qa` mode
-(chrome + devtools), and the file says which word to change to boot straight
-into the kiosk. `make demo-kiosk-stop` closes a window this script opened —
-kiosk mode hides the usual exit affordances — and never touches your own
-Firefox.
+(chrome + devtools), and `make install-demo-autostart BOOT_MODE=fullscreen`
+boots straight into the presentation. To close a window this script opened,
+run `./deploy/scripts/demo-browser.sh --stop` — it matches only the two
+profiles it creates, and never touches your own Firefox.
 
 `make doctor` re-runs just the preflight — a red/green check of every moving
 part (4 services, terminal daemon, hook-relay, sandbox wake-hook, LLM
